@@ -4,8 +4,8 @@ const { connectToDatabase } = require('./config/database');
 
 dotenv.config();
 
-const port = process.env.PORT || 5000;
-const mongoUri = process.env.MONGODB_URI || '';
+const port = process.env.PORT || 6500;
+const mongoUri = process.env.MONGODB_ATLAS_URL || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/shopping-mall-demo';
 
 async function bootstrap() {
   try {

@@ -1,0 +1,29 @@
+{
+  "name": "@shopbuddy/product-display",
+  "version": "1.0.0",
+  "description": "ShopBuddy Product Display Package - Grid and Sphere product display components",
+  "main": "src/index.js",
+  "type": "module",
+  "keywords": [
+    "shopbuddy",
+    "product",
+    "display",
+    "grid",
+    "sphere",
+    "react",
+    "ecommerce"
+  ],
+  "author": "",
+  "license": "ISC",
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./ProductCard": "./src/components/ProductCard.jsx",
+    "./ProductGrid": "./src/components/ProductGrid.jsx",
+    "./ProductSphere": "./src/components/ProductSphere.jsx"
+  }
+}
+

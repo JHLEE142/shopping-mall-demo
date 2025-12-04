@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { loginUser } from '../services/userService';
+import { saveSession, clearSession } from '../utils/sessionStorage';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,19 +50,24 @@ function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () 
         password: form.password,
       });
 
-      if (form.remember) {
-        window.localStorage.setItem('authToken', data.token);
-      } else {
-        window.localStorage.removeItem('authToken');
-      }
+      const expiresInMs = form.remember ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000; // 60분
+      const expiresAt = Date.now() + expiresInMs;
+
+      saveSession({
+        token: data.token,
+        user: data.user,
+        expiresAt,
+        lastActivityTime: Date.now(),
+      });
 
       setForm((prev) => ({ ...INITIAL_FORM, remember: prev.remember }));
       setStatus('success');
       setSuccessMessage('로그인에 성공했어요!');
       setToken(data.token);
-      onLoginSuccess(data);
+      onLoginSuccess({ ...data, expiresAt });
     } catch (submitError) {
       setStatus('error');
+      clearSession();
       setError(submitError.message || '로그인에 실패했어요.');
     }
   };
