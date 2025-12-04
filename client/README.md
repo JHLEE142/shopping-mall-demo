@@ -1,16 +1,29 @@
-# React + Vite
+# Client App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 개발 환경
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 환경 변수
 
-## React Compiler
+Cloudinary 업로드 위젯을 사용하려면 `client/.env` 파일에 아래 값을 설정해야 합니다.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Key | 설명 |
+| --- | --- |
+| `VITE_CLOUDINARY_CLOUD_NAME` | Cloudinary 대시보드에서 확인 가능한 클라우드 이름 |
+| `VITE_CLOUDINARY_UPLOAD_PRESET` | unsigned 업로드 프리셋 이름 |
+| `VITE_CLOUDINARY_UPLOAD_FOLDER` | (선택) 업로드할 폴더명, 기본값은 `products` |
 
-## Expanding the ESLint configuration
+예시:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
+VITE_CLOUDINARY_UPLOAD_PRESET=unsigned_preset
+# Optional
+VITE_CLOUDINARY_UPLOAD_FOLDER=products
+```
+
+환경 변수가 없으면 이미지 업로드 버튼이 비활성화되며 오류 메시지가 표시됩니다.
