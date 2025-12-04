@@ -1,0 +1,37 @@
+{
+  "name": "@shopbuddy/backend",
+  "version": "1.0.0",
+  "description": "ShopBuddy Backend Package - Database schemas, API routes, controllers, and middleware",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [
+    "shopbuddy",
+    "backend",
+    "api",
+    "mongodb",
+    "express",
+    "ecommerce"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "uuid": "^13.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./models": "./models/index.js",
+    "./routes": "./routes/index.js",
+    "./middleware": "./middleware/auth.js",
+    "./config": "./config/database.js",
+    "./utils": "./utils/index.js"
+  }
+}
+

@@ -21,7 +21,7 @@ function createAuthToken(userId) {
     throw new Error('Missing JWT_SECRET environment variable');
   }
 
-  return jwt.sign({ sub: userId }, secret, { expiresIn: '1h' });
+  return jwt.sign({ sub: userId }, secret, { expiresIn: '60m' });
 }
 
 async function createUser(req, res, next) {
@@ -53,8 +53,30 @@ async function createUser(req, res, next) {
 
 async function getUsers(req, res, next) {
   try {
-    const users = await User.find();
-    res.json(users.map(sanitizeUser));
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
+    const skip = (page - 1) * limit;
+    const userType = req.query.user_type; // 'customer' or 'admin' 필터링
+
+    const filter = {};
+    if (userType) {
+      filter.user_type = userType;
+    }
+
+    const [items, totalItems] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      User.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.max(Math.ceil(totalItems / limit), 1);
+
+    res.json({
+      page,
+      limit,
+      totalItems,
+      totalPages,
+      items: items.map(sanitizeUser),
+    });
   } catch (error) {
     next(error);
   }
@@ -151,6 +173,17 @@ async function loginUser(req, res, next) {
   }
 }
 
+function getCurrentUser(req, res) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  res.json({ user: sanitizeUser(req.user) });
+}
+
+function logoutUser(req, res) {
+  res.status(200).json({ message: '로그아웃되었습니다.' });
+}
+
 module.exports = {
   createUser,
   getUsers,
@@ -158,5 +191,7 @@ module.exports = {
   updateUser,
   deleteUser,
   loginUser,
+  getCurrentUser,
+  logoutUser,
 };
 
