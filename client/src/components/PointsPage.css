@@ -1,0 +1,493 @@
+.points-page {
+  min-height: 100vh;
+  background: #f5f7fb;
+  width: 100%;
+  position: relative;
+}
+
+.points-wrapper {
+  width: 100%;
+  padding: 3rem 2rem;
+  min-height: calc(100vh - 0px);
+}
+
+.points-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.points-page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.points-back-link {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.points-back-link:hover {
+  color: #000000;
+}
+
+.points-page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.points-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* 왼쪽 사이드바 - 적립금 잔액 카드 */
+.points-sidebar {
+  position: sticky;
+  top: 2rem;
+}
+
+.points-balance-card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.points-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.points-balance-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #000000;
+  margin: 0;
+}
+
+.points-info-link {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.points-info-link:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #000000;
+}
+
+.points-balance-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.points-balance-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #f3f4f6;
+}
+
+.points-balance-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: -0.02em;
+}
+
+.points-balance-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.points-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.points-summary-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.points-summary-value {
+  font-size: 1rem;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* 오른쪽 메인 영역 */
+.points-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 적립 규칙 안내 카드 */
+.points-info-card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.points-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.points-info-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+  margin: 0;
+}
+
+.points-info-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  transition: color 0.2s;
+}
+
+.points-info-close:hover {
+  color: #000000;
+}
+
+.points-info-content {
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* 적립 내역 카드 */
+.points-history-card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.points-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.points-history-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+  margin: 0;
+}
+
+.points-history-filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.points-filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+.points-filter-tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.points-filter-tab:hover {
+  color: #000000;
+  background: #ffffff;
+}
+
+.points-filter-tab.active {
+  background: #000000;
+  color: #ffffff;
+}
+
+/* 적립 내역 테이블 */
+.points-history-table {
+  width: 100%;
+}
+
+.points-history-table-header {
+  display: grid;
+  grid-template-columns: 100px 1fr 150px 150px;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 0.5rem;
+}
+
+.points-history-table-header > div {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: left;
+}
+
+.points-history-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.points-history-table-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 150px 150px;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+}
+
+.points-history-table-row:last-child {
+  border-bottom: none;
+}
+
+.points-table-col-category {
+  display: flex;
+  align-items: center;
+}
+
+.points-category-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.points-category-badge--earn {
+  background: #f3f4f6;
+  color: #000000;
+}
+
+.points-category-badge--use {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.points-table-col-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.points-content-description {
+  font-size: 0.95rem;
+  color: #000000;
+  font-weight: 500;
+}
+
+.points-content-date {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.points-table-col-amount {
+  text-align: right;
+}
+
+.points-amount {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.points-amount--positive {
+  color: #000000;
+}
+
+.points-amount--negative {
+  color: #6b7280;
+}
+
+.points-table-col-balance {
+  text-align: right;
+  font-size: 0.95rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.points-loading,
+.points-error,
+.points-empty {
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.points-error {
+  color: #dc3545;
+}
+
+.points-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.points-pagination-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.points-pagination-button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.points-pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.points-pagination-info {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1024px) {
+  .points-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .points-sidebar {
+    position: static;
+  }
+
+  .points-balance-card {
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .points-wrapper {
+    padding: 2rem 1rem;
+  }
+
+  .points-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .points-page-title {
+    font-size: 1.5rem;
+  }
+
+  .points-history-table-header,
+  .points-history-table-row {
+    grid-template-columns: 80px 1fr 120px 100px;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .points-balance-amount {
+    font-size: 2rem;
+  }
+
+  .points-filter-tabs {
+    width: 100%;
+  }
+
+  .points-filter-tab {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .points-history-table-header,
+  .points-history-table-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .points-history-table-header > div {
+    display: none;
+  }
+
+  .points-table-col-category,
+  .points-table-col-amount,
+  .points-table-col-balance {
+    text-align: left;
+  }
+
+  .points-content-date {
+    margin-top: 0.25rem;
+  }
+}

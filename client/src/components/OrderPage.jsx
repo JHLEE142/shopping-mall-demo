@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchCart } from '../services/cartService';
 import { createOrder as createOrderApi } from '../services/orderService';
+import { getUserCoupons } from '../services/couponService';
 
 const PAYMENT_METHODS = [
   { value: 'online', label: 'Online Payment', description: '신용/체크카드, 간편결제' },
@@ -30,6 +31,7 @@ function OrderPage({
   onBackToCart = () => {},
   onOrderPlaced = () => {},
   onCartUpdate = () => {},
+  directOrderItem = null, // 바로구매 아이템 { product, quantity, options }
 }) {
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -53,6 +55,9 @@ function OrderPage({
   const [orderStatus, setOrderStatus] = useState('form'); // form | success | failure
   const [orderResult, setOrderResult] = useState(null);
   const [orderFailureMessage, setOrderFailureMessage] = useState('');
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [couponsLoading, setCouponsLoading] = useState(false);
 
   useEffect(() => {
     setFormData((prev) => ({
@@ -84,11 +89,30 @@ function OrderPage({
     async function loadCart() {
       try {
         setStatus('loading');
-        const data = await fetchCart();
-        if (!isMounted) return;
-        setCart(data.cart);
-        setStatus('success');
-        onCartUpdate(data.cart?.items?.length ?? 0);
+        
+        // 바로구매 아이템이 있으면 가상의 cart 생성
+        if (directOrderItem) {
+          const virtualCart = {
+            _id: 'direct-order',
+            items: [{
+              product: directOrderItem.product,
+              quantity: directOrderItem.quantity,
+              priceSnapshot: directOrderItem.product.priceSale || directOrderItem.product.price,
+              options: directOrderItem.options || {},
+            }],
+          };
+          if (!isMounted) return;
+          setCart(virtualCart);
+          setStatus('success');
+          onCartUpdate(0); // 바로구매는 장바구니에 영향을 주지 않음
+        } else {
+          // 일반 주문: 장바구니에서 로드
+          const data = await fetchCart();
+          if (!isMounted) return;
+          setCart(data.cart);
+          setStatus('success');
+          onCartUpdate(data.cart?.items?.length ?? 0);
+        }
       } catch (err) {
         if (!isMounted) return;
         setError(err.message || '주문 정보를 불러오지 못했습니다.');
@@ -102,7 +126,36 @@ function OrderPage({
     return () => {
       isMounted = false;
     };
-  }, [onCartUpdate]);
+  }, [onCartUpdate, directOrderItem]);
+
+  useEffect(() => {
+    async function loadCoupons() {
+      if (!user) return;
+      
+      try {
+        setCouponsLoading(true);
+        const data = await getUserCoupons();
+        // 사용 가능한 쿠폰만 필터링 (미사용, 유효기간 내)
+        const now = new Date();
+        const validCoupons = (data.coupons || []).filter((uc) => {
+          const coupon = uc.coupon || uc.couponId;
+          if (!coupon || uc.isUsed) return false;
+          if (!coupon.isActive) return false;
+          const validFrom = new Date(coupon.validFrom);
+          const validUntil = new Date(coupon.validUntil);
+          return validFrom <= now && validUntil >= now;
+        });
+        setAvailableCoupons(validCoupons);
+      } catch (err) {
+        console.error('쿠폰 로드 실패:', err);
+        setAvailableCoupons([]);
+      } finally {
+        setCouponsLoading(false);
+      }
+    }
+
+    loadCoupons();
+  }, [user]);
 
   const subtotal = useMemo(() => {
     if (!cart?.items?.length) {
@@ -111,8 +164,43 @@ function OrderPage({
     return cart.items.reduce((sum, item) => sum + item.quantity * item.priceSnapshot, 0);
   }, [cart]);
 
-  const shippingFee = subtotal >= 100000 || !cart?.items?.length ? 0 : 3000;
-  const total = subtotal + shippingFee;
+  // 쿠폰 할인 금액 계산
+  const couponDiscount = useMemo(() => {
+    if (!selectedCoupon || !cart?.items?.length) return 0;
+    
+    const coupon = selectedCoupon.coupon || selectedCoupon.couponId;
+    if (!coupon) return 0;
+
+    if (coupon.type === 'freeShipping') {
+      return 0; // 무료배송은 shippingFee에서 처리
+    } else if (coupon.type === 'fixedAmount') {
+      return coupon.discountValue || 0;
+    } else if (coupon.type === 'percentage') {
+      const percentageDiscount = Math.floor(subtotal * ((coupon.discountValue || 0) / 100));
+      if (coupon.maxDiscountAmount) {
+        return Math.min(percentageDiscount, coupon.maxDiscountAmount);
+      }
+      return percentageDiscount;
+    }
+    return 0;
+  }, [selectedCoupon, subtotal, cart]);
+
+  const shippingFee = useMemo(() => {
+    if (!cart?.items?.length) return 0;
+    // 무료배송 쿠폰이 선택된 경우
+    if (selectedCoupon) {
+      const coupon = selectedCoupon.coupon || selectedCoupon.couponId;
+      if (coupon && coupon.type === 'freeShipping') {
+        return 0;
+      }
+    }
+    return subtotal >= 100000 ? 0 : 3000;
+  }, [cart, selectedCoupon, subtotal]);
+
+  const total = useMemo(() => {
+    return Math.max(0, subtotal - couponDiscount + shippingFee);
+  }, [subtotal, couponDiscount, shippingFee]);
+
   const currencyCode = cart?.summary?.currency || 'KRW';
 
   const estimatedWindow = useMemo(() => {
@@ -210,9 +298,9 @@ function OrderPage({
         buyer_addr: `${formData.address1} ${formData.address2}`.trim(),
         buyer_postcode: formData.postalCode,
         custom_data: {
-          cartId: cart._id ?? null,
+          cartId: directOrderItem ? null : (cart._id ?? null),
           items: cart.items.map((item) => ({
-            productId: item.product._id,
+            productId: item.product._id || item.product.id,
             quantity: item.quantity,
           })),
         },
@@ -232,15 +320,15 @@ function OrderPage({
 
           const orderPayload = {
             items: cart.items.map((item) => ({
-              product: item.product._id,
+              product: item.product._id || item.product.id,
               name: item.product.name,
-              sku: item.product.sku,
-              thumbnail: item.product.image,
-              options: convertSelectedOptions(item.selectedOptions),
+              sku: item.product.sku || '',
+              thumbnail: item.product.image || item.product.thumbnail || '',
+              options: directOrderItem ? item.options : convertSelectedOptions(item.selectedOptions),
               quantity: item.quantity,
-              unitPrice: item.priceSnapshot,
-              lineDiscount: Math.max(Number(item.product?.price ?? 0) - item.priceSnapshot, 0),
-              lineTotal: item.priceSnapshot * item.quantity,
+              unitPrice: item.priceSnapshot || (item.product.priceSale || item.product.price),
+              lineDiscount: Math.max(Number(item.product?.price ?? 0) - (item.priceSnapshot || (item.product.priceSale || item.product.price)), 0),
+              lineTotal: (item.priceSnapshot || (item.product.priceSale || item.product.price)) * item.quantity,
             })),
             summary: {
               currency: currencyCode || 'KRW',
@@ -249,6 +337,10 @@ function OrderPage({
               shippingFee,
               grandTotal: amountToCharge,
             },
+            coupon: selectedCoupon ? {
+              userCouponId: selectedCoupon._id,
+              type: (selectedCoupon.coupon || selectedCoupon.couponId)?.type,
+            } : null,
             payment: {
               method: 'card',
               status: 'paid',
@@ -280,7 +372,7 @@ function OrderPage({
             },
             guestName: formData.name,
             guestEmail: formData.email,
-            sourceCart: cart._id,
+            sourceCart: directOrderItem ? null : cart._id,
           };
 
           try {
@@ -291,7 +383,18 @@ function OrderPage({
               type: 'success',
               message: '주문이 완료되었습니다!',
             });
-            onCartUpdate(0);
+            // 바로 구매가 아닌 경우에만 장바구니 개수 업데이트
+            // 서버에서 장바구니 상태를 변경하지 않으므로 장바구니는 그대로 유지됨
+            if (!directOrderItem) {
+              // 장바구니에서 주문한 경우, 장바구니는 그대로 유지됨
+              fetchCart()
+                .then((data) => {
+                  onCartUpdate(data.cart?.items?.length ?? 0);
+                })
+                .catch(() => {
+                  // 에러가 발생해도 장바구니 개수는 유지
+                });
+            }
           } catch (orderError) {
             const message = orderError.message || '주문을 생성하지 못했습니다.';
             setOrderFailureMessage(message);
@@ -332,27 +435,90 @@ function OrderPage({
     return (
       <>
         <ul className="order-summary__list">
-          {cart.items.map((item) => (
-            <li key={item.product._id} className="order-summary__item">
+          {cart.items.map((item, index) => (
+            <li key={item.product._id || item.product.id || index} className="order-summary__item">
               <div className="order-summary__item-thumb">
-                <img src={item.product.image} alt={item.product.name} />
+                <img src={item.product.image || item.product.thumbnail || ''} alt={item.product.name} />
               </div>
               <div className="order-summary__item-info">
                 <strong>{item.product.name}</strong>
-                <span>{item.product.sku}</span>
+                <span>{item.product.sku || ''}</span>
                 <div>
                   수량 {item.quantity} ·{' '}
-                  {formatCurrency(item.priceSnapshot * item.quantity, currencyCode)}
+                  {formatCurrency((item.priceSnapshot || (item.product.priceSale || item.product.price)) * item.quantity, currencyCode)}
                 </div>
               </div>
             </li>
           ))}
         </ul>
+        {user && (
+          <div className="order-summary__coupon" style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>
+              쿠폰 선택
+            </label>
+            <select
+              value={selectedCoupon?._id || ''}
+              onChange={(e) => {
+                const couponId = e.target.value;
+                if (couponId) {
+                  const coupon = availableCoupons.find(c => c._id === couponId);
+                  setSelectedCoupon(coupon || null);
+                } else {
+                  setSelectedCoupon(null);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '0.9rem',
+              }}
+              disabled={couponsLoading}
+            >
+              <option value="">쿠폰을 선택하세요</option>
+              {availableCoupons.map((uc) => {
+                const coupon = uc.coupon || uc.couponId;
+                if (!coupon) return null;
+                const couponTitle = coupon.title || 
+                  (coupon.type === 'freeShipping' ? '무료배송' :
+                   coupon.type === 'fixedAmount' ? `${coupon.discountValue?.toLocaleString() || 0}원 할인` :
+                   coupon.type === 'percentage' ? `${coupon.discountValue || 0}% 할인` : '쿠폰');
+                return (
+                  <option key={uc._id} value={uc._id}>
+                    {couponTitle}
+                  </option>
+                );
+              })}
+            </select>
+            {selectedCoupon && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#6366f1' }}>
+                {(() => {
+                  const coupon = selectedCoupon.coupon || selectedCoupon.couponId;
+                  if (coupon?.type === 'freeShipping') {
+                    return '무료배송 쿠폰이 적용됩니다.';
+                  } else if (coupon?.type === 'fixedAmount') {
+                    return `${couponDiscount.toLocaleString()}원 할인됩니다.`;
+                  } else if (coupon?.type === 'percentage') {
+                    return `${couponDiscount.toLocaleString()}원 할인됩니다.`;
+                  }
+                  return '';
+                })()}
+              </div>
+            )}
+          </div>
+        )}
         <dl className="order-summary__totals">
           <div>
             <dt>Subtotal</dt>
             <dd>{formatCurrency(subtotal, currencyCode)}</dd>
           </div>
+          {couponDiscount > 0 && (
+            <div>
+              <dt>Coupon Discount</dt>
+              <dd style={{ color: '#6366f1' }}>-{formatCurrency(couponDiscount, currencyCode)}</dd>
+            </div>
+          )}
           <div>
             <dt>Shipping</dt>
             <dd>{shippingFee === 0 ? '무료' : formatCurrency(shippingFee, currencyCode)}</dd>
@@ -452,7 +618,7 @@ function OrderPage({
     <div className="order-page">
       <header className="order-page__header">
         <button type="button" onClick={onBackToCart} className="order-page__back">
-          ← 장바구니로 돌아가기
+          {directOrderItem ? '← 상품 상세로 돌아가기' : '← 장바구니로 돌아가기'}
         </button>
         <h1>주문하기</h1>
       </header>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Heart, Minus, Plus, Trash2 } from 'lucide-react';
 import { fetchCart, removeCartItem, updateCartItemQuantity } from '../services/cartService';
+import { addWishlistItem } from '../services/wishlistService';
 
 const RECOMMENDED_PRODUCTS = [
   {
@@ -52,13 +53,14 @@ function formatCurrency(value, currency = 'KRW') {
   }).format(value || 0);
 }
 
-function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
+function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {}, onMoveToWishlist = () => {} }) {
   const [cart, setCart] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState({ type: '', message: '' });
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [removingItemId, setRemovingItemId] = useState(null);
+  const [addingToWishlist, setAddingToWishlist] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -142,8 +144,28 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
     }
   };
 
-  const handleSaveForLater = () => {
-    setNotice({ type: 'info', message: '나중에 담아두기 기능은 준비 중입니다.' });
+  const handleSaveForLater = async (productId) => {
+    try {
+      setAddingToWishlist(productId);
+      setNotice({ type: '', message: '' });
+      await addWishlistItem(productId);
+      setNotice({ type: 'success', message: '찜하기에 추가되었습니다.' });
+      // 찜하기 페이지로 이동
+      setTimeout(() => {
+        onMoveToWishlist();
+      }, 1000);
+    } catch (err) {
+      if (err.message.includes('이미 찜하기에 추가된')) {
+        setNotice({ type: 'info', message: '이미 찜하기에 추가된 상품입니다.' });
+        setTimeout(() => {
+          onMoveToWishlist();
+        }, 1000);
+      } else {
+        setNotice({ type: 'error', message: err.message || '찜하기에 추가하지 못했습니다.' });
+      }
+    } finally {
+      setAddingToWishlist(null);
+    }
   };
 
   const renderOption = (item, key) => {
@@ -251,9 +273,13 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
                         </div>
 
                         <div className="cart-item-card__actions">
-                          <button type="button" onClick={handleSaveForLater}>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveForLater(item.product._id)}
+                            disabled={addingToWishlist === item.product._id || isUpdating || isRemoving}
+                          >
                             <Heart size={16} />
-                            Save for later
+                            찜하기
                           </button>
                           <button
                             type="button"

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Heart, ShoppingBag, Star, ChevronLeft, ChevronRight } from 'lucide-react';
-import { fetchProducts } from '../services/productService';
+import { Heart, ShoppingBag, Star, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { fetchProducts, searchProducts as searchProductsAPI } from '../services/productService';
+import { fetchCategories } from '../services/categoryService';
+import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../services/wishlistService';
+import { loadSession } from '../utils/sessionStorage';
 
 const FALLBACK_CATALOG = [
   {
@@ -74,7 +77,7 @@ const FALLBACK_CATALOG = [
     reviews: 43,
     pricePrimary: '93,000원',
     priceSecondary: null,
-    badge: '온라인 단독',
+    badge: null,
     colors: [
       { name: 'Black', value: '#151516' },
       { name: 'Powder Grey', value: '#c7cad2' },
@@ -232,7 +235,7 @@ function mapProductsToCatalog(products = []) {
       reviews: 24 + index * 3,
       pricePrimary: formattedPrice,
       priceSecondary: null,
-      badge: index % 3 === 0 ? '온라인 단독' : null,
+      badge: null,
       colors: palette.map((value, colorIndex) => ({
         name: `컬러 ${colorIndex + 1}`,
         value,
@@ -256,7 +259,9 @@ function HomeHero({
   onMoveToLogin,
   onMoveToLookbook = () => {},
   onViewProduct = () => {},
+  onWishlistChange = () => {},
   initialCategory = null,
+  initialSearchQuery = null,
   onCategoryFiltered = () => {},
 }) {
   const [products, setProducts] = useState([]);
@@ -264,21 +269,101 @@ function HomeHero({
   const [sortOption, setSortOption] = useState('featured');
   const [filterOption, setFilterOption] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState(initialCategory);
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
+  const [submittedSearchQuery, setSubmittedSearchQuery] = useState(initialSearchQuery || '');
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 12;
+  const itemsPerPage = 40;
   const [currentSlide, setCurrentSlide] = useState(0);
   const slideIntervalRef = useRef(null);
+  const catalogToolbarRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const isInitialLoad = useRef(true);
+  const previousSearchQuery = useRef(null);
+  const [wishlistedItems, setWishlistedItems] = useState(new Set());
+  const [togglingWishlist, setTogglingWishlist] = useState(new Set());
+
+  // 페이지 로드 시 스크롤을 맨 위로 이동
+  useEffect(() => {
+    // 브라우저의 스크롤 복원 방지
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    // 즉시 스크롤을 상단으로 이동
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    isInitialLoad.current = false;
+  }, []);
+
+  // 페이지 로드 시 스크롤을 상단으로 이동
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  // 카테고리 목록 로드
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        setCategoriesLoading(true);
+        const data = await fetchCategories({ includeProductCount: true });
+        console.log('카테고리 로드 성공:', data?.length || 0, '개');
+        setCategories(data || []);
+      } catch (error) {
+        console.error('카테고리 로드 실패:', error.message);
+        // 에러가 발생해도 빈 배열로 설정하여 UI가 깨지지 않도록 함
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
+  // 찜하기 상태 로드
+  useEffect(() => {
+    const session = loadSession();
+    if (!session?.user) {
+      setWishlistedItems(new Set());
+      return;
+    }
+
+    async function loadWishlistStatus() {
+      try {
+        const productIds = products.map((p) => p._id || p.id).filter(Boolean);
+        if (productIds.length === 0) return;
+
+        const data = await checkWishlistItems(productIds);
+        setWishlistedItems(new Set(data.wishlistedItems || []));
+      } catch (error) {
+        console.error('찜하기 상태 로드 실패:', error.message);
+      }
+    }
+
+    if (products.length > 0) {
+      loadWishlistStatus();
+    }
+  }, [products]);
 
   // initialCategory가 변경되면 categoryFilter 업데이트
   useEffect(() => {
     if (initialCategory) {
       setCategoryFilter(initialCategory);
+      setSearchQuery('');
       setCurrentPage(1);
     }
   }, [initialCategory]);
+
+  // initialSearchQuery가 변경되면 searchQuery 업데이트
+  useEffect(() => {
+    if (initialSearchQuery !== null && initialSearchQuery !== undefined) {
+      setSearchQuery(initialSearchQuery);
+      setCategoryFilter(null);
+      setCurrentPage(1);
+    }
+  }, [initialSearchQuery]);
 
   // 슬라이드 자동 전환
   useEffect(() => {
@@ -299,16 +384,59 @@ function HomeHero({
     async function loadProducts() {
       try {
         setProductsStatus('loading');
-        const data = await fetchProducts(currentPage, itemsPerPage);
+        
+        // submittedSearchQuery가 있으면 Hybrid 검색 API 사용, 없으면 일반 상품 목록 API 사용
+        let data;
+        if (submittedSearchQuery && submittedSearchQuery.trim()) {
+          // Hybrid 검색 사용
+          const searchResult = await searchProductsAPI(submittedSearchQuery.trim(), itemsPerPage);
+          data = {
+            items: searchResult.results || [],
+            totalItems: searchResult.total || 0,
+            totalPages: Math.ceil((searchResult.total || 0) / itemsPerPage),
+            page: currentPage,
+          };
+        } else {
+          // 일반 상품 목록
+          data = await fetchProducts(currentPage, itemsPerPage, categoryFilter, null);
+        }
+        
         if (!isMounted) return;
-        setProducts(data?.items ?? []);
+        
+        // 검색 결과 또는 일반 상품 목록 설정
+        const items = data?.items ?? [];
+        setProducts(items);
         setTotalPages(data?.totalPages ?? 1);
         setTotalItems(data?.totalItems ?? 0);
         setProductsStatus('success');
-        // 페이지 변경 시 스크롤을 맨 위로 이동
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // 디버깅: 검색 결과 로그
+        if (submittedSearchQuery && submittedSearchQuery.trim()) {
+          console.log('검색 결과:', {
+            query: submittedSearchQuery,
+            count: items.length,
+            items: items.map(p => p.name || p._id),
+          });
+        }
+        // 검색 쿼리가 변경되었거나 페이지가 변경되었을 때 스크롤 이동
+        if (catalogToolbarRef.current && !isInitialLoad.current) {
+          // 검색 쿼리가 변경되었거나, 페이지가 1보다 클 때 스크롤
+          const searchChanged = previousSearchQuery.current !== submittedSearchQuery;
+          if (searchChanged || currentPage > 1) {
+            // 약간의 지연을 두어 DOM 업데이트 후 스크롤
+            setTimeout(() => {
+              if (catalogToolbarRef.current) {
+                const toolbarTop = catalogToolbarRef.current.getBoundingClientRect().top + window.pageYOffset;
+                window.scrollTo({ top: toolbarTop - 20, behavior: 'smooth' });
+              }
+            }, 100);
+          }
+        }
+        // 검색 쿼리 업데이트
+        previousSearchQuery.current = submittedSearchQuery;
       } catch (error) {
         if (!isMounted) return;
+        console.error('Error loading products:', error);
         setProductsStatus('error');
       }
     }
@@ -318,7 +446,7 @@ function HomeHero({
     return () => {
       isMounted = false;
     };
-  }, [currentPage]);
+  }, [currentPage, categoryFilter, submittedSearchQuery]);
 
   const handleSlideClick = (index) => {
     setCurrentSlide(index);
@@ -331,6 +459,15 @@ function HomeHero({
   };
 
   const catalogProducts = useMemo(() => {
+    // 검색 중이면 검색 결과를 그대로 사용 (필터링 없음)
+    if (submittedSearchQuery && submittedSearchQuery.trim()) {
+      if (!products || products.length === 0) {
+        return []; // 검색 결과가 없으면 빈 배열 반환
+      }
+      return mapProductsToCatalog(products);
+    }
+    
+    // 일반 목록일 때만 카테고리 필터 적용
     let filteredProducts = products;
     
     // 카테고리 필터 적용
@@ -338,11 +475,12 @@ function HomeHero({
       filteredProducts = products.filter((product) => product.category === categoryFilter);
     }
     
-    if (!filteredProducts?.length) {
-      return FALLBACK_CATALOG;
+    // 일반 목록에서도 products가 비어있으면 빈 배열 반환 (FALLBACK_CATALOG 제거)
+    if (!filteredProducts || filteredProducts.length === 0) {
+      return [];
     }
     return mapProductsToCatalog(filteredProducts);
-  }, [products, categoryFilter]);
+  }, [products, categoryFilter, submittedSearchQuery]);
 
   // 카테고리 필터가 적용되면 표시
   useEffect(() => {
@@ -351,8 +489,96 @@ function HomeHero({
     }
   }, [categoryFilter, onCategoryFiltered]);
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      setSubmittedSearchQuery(query);
+      setCategoryFilter(null);
+      setCurrentPage(1);
+    } else {
+      // 검색어가 비어있으면 검색 초기화
+      setSubmittedSearchQuery('');
+      setCategoryFilter(null);
+      setCurrentPage(1);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleToggleWishlist = async (e, product) => {
+    e.stopPropagation();
+    const session = loadSession();
+    if (!session?.user) {
+      alert('로그인이 필요합니다.');
+      onMoveToLogin();
+      return;
+    }
+
+    const productId = product.id || product._id;
+    if (!productId) return;
+
+    const isWishlisted = wishlistedItems.has(productId);
+    setTogglingWishlist((prev) => new Set(prev).add(productId));
+
+    try {
+      if (isWishlisted) {
+        await removeWishlistItem(productId);
+        setWishlistedItems((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+        // 찜하기 개수 변경 알림
+        onWishlistChange();
+      } else {
+        await addWishlistItem(productId);
+        setWishlistedItems((prev) => new Set(prev).add(productId));
+        // 찜하기 개수 변경 알림
+        onWishlistChange();
+      }
+    } catch (error) {
+      if (error.message.includes('이미 찜하기에 추가된')) {
+        // 이미 찜하기에 있으면 상태만 업데이트
+        setWishlistedItems((prev) => new Set(prev).add(productId));
+        onWishlistChange();
+      } else {
+        alert(error.message || '찜하기 상태를 변경하지 못했습니다.');
+      }
+    } finally {
+      setTogglingWishlist((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+    }
+  };
+
   return (
     <>
+      {/* 검색 바 */}
+      <div className="hero-search-bar">
+        <form className="hero-search-form" onSubmit={handleSearch}>
+          <div className="hero-search-container">
+            <div className="hero-search-input-wrapper">
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="hero-search-input"
+                placeholder="무엇이든 찾아보세요!"
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+              <button type="submit" className="hero-search-icon-button" aria-label="검색">
+                <Search className="hero-search-icon" size={20} />
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
       {/* 메인 슬라이드 */}
       <section className="hero-slider">
         <div className="hero-slider__container">
@@ -448,7 +674,7 @@ function HomeHero({
 
       <div className="catalog-page">
 
-      <div className="catalog-toolbar">
+      <div className="catalog-toolbar" ref={catalogToolbarRef}>
         <div className="catalog-toolbar__left">
           <label className="catalog-select">
             <span>필터</span>
@@ -471,11 +697,29 @@ function HomeHero({
         <div className="catalog-toolbar__right">
           <label className="catalog-select">
             <span>카테고리</span>
-            <select value={filterOption} onChange={(event) => setFilterOption(event.target.value)}>
+            <select 
+              value={categoryFilter || 'all'} 
+              onChange={(event) => {
+                const selectedCategory = event.target.value;
+                if (selectedCategory === 'all') {
+                  setCategoryFilter(null);
+                  onCategoryFiltered();
+                } else {
+                  setCategoryFilter(selectedCategory);
+                  setCurrentPage(1);
+                }
+              }}
+              disabled={categoriesLoading}
+            >
               <option value="all">전체 제품</option>
-              <option value="men">남성 제품</option>
-              <option value="women">여성 제품</option>
-              <option value="new">신상품</option>
+              {categories.map((category) => (
+                <option key={category._id || category.code} value={category.name}>
+                  {category.name}
+                  {category.productCount !== undefined && category.productCount > 0 
+                    ? ` (${category.productCount})` 
+                    : ''}
+                </option>
+              ))}
             </select>
           </label>
           <label className="catalog-select">
@@ -492,7 +736,30 @@ function HomeHero({
 
       <div className="catalog-metadata">
         <span>
-          {categoryFilter ? (
+          {submittedSearchQuery ? (
+            <>
+              "<strong>{submittedSearchQuery}</strong>" 검색 결과: {totalItems || catalogProducts.length}개 제품
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSubmittedSearchQuery('');
+                  setCurrentPage(1);
+                }}
+                style={{
+                  marginLeft: '0.75rem',
+                  padding: '0.25rem 0.75rem',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                검색 초기화
+              </button>
+            </>
+          ) : categoryFilter ? (
             <>
               <strong>{categoryFilter}</strong> 카테고리: {catalogProducts.length}개 제품
               <button
@@ -536,8 +803,22 @@ function HomeHero({
             }}>
               {product.badge && <span className="catalog-card__badge">{product.badge}</span>}
               <img src={product.image} alt={product.name} />
-              <button type="button" className="catalog-card__wishlist" aria-label="관심상품 추가">
-                <Heart size={18} strokeWidth={1.5} />
+              <button
+                type="button"
+                className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
+                aria-label={wishlistedItems.has(product.id) ? '찜하기 해제' : '찜하기 추가'}
+                onClick={(e) => handleToggleWishlist(e, product)}
+                disabled={togglingWishlist.has(product.id)}
+              >
+                <Heart 
+                  size={14} 
+                  strokeWidth={wishlistedItems.has(product.id) ? 0 : 2.5} 
+                  fill={wishlistedItems.has(product.id) ? '#ef4444' : 'none'}
+                  color={wishlistedItems.has(product.id) ? '#ef4444' : '#000000'}
+                  style={{
+                    transition: 'all 0.3s ease',
+                  }}
+                />
               </button>
             </div>
             <div className="catalog-card__body">

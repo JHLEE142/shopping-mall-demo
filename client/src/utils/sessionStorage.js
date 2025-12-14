@@ -1,7 +1,8 @@
 const STORAGE_KEY = 'authSession';
+const DEVICE_STORAGE_KEY = 'trustedDevice';
 const SESSION_DURATION = 60 * 60 * 1000; // 60분 (밀리초)
 
-export function saveSession({ token, user, expiresAt, lastActivityTime }) {
+export function saveSession({ token, user, expiresAt, lastActivityTime, deviceId, rememberToken, deviceExpiresAt }) {
   if (!token || !expiresAt) {
     return;
   }
@@ -14,6 +15,16 @@ export function saveSession({ token, user, expiresAt, lastActivityTime }) {
   };
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+  // 자동 로그인 정보 저장
+  if (deviceId && rememberToken) {
+    const deviceData = {
+      deviceId,
+      rememberToken,
+      expiresAt: deviceExpiresAt || null,
+    };
+    localStorage.setItem(DEVICE_STORAGE_KEY, JSON.stringify(deviceData));
+  }
 }
 
 // 활동 시간 업데이트 (새로운 동작 시마다 호출)
@@ -88,6 +99,33 @@ export function loadSession() {
 
 export function clearSession() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(DEVICE_STORAGE_KEY);
+}
+
+export function getTrustedDevice() {
+  try {
+    const raw = localStorage.getItem(DEVICE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.deviceId || !parsed?.rememberToken) {
+      return null;
+    }
+    // 만료 확인
+    if (parsed.expiresAt && new Date(parsed.expiresAt) < new Date()) {
+      localStorage.removeItem(DEVICE_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    localStorage.removeItem(DEVICE_STORAGE_KEY);
+    return null;
+  }
+}
+
+export function clearTrustedDevice() {
+  localStorage.removeItem(DEVICE_STORAGE_KEY);
 }
 
 export function getAuthToken() {

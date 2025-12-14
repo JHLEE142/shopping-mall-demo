@@ -39,6 +39,13 @@ import { deleteProduct, fetchProducts, updateProduct } from '../services/product
 import { fetchOrders as fetchOrdersApi, fetchOrderById } from '../services/orderService';
 import { getUsers as getUsersApi } from '../services/userService';
 import {
+  getAllCoupons,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
+  getUserCouponsByAdmin,
+} from '../services/couponService';
+import {
   getDashboardStats,
   getRevenueTrend,
   getCategorySales,
@@ -49,8 +56,8 @@ import {
   getStatisticsHighlights,
 } from '../services/statisticsService';
 
-const NAV_ITEMS = ['Dashboard', 'Sales', 'Inventory', 'Customers', 'Statistics', 'Products'];
-const PRODUCTS_PAGE_SIZE = 2;
+const NAV_ITEMS = ['Dashboard', 'Sales', 'Inventory', 'Customers', 'Statistics', 'Products', 'Coupons'];
+const PRODUCTS_PAGE_SIZE = 10;
 
 // Inventory Row Component
 function InventoryRow({ product, onUpdate }) {
@@ -459,6 +466,7 @@ const NAV_DESCRIPTION = {
   Customers: 'View and manage customer information',
   Statistics: 'Detailed analytics and insights',
   Products: '신규 등록 상품 관리',
+  Coupons: '쿠폰 발급 및 관리',
 };
 
 function AdminDashboard({
@@ -531,6 +539,38 @@ function AdminDashboard({
   const [statisticsDataStatus, setStatisticsDataStatus] = useState('idle');
   const [categoryPerformance, setCategoryPerformance] = useState([]);
   const [categoryPerformanceStatus, setCategoryPerformanceStatus] = useState('idle');
+
+  // Coupons 데이터 상태
+  const [activeCoupons, setActiveCoupons] = useState([]);
+  const [activeCouponsStatus, setActiveCouponsStatus] = useState('idle');
+  const [activeCouponsError, setActiveCouponsError] = useState('');
+  const [activeCouponsPage, setActiveCouponsPage] = useState(1);
+  const [activeCouponsPagination, setActiveCouponsPagination] = useState({
+    totalPages: 1,
+    totalItems: 0,
+  });
+  const [expiredCoupons, setExpiredCoupons] = useState([]);
+  const [expiredCouponsStatus, setExpiredCouponsStatus] = useState('idle');
+  const [expiredCouponsError, setExpiredCouponsError] = useState('');
+  const [expiredCouponsPage, setExpiredCouponsPage] = useState(1);
+  const [expiredCouponsPagination, setExpiredCouponsPagination] = useState({
+    totalPages: 1,
+    totalItems: 0,
+  });
+  const [editingCoupon, setEditingCoupon] = useState(null);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [userCoupons, setUserCoupons] = useState([]);
+  const [userCouponsStatus, setUserCouponsStatus] = useState('idle');
+  const [userCouponsError, setUserCouponsError] = useState('');
+  const [userCouponsPage, setUserCouponsPage] = useState(1);
+  const [userCouponsPagination, setUserCouponsPagination] = useState({
+    totalPages: 1,
+    totalItems: 0,
+  });
+  const [couponTab, setCouponTab] = useState('coupons'); // 'coupons' or 'user-coupons'
+  const [userCouponSearch, setUserCouponSearch] = useState('');
+  const [userCouponFilter, setUserCouponFilter] = useState('');
+  const [allUsersForFilter, setAllUsersForFilter] = useState([]);
 
   useEffect(() => {
     setActiveNav(initialNav);
@@ -2293,6 +2333,622 @@ function AdminDashboard({
     );
   };
 
+  const loadActiveCoupons = useCallback(
+    async (page = 1) => {
+      try {
+        setActiveCouponsStatus('loading');
+        setActiveCouponsError('');
+        const data = await getAllCoupons({ page, limit: 10, status: 'active' });
+        setActiveCoupons(data?.coupons ?? []);
+        setActiveCouponsPagination({
+          totalPages: data?.pagination?.totalPages ?? 1,
+          totalItems: data?.pagination?.total ?? 0,
+        });
+        setActiveCouponsPage(data?.pagination?.page ?? page);
+        setActiveCouponsStatus('success');
+      } catch (error) {
+        setActiveCouponsStatus('error');
+        setActiveCouponsError(error.message || '쿠폰 목록을 불러오지 못했습니다.');
+      }
+    },
+    []
+  );
+
+  const loadExpiredCoupons = useCallback(
+    async (page = 1) => {
+      try {
+        setExpiredCouponsStatus('loading');
+        setExpiredCouponsError('');
+        const data = await getAllCoupons({ page, limit: 10, status: 'expired' });
+        setExpiredCoupons(data?.coupons ?? []);
+        setExpiredCouponsPagination({
+          totalPages: data?.pagination?.totalPages ?? 1,
+          totalItems: data?.pagination?.total ?? 0,
+        });
+        setExpiredCouponsPage(data?.pagination?.page ?? page);
+        setExpiredCouponsStatus('success');
+      } catch (error) {
+        setExpiredCouponsStatus('error');
+        setExpiredCouponsError(error.message || '만료된 쿠폰 목록을 불러오지 못했습니다.');
+      }
+    },
+    []
+  );
+
+  const loadUserCoupons = useCallback(
+    async (page = 1, userId = null) => {
+      try {
+        setUserCouponsStatus('loading');
+        setUserCouponsError('');
+        const data = await getUserCouponsByAdmin({ page, limit: 20, userId: userId || userCouponFilter || undefined });
+        let filteredCoupons = data?.userCoupons ?? [];
+        
+        // 검색어로 필터링
+        if (userCouponSearch) {
+          const searchLower = userCouponSearch.toLowerCase();
+          filteredCoupons = filteredCoupons.filter((uc) => {
+            const user = uc.userId || uc.user;
+            return (
+              user?.name?.toLowerCase().includes(searchLower) ||
+              user?.email?.toLowerCase().includes(searchLower)
+            );
+          });
+        }
+        
+        setUserCoupons(filteredCoupons);
+        setUserCouponsPagination({
+          totalPages: data?.pagination?.totalPages ?? 1,
+          totalItems: data?.pagination?.total ?? 0,
+        });
+        setUserCouponsPage(data?.pagination?.page ?? page);
+        setUserCouponsStatus('success');
+      } catch (error) {
+        setUserCouponsStatus('error');
+        setUserCouponsError(error.message || '사용자 쿠폰 목록을 불러오지 못했습니다.');
+      }
+    },
+    [userCouponSearch, userCouponFilter]
+  );
+
+  // 사용자 필터 목록 로드
+  useEffect(() => {
+    const loadUsersForFilter = async () => {
+      try {
+        const data = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
+        setAllUsersForFilter(data?.items || []);
+      } catch (error) {
+        console.error('Failed to load users for filter:', error);
+      }
+    };
+    if (activeNav === 'Coupons' && couponTab === 'user-coupons') {
+      loadUsersForFilter();
+    }
+  }, [activeNav, couponTab]);
+
+  // 사용자 필터 변경 시 쿠폰 목록 다시 로드
+  useEffect(() => {
+    if (activeNav === 'Coupons' && couponTab === 'user-coupons' && userCouponsStatus !== 'idle') {
+      loadUserCoupons(1);
+    }
+  }, [userCouponFilter, userCouponSearch]);
+
+  useEffect(() => {
+    if (activeNav === 'Coupons') {
+      if (activeCouponsStatus === 'idle') {
+        loadActiveCoupons(1);
+      }
+      if (expiredCouponsStatus === 'idle') {
+        loadExpiredCoupons(1);
+      }
+      if (userCouponsStatus === 'idle' && couponTab === 'user-coupons') {
+        loadUserCoupons(1);
+      }
+    }
+  }, [activeNav, activeCouponsStatus, expiredCouponsStatus, userCouponsStatus, couponTab, loadActiveCoupons, loadExpiredCoupons, loadUserCoupons]);
+
+  const handleDeleteCoupon = useCallback(
+    async (couponId) => {
+      const confirmed = window.confirm('이 쿠폰을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');
+      if (!confirmed) return;
+
+      try {
+        await deleteCoupon(couponId);
+        // 상태를 idle로 리셋하여 목록을 다시 로드
+        setActiveCouponsStatus('idle');
+        setExpiredCouponsStatus('idle');
+        // 첫 페이지로 리셋
+        setActiveCouponsPage(1);
+        setExpiredCouponsPage(1);
+        // 목록 다시 로드
+        await loadActiveCoupons(1);
+        await loadExpiredCoupons(1);
+      } catch (error) {
+        alert(error.message || '쿠폰 삭제에 실패했습니다.');
+      }
+    },
+    [loadActiveCoupons, loadExpiredCoupons]
+  );
+
+  const formatCouponTitle = (coupon) => {
+    if (!coupon) return '';
+    
+    // title이 있으면 우선 사용
+    if (coupon.title) {
+      return coupon.title;
+    }
+    
+    // title이 없으면 타입에 따라 생성
+    if (coupon.type === 'freeShipping') {
+      return '무료배송';
+    } else if (coupon.type === 'fixedAmount') {
+      return `${coupon.discountValue?.toLocaleString() || 0}원`;
+    } else if (coupon.type === 'percentage') {
+      return `${coupon.discountValue || 0}%`;
+    }
+    return coupon.description || '쿠폰';
+  };
+
+  const formatTargetUsers = (coupon) => {
+    if (!coupon) return '지정 없음';
+    
+    if (coupon.targetType === 'all') {
+      return '전체 사용자';
+    }
+    
+    if (coupon.targetType === 'specific') {
+      // targetUsers가 배열인 경우
+      if (Array.isArray(coupon.targetUsers)) {
+        const count = coupon.targetUsers.length;
+        if (count > 0) {
+          return `${count}명 지정`;
+        }
+      }
+      // populate된 경우 (객체 배열)
+      if (coupon.targetUsers && typeof coupon.targetUsers === 'object' && !Array.isArray(coupon.targetUsers)) {
+        return '1명 지정';
+      }
+    }
+    
+    return '지정 없음';
+  };
+
+  const formatDateRange = (from, until) => {
+    if (!from || !until) return '-';
+    const fromDate = new Date(from).toLocaleDateString('ko-KR').replace(/\./g, '-').replace(/\s/g, '');
+    const untilDate = new Date(until).toLocaleDateString('ko-KR').replace(/\./g, '-').replace(/\s/g, '');
+    return `${fromDate}~${untilDate}`;
+  };
+
+  const handleCouponSubmit = useCallback(
+    async (couponData) => {
+      try {
+        if (editingCoupon) {
+          await updateCoupon(editingCoupon._id, couponData);
+        } else {
+          await createCoupon(couponData);
+        }
+        setIsCouponModalOpen(false);
+        setEditingCoupon(null);
+        // 상태를 idle로 리셋하여 목록을 다시 로드
+        setActiveCouponsStatus('idle');
+        setExpiredCouponsStatus('idle');
+        // 첫 페이지로 리셋
+        setActiveCouponsPage(1);
+        setExpiredCouponsPage(1);
+        // 목록 다시 로드
+        await loadActiveCoupons(1);
+        await loadExpiredCoupons(1);
+      } catch (error) {
+        alert(error.message || '쿠폰 저장에 실패했습니다.');
+      }
+    },
+    [editingCoupon, loadActiveCoupons, loadExpiredCoupons]
+  );
+
+  const renderCoupons = () => (
+    <>
+      <section className="admin-section">
+        <header className="admin-section__header admin-section__header--inline">
+          <div className="admin-section__title">
+            <h2>쿠폰 관리</h2>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.25rem', background: '#f3f4f6', padding: '0.25rem', borderRadius: '6px' }}>
+              <button
+                type="button"
+                className={`admin-filter-button ${couponTab === 'coupons' ? 'admin-filter-button--primary' : ''}`}
+                onClick={() => setCouponTab('coupons')}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              >
+                쿠폰 관리
+              </button>
+              <button
+                type="button"
+                className={`admin-filter-button ${couponTab === 'user-coupons' ? 'admin-filter-button--primary' : ''}`}
+                onClick={() => {
+                  setCouponTab('user-coupons');
+                  if (userCouponsStatus === 'idle') {
+                    loadUserCoupons(1);
+                  }
+                }}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              >
+                사용자 쿠폰
+              </button>
+            </div>
+            {couponTab === 'coupons' && (
+              <button
+                type="button"
+                className="admin-filter-button admin-filter-button--primary"
+                onClick={() => {
+                  setEditingCoupon(null);
+                  setIsCouponModalOpen(true);
+                }}
+              >
+                <Plus className="admin-icon" />
+                신규 쿠폰 발급
+              </button>
+            )}
+          </div>
+        </header>
+      </section>
+
+      {couponTab === 'user-coupons' ? (
+        <section className="admin-section">
+          <header className="admin-section__header">
+            <div className="admin-section__title">
+              <h2>사용자 쿠폰 관리</h2>
+              <p className="admin-section__subtitle">사용자들이 보유한 쿠폰을 조회하고 관리합니다.</p>
+            </div>
+          </header>
+          <div className="admin-section" style={{ marginBottom: '1.5rem' }}>
+            <div className="admin-search-group">
+              <div className="admin-search">
+                <Search className="admin-search__icon" />
+                <input
+                  className="admin-search__input"
+                  type="text"
+                  placeholder="사용자 검색 (이름 또는 이메일)"
+                  value={userCouponSearch}
+                  onChange={(e) => setUserCouponSearch(e.target.value)}
+                />
+              </div>
+              <select
+                className="admin-filter-button"
+                value={userCouponFilter}
+                onChange={(e) => setUserCouponFilter(e.target.value)}
+                style={{ minWidth: '150px', padding: '0.5rem' }}
+              >
+                <option value="">전체 사용자</option>
+                {allUsersForFilter.map((user) => (
+                  <option key={user._id || user.id} value={user._id || user.id}>
+                    {user.name} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {userCouponsStatus === 'loading' && (
+            <div className="admin-empty-state">
+              <Loader2 className="admin-icon admin-icon--spin" />
+              <p>사용자 쿠폰 목록을 불러오는 중입니다...</p>
+            </div>
+          )}
+          {userCouponsStatus === 'error' && (
+            <div className="admin-alert admin-alert--error">
+              <AlertCircle className="admin-icon" />
+              <div>
+                <strong>사용자 쿠폰 목록을 불러오지 못했습니다.</strong>
+                <p>{userCouponsError}</p>
+              </div>
+              <button type="button" className="admin-filter-button" onClick={() => loadUserCoupons(userCouponsPage)}>
+                다시 시도
+              </button>
+            </div>
+          )}
+          {userCouponsStatus === 'success' && userCoupons.length === 0 && (
+            <div className="admin-empty-state">
+              <Users className="admin-icon" />
+              <h3>보유한 쿠폰이 없습니다.</h3>
+              <p>사용자가 쿠폰을 받으면 이곳에서 확인할 수 있어요.</p>
+            </div>
+          )}
+          {userCouponsStatus === 'success' && userCoupons.length > 0 && (
+            <>
+              <div className="admin-table admin-table--orders">
+                <div className="admin-table__header">
+                  <span>사용자</span>
+                  <span>쿠폰명</span>
+                  <span>할인</span>
+                  <span>받은 날짜</span>
+                  <span>사용 여부</span>
+                  <span>사용 날짜</span>
+                </div>
+                <div className="admin-table__body">
+                  {userCoupons.map((uc) => {
+                    const coupon = uc.couponId || uc.coupon;
+                    const user = uc.userId || uc.user;
+                    return (
+                      <div key={uc._id} className="admin-table__row">
+                        <div>
+                          <p className="admin-table__primary">{user?.name || '알 수 없음'}</p>
+                          <p className="admin-table__secondary">{user?.email || '-'}</p>
+                        </div>
+                        <span>{formatCouponTitle(coupon)}</span>
+                        <span>
+                          {coupon?.type === 'percentage'
+                            ? `${coupon.discountValue}%`
+                            : coupon?.type === 'fixedAmount'
+                            ? `${coupon.discountValue.toLocaleString()}원`
+                            : '무료배송'}
+                        </span>
+                        <span>{uc.receivedAt ? new Date(uc.receivedAt).toLocaleDateString('ko-KR') : '-'}</span>
+                        <span className={`admin-status ${uc.isUsed ? 'admin-status--success' : 'admin-status--warning'}`}>
+                          {uc.isUsed ? '사용됨' : '미사용'}
+                        </span>
+                        <span>{uc.usedAt ? new Date(uc.usedAt).toLocaleDateString('ko-KR') : '-'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {userCouponsPagination.totalPages > 1 && (
+                <div className="admin-pagination">
+                  <button
+                    type="button"
+                    className="admin-pagination__button"
+                    onClick={() => {
+                      const nextPage = userCouponsPage - 1;
+                      if (nextPage >= 1) loadUserCoupons(nextPage);
+                    }}
+                    disabled={userCouponsPage <= 1 || userCouponsStatus === 'loading'}
+                  >
+                    이전
+                  </button>
+                  <span className="admin-pagination__status">
+                    {userCouponsPage} / {userCouponsPagination.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="admin-pagination__button"
+                    onClick={() => {
+                      const nextPage = userCouponsPage + 1;
+                      if (nextPage <= userCouponsPagination.totalPages) loadUserCoupons(nextPage);
+                    }}
+                    disabled={userCouponsPage >= userCouponsPagination.totalPages || userCouponsStatus === 'loading'}
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <>
+
+      {/* 쿠폰 현황 */}
+      <section className="admin-section">
+        <header className="admin-section__header">
+          <div className="admin-section__title">
+            <h2>쿠폰 현황</h2>
+            <p className="admin-section__subtitle">현재 사용가능한 쿠폰을 조회합니다.</p>
+          </div>
+        </header>
+        {activeCouponsStatus === 'loading' && (
+          <div className="admin-empty-state">
+            <Loader2 className="admin-icon admin-icon--spin" />
+            <p>쿠폰 목록을 불러오는 중입니다...</p>
+          </div>
+        )}
+        {activeCouponsStatus === 'error' && (
+          <div className="admin-alert admin-alert--error">
+            <AlertCircle className="admin-icon" />
+            <div>
+              <strong>쿠폰 목록을 불러오지 못했습니다.</strong>
+              <p>{activeCouponsError}</p>
+            </div>
+            <button type="button" className="admin-filter-button" onClick={() => loadActiveCoupons(activeCouponsPage)}>
+              다시 시도
+            </button>
+          </div>
+        )}
+        {activeCouponsStatus === 'success' && activeCoupons.length === 0 && (
+          <div className="admin-empty-state">
+            <Package className="admin-icon" />
+            <h3>사용 가능한 쿠폰이 없습니다.</h3>
+            <p>새로운 쿠폰을 발급하면 이곳에서 확인할 수 있어요.</p>
+          </div>
+        )}
+        {activeCouponsStatus === 'success' && activeCoupons.length > 0 && (
+          <>
+            <div className="admin-table admin-table--coupons">
+              <div className="admin-table__header">
+                <span>번호</span>
+                <span>쿠폰 이름</span>
+                <span>할인율</span>
+                <span>잔여량</span>
+                <span>지급 대상</span>
+                <span>배포기간</span>
+                <span>사용기간</span>
+                <span>수정</span>
+                <span>삭제</span>
+              </div>
+              <div className="admin-table__body">
+                {activeCoupons.map((coupon, index) => (
+                  <div key={coupon._id} className="admin-table__row">
+                    <span>{(activeCouponsPage - 1) * 10 + index + 1}</span>
+                    <span>{formatCouponTitle(coupon)}</span>
+                    <span>{coupon.type === 'percentage' ? `${coupon.discountValue || 0}%` : coupon.type === 'fixedAmount' ? `${(coupon.discountValue || 0).toLocaleString()}원` : '무료배송'}</span>
+                    <span>{coupon.remaining !== null ? `${coupon.remaining}개` : '무제한'}</span>
+                    <span>{formatTargetUsers(coupon)}</span>
+                    <span>{formatDateRange(coupon.validFrom, coupon.validUntil)}</span>
+                    <span>{formatDateRange(coupon.validFrom, coupon.validUntil)}</span>
+                    <div className="admin-table__actions">
+                      <button
+                        type="button"
+                        className="admin-table__action-button"
+                        onClick={() => {
+                          setEditingCoupon(coupon);
+                          setIsCouponModalOpen(true);
+                        }}
+                      >
+                        수정
+                      </button>
+                    </div>
+                    <div className="admin-table__actions">
+                      <button
+                        type="button"
+                        className="admin-table__action-button admin-table__action-button--danger"
+                        onClick={() => handleDeleteCoupon(coupon._id)}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {activeCouponsPagination.totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => {
+                    const nextPage = activeCouponsPage - 1;
+                    if (nextPage >= 1) loadActiveCoupons(nextPage);
+                  }}
+                  disabled={activeCouponsPage <= 1 || activeCouponsStatus === 'loading'}
+                >
+                  이전
+                </button>
+                <span className="admin-pagination__status">
+                  {activeCouponsPage} / {activeCouponsPagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => {
+                    const nextPage = activeCouponsPage + 1;
+                    if (nextPage <= activeCouponsPagination.totalPages) loadActiveCoupons(nextPage);
+                  }}
+                  disabled={activeCouponsPage >= activeCouponsPagination.totalPages || activeCouponsStatus === 'loading'}
+                >
+                  다음
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 만료된 쿠폰 */}
+      <section className="admin-section">
+        <header className="admin-section__header">
+          <div className="admin-section__title">
+            <h2>만료된 쿠폰</h2>
+            <p className="admin-section__subtitle">사용기간 만료, 수량없음, 삭제된 쿠폰을 조회합니다.</p>
+          </div>
+        </header>
+        {expiredCouponsStatus === 'loading' && (
+          <div className="admin-empty-state">
+            <Loader2 className="admin-icon admin-icon--spin" />
+            <p>만료된 쿠폰 목록을 불러오는 중입니다...</p>
+          </div>
+        )}
+        {expiredCouponsStatus === 'error' && (
+          <div className="admin-alert admin-alert--error">
+            <AlertCircle className="admin-icon" />
+            <div>
+              <strong>만료된 쿠폰 목록을 불러오지 못했습니다.</strong>
+              <p>{expiredCouponsError}</p>
+            </div>
+            <button type="button" className="admin-filter-button" onClick={() => loadExpiredCoupons(expiredCouponsPage)}>
+              다시 시도
+            </button>
+          </div>
+        )}
+        {expiredCouponsStatus === 'success' && expiredCoupons.length === 0 && (
+          <div className="admin-empty-state">
+            <Package className="admin-icon" />
+            <h3>만료된 쿠폰이 없습니다.</h3>
+          </div>
+        )}
+        {expiredCouponsStatus === 'success' && expiredCoupons.length > 0 && (
+          <>
+            <div className="admin-table admin-table--coupons admin-table--expired">
+              <div className="admin-table__header">
+                <span>번호</span>
+                <span>쿠폰 이름</span>
+                <span>할인율</span>
+                <span>잔여량</span>
+                <span>지급 대상</span>
+                <span>배포기간</span>
+                <span>사용기간</span>
+              </div>
+              <div className="admin-table__body">
+                {expiredCoupons.map((coupon, index) => (
+                  <div key={coupon._id} className="admin-table__row">
+                    <span>{(expiredCouponsPage - 1) * 10 + index + 1}</span>
+                    <span>{formatCouponTitle(coupon)}</span>
+                    <span>{coupon.type === 'percentage' ? `${coupon.discountValue || 0}%` : coupon.type === 'fixedAmount' ? `${(coupon.discountValue || 0).toLocaleString()}원` : '무료배송'}</span>
+                    <span>{coupon.remaining !== null ? `${coupon.remaining}개` : '무제한'}</span>
+                    <span>{formatTargetUsers(coupon)}</span>
+                    <span>{formatDateRange(coupon.validFrom, coupon.validUntil)}</span>
+                    <span>{formatDateRange(coupon.validFrom, coupon.validUntil)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {expiredCouponsPagination.totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => {
+                    const nextPage = expiredCouponsPage - 1;
+                    if (nextPage >= 1) loadExpiredCoupons(nextPage);
+                  }}
+                  disabled={expiredCouponsPage <= 1 || expiredCouponsStatus === 'loading'}
+                >
+                  이전
+                </button>
+                <span className="admin-pagination__status">
+                  {expiredCouponsPage} / {expiredCouponsPagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => {
+                    const nextPage = expiredCouponsPage + 1;
+                    if (nextPage <= expiredCouponsPagination.totalPages) loadExpiredCoupons(nextPage);
+                  }}
+                  disabled={expiredCouponsPage >= expiredCouponsPagination.totalPages || expiredCouponsStatus === 'loading'}
+                >
+                  다음
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 쿠폰 생성/수정 모달 */}
+      {isCouponModalOpen && (
+        <CouponModal
+          coupon={editingCoupon}
+          onClose={() => {
+            setIsCouponModalOpen(false);
+            setEditingCoupon(null);
+          }}
+          onSubmit={handleCouponSubmit}
+        />
+      )}
+        </>
+      )}
+    </>
+  );
+
   const renderProducts = () => (
     <>
       <section className="admin-section">
@@ -2432,6 +3088,7 @@ function AdminDashboard({
     Customers: renderCustomers(),
     Statistics: renderStatistics(),
     Products: renderProducts(),
+    Coupons: renderCoupons(),
   }[activeNav];
 
   return (
@@ -2489,6 +3146,285 @@ function AdminDashboard({
         </header>
 
         <main className="admin-content">{activeContent}</main>
+      </div>
+    </div>
+  );
+}
+
+// Coupon Modal Component
+function CouponModal({ coupon, onClose, onSubmit }) {
+  const [formData, setFormData] = useState({
+    title: coupon?.title || '',
+    description: coupon?.description || '',
+    type: coupon?.type || 'percentage',
+    discountValue: coupon?.discountValue || 0,
+    minPurchaseAmount: coupon?.minPurchaseAmount || 0,
+    maxDiscountAmount: coupon?.maxDiscountAmount || null,
+    validFrom: coupon?.validFrom ? new Date(coupon.validFrom).toISOString().split('T')[0] : '',
+    validUntil: coupon?.validUntil ? new Date(coupon.validUntil).toISOString().split('T')[0] : '',
+    usageLimit: coupon?.usageLimit || null,
+    isActive: coupon?.isActive !== undefined ? coupon.isActive : true,
+    targetType: coupon?.targetType || 'all',
+    targetUsers: coupon?.targetUsers?.map(u => (typeof u === 'object' ? (u._id || u.id) : u)) || [],
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setUsersLoading(true);
+        const data = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
+        setUsers(data?.items || []);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    loadUsers();
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return users;
+    const searchLower = userSearch.toLowerCase();
+    return users.filter(
+      (user) =>
+        user.name?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower)
+    );
+  }, [users, userSearch]);
+
+  const handleUserToggle = (userId) => {
+    setFormData((prev) => {
+      const currentUsers = prev.targetUsers || [];
+      const isSelected = currentUsers.includes(userId);
+      return {
+        ...prev,
+        targetUsers: isSelected
+          ? currentUsers.filter((id) => id !== userId)
+          : [...currentUsers, userId],
+      };
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? (value === '' ? null : Number(value)) : value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Coupon submit error:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="admin-modal-overlay" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="admin-modal__header">
+          <h2>{coupon ? '쿠폰 수정' : '신규 쿠폰 발급'}</h2>
+          <button type="button" className="admin-modal__close" onClick={onClose}>
+            <X className="admin-icon" />
+          </button>
+        </header>
+        <form onSubmit={handleSubmit} className="admin-modal__form">
+          <div className="admin-form-group">
+            <label>쿠폰 이름</label>
+            <input
+              type="text"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              required
+              placeholder="예: 무료배송, 10% 할인"
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>설명</label>
+            <input
+              type="text"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              required
+              placeholder="예: 생일 축하 쿠폰"
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>쿠폰 타입</label>
+            <select name="type" value={formData.type} onChange={handleChange} required>
+              <option value="freeShipping">무료배송</option>
+              <option value="fixedAmount">정액 할인</option>
+              <option value="percentage">퍼센트 할인</option>
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label>할인 값</label>
+            <input
+              type="number"
+              name="discountValue"
+              value={formData.discountValue}
+              onChange={handleChange}
+              required
+              min="0"
+              placeholder={formData.type === 'percentage' ? '예: 10 (10%)' : '예: 3000 (3000원)'}
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>최소 구매 금액</label>
+            <input
+              type="number"
+              name="minPurchaseAmount"
+              value={formData.minPurchaseAmount}
+              onChange={handleChange}
+              min="0"
+            />
+          </div>
+          {formData.type === 'percentage' && (
+            <div className="admin-form-group">
+              <label>최대 할인 금액 (선택)</label>
+              <input
+                type="number"
+                name="maxDiscountAmount"
+                value={formData.maxDiscountAmount || ''}
+                onChange={handleChange}
+                min="0"
+                placeholder="예: 20000"
+              />
+            </div>
+          )}
+          <div className="admin-form-group">
+            <label>유효 시작일</label>
+            <input
+              type="date"
+              name="validFrom"
+              value={formData.validFrom}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>유효 종료일</label>
+            <input
+              type="date"
+              name="validUntil"
+              value={formData.validUntil}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>사용 제한 (선택)</label>
+            <input
+              type="number"
+              name="usageLimit"
+              value={formData.usageLimit || ''}
+              onChange={handleChange}
+              min="1"
+              placeholder="예: 100 (100명만 사용 가능)"
+            />
+          </div>
+          <div className="admin-form-group">
+            <label>쿠폰 지급 대상</label>
+            <select
+              name="targetType"
+              value={formData.targetType}
+              onChange={handleChange}
+            >
+              <option value="all">전체 사용자</option>
+              <option value="specific">특정 사용자</option>
+            </select>
+          </div>
+          {formData.targetType === 'specific' && (
+            <div className="admin-form-group">
+              <label>사용자 선택</label>
+              <input
+                type="text"
+                placeholder="사용자 검색 (이름 또는 이메일)"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                style={{ marginBottom: '0.75rem' }}
+              />
+              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '0.5rem' }}>
+                {usersLoading ? (
+                  <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>사용자 목록을 불러오는 중...</p>
+                ) : filteredUsers.length === 0 ? (
+                  <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>사용자를 찾을 수 없습니다.</p>
+                ) : (
+                  filteredUsers.map((user) => {
+                    const isSelected = formData.targetUsers.includes(user._id || user.id);
+                    return (
+                      <label
+                        key={user._id || user.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          backgroundColor: isSelected ? '#f3f4f6' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.backgroundColor = '#f9fafb';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleUserToggle(user._id || user.id)}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{user.name}</div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{user.email}</div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {formData.targetUsers.length > 0 && (
+                <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                  {formData.targetUsers.length}명 선택됨
+                </p>
+              )}
+            </div>
+          )}
+          <div className="admin-form-group">
+            <label>
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={formData.isActive}
+                onChange={handleChange}
+              />
+              활성화
+            </label>
+          </div>
+          <div className="admin-modal__actions">
+            <button type="button" className="admin-filter-button" onClick={onClose}>
+              취소
+            </button>
+            <button type="submit" className="admin-filter-button admin-filter-button--primary" disabled={submitting}>
+              {submitting ? '저장 중...' : coupon ? '수정' : '생성'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

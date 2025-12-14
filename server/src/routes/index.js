@@ -8,6 +8,13 @@ const categoryRouter = require('./categories');
 const adminLookbookRouter = require('./adminLookbook');
 const adminInventoryRouter = require('./adminInventory');
 const statisticsRouter = require('./statistics');
+const searchRouter = require('./search');
+const couponRouter = require('./coupons');
+const reviewRouter = require('./reviews');
+const productInquiryRouter = require('./productInquiries');
+const wishlistRouter = require('./wishlists');
+const trustedDeviceRouter = require('./trustedDevices');
+const pointRouter = require('./points');
 const { getCurrentUser, logoutUser } = require('../controllers/userController');
 
 const router = Router();
@@ -43,6 +50,13 @@ router.use('/orders', orderRouter);
 router.use('/admin/lookbook', adminLookbookRouter);
 router.use('/admin/inventory', adminInventoryRouter);
 router.use('/statistics', statisticsRouter);
+router.use('/search', searchRouter);
+router.use('/coupons', couponRouter);
+router.use('/reviews', reviewRouter);
+router.use('/product-inquiries', productInquiryRouter);
+router.use('/wishlists', wishlistRouter);
+router.use('/trusted-devices', trustedDeviceRouter);
+router.use('/points', pointRouter);
 router.get('/auth/session', authenticate, getCurrentUser);
 router.post('/auth/logout', authenticate, logoutUser);
 

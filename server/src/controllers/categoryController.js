@@ -21,17 +21,24 @@ const getCategories = async (req, res) => {
     // 상품 수 포함 여부
     if (includeProductCount === 'true') {
       for (const category of categories) {
-        const productCount = await Product.countDocuments({ 
-          categoryId: category._id,
-          status: 'active'
-        });
-        category.productCount = productCount;
+        try {
+          // category 필드가 문자열인 경우 (카테고리 이름으로 매칭)
+          const productCount = await Product.countDocuments({ 
+            category: category.name
+          });
+          category.productCount = productCount;
+        } catch (countError) {
+          // 상품 수 계산 실패 시 0으로 설정
+          console.error(`카테고리 ${category.name}의 상품 수 계산 실패:`, countError);
+          category.productCount = 0;
+        }
       }
     }
 
     successResponse(res, { categories }, '카테고리 목록 조회 성공');
   } catch (error) {
-    errorResponse(res, error.message, 500);
+    console.error('카테고리 목록 조회 중 오류:', error);
+    errorResponse(res, error.message || '카테고리 목록 조회에 실패했습니다.', 500);
   }
 };
 

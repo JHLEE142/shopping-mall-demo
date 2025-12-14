@@ -43,7 +43,8 @@ async function disconnectFromDatabase() {
 
 // 간단한 연결 함수 (패키지와 호환성)
 async function connectDB() {
-  const mongoURI = process.env.MONGODB_URI || process.env.MONGODB_ATLAS_URL || 'mongodb://127.0.0.1:27017/shopping-mall-demo';
+  // MONGODB_ATLAS_URL을 우선 사용 (MongoDB Atlas 클러스터)
+  const mongoURI = process.env.MONGODB_ATLAS_URL || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/shopping-mall-demo';
   return connectToDatabase(mongoURI);
 }
 
