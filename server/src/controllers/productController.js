@@ -57,14 +57,34 @@ async function getProducts(req, res, next) {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
     const skip = (page - 1) * limit;
+    
+    // 카테고리 필터
+    const categoryFilter = req.query.category;
+    // 검색 쿼리
+    const searchQuery = req.query.search;
+    const query = {};
+    
+    if (categoryFilter) {
+      // 카테고리 이름으로 필터링 (category 필드가 문자열인 경우)
+      query.category = categoryFilter;
+    }
+    
+    // 검색 기능: 상품 이름 또는 설명에서 검색
+    if (searchQuery && searchQuery.trim()) {
+      const searchRegex = new RegExp(searchQuery.trim(), 'i'); // 대소문자 구분 없이 검색
+      query.$or = [
+        { name: searchRegex },
+        { description: searchRegex },
+      ];
+    }
 
     const [items, totalItems] = await Promise.all([
-      Product.find()
+      Product.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Product.countDocuments(),
+      Product.countDocuments(query),
     ]);
 
     // 각 상품의 재고 상태를 계산하여 업데이트

@@ -31,6 +31,11 @@ const userSchema = new Schema(
       default: null,
       trim: true,
     },
+    points: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,

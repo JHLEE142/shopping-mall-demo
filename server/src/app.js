@@ -56,6 +56,9 @@ function createCorsOptions() {
 function createApp() {
   const app = express();
 
+  // IP 주소를 제대로 추출하기 위해 trust proxy 설정
+  app.set('trust proxy', true);
+
   const corsOptions = createCorsOptions();
   app.use(cors(corsOptions));
   app.use(express.json());
@@ -75,10 +78,29 @@ function createApp() {
 
   app.use((err, req, res, next) => {
     const status = err.status || 500;
-    const message = err.message || 'Internal Server Error';
-    if (process.env.NODE_ENV !== 'production') {
-      console.error(err);
+    let message = err.message || 'Internal Server Error';
+    
+    // 기술적인 에러 메시지를 사용자 친화적인 메시지로 변환
+    if (message.includes('E11000') || message.includes('duplicate key')) {
+      if (message.includes('email')) {
+        message = '이미 사용 중인 이메일입니다.';
+      } else if (message.includes('code')) {
+        message = '쿠폰 코드가 이미 사용 중입니다. 다른 코드를 사용해주세요.';
+      } else {
+        message = '이미 사용 중인 정보입니다.';
+      }
+    } else if (message.includes('ValidationError') || message.includes('validation')) {
+      message = '입력 정보를 확인해주세요.';
+    } else if (status === 500) {
+      // 프로덕션 환경에서는 일반적인 에러 메시지만 표시
+      message = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
     }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Error:', err);
+      console.error('Error message:', message);
+    }
+    
     res.status(status).json({ message });
   });
 

@@ -1,153 +1,412 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Upload, ArrowLeft, CheckCircle2, AlertCircle, ImagePlus } from 'lucide-react';
-import { createProduct, updateProduct } from '../services/productService';
-
-const CATEGORY_OPTIONS = ['상의', '하의', '악세사리', '아우터', '신발', '기타'];
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, Upload, Trash2 } from 'lucide-react';
+import { createProduct, updateProduct, deleteProduct } from '../services/productService';
+import { fetchCategories } from '../services/categoryService';
+import './ProductCreatePage.css';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const UPLOAD_FOLDER = import.meta.env.VITE_CLOUDINARY_UPLOAD_FOLDER || 'products';
 
 const EMPTY_FORM = {
-  sku: '',
   name: '',
-  price: '',
-  category: CATEGORY_OPTIONS[0],
-  image: '',
+  sku: '',
   description: '',
+  category: '',
+  price: '',
+  image: '',
+  images: [],
+  colors: [],
+  sizes: [],
+  stockManagement: 'track',
+  totalStock: 0,
+  status: 'draft',
+  shipping: {
+    isFree: false,
+    fee: 0,
+    estimatedDays: 3,
+  },
+  returnPolicy: {
+    isReturnable: true,
+    returnDays: 30,
+    returnFee: 0,
+  },
 };
 
 function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} }) {
-  const initialForm = useMemo(
-    () =>
-      product
-        ? {
-            sku: product.sku || '',
-            name: product.name || '',
-            price: product.price?.toString() || '',
-            category: product.category || CATEGORY_OPTIONS[0],
-            image: product.image || '',
-            description: product.description || '',
-          }
-        : { ...EMPTY_FORM },
-    [product]
-  );
-
-  const [form, setForm] = useState(initialForm);
-  const [status, setStatus] = useState('idle');
+  const isEditMode = Boolean(product?._id);
+  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [previewImages, setPreviewImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [uploadingDescriptionImage, setUploadingDescriptionImage] = useState(false);
+  const [descriptionImageProgress, setDescriptionImageProgress] = useState(0);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [isWidgetReady, setIsWidgetReady] = useState(false);
-  const isEditMode = Boolean(product?._id);
 
   useEffect(() => {
-    setForm(initialForm);
-  }, [initialForm]);
+    loadCategories();
+    if (isEditMode && product) {
+      const productImages = product.images && Array.isArray(product.images) && product.images.length > 0
+        ? product.images
+        : (product.image ? [product.image] : []);
+      
+      setFormData({
+        name: product.name || '',
+        sku: product.sku || '',
+        description: product.description || '',
+        category: product.category || '',
+        price: product.price?.toString() || '',
+        image: productImages[0] || product.image || '',
+        images: productImages,
+        colors: product.colors && Array.isArray(product.colors) ? product.colors : [],
+        sizes: product.sizes && Array.isArray(product.sizes) ? product.sizes : [],
+        stockManagement: product.stockManagement || 'track',
+        totalStock: product.totalStock || 0,
+        status: product.status || 'draft',
+        shipping: {
+          isFree: product.shipping?.isFree || false,
+          fee: product.shipping?.fee || 0,
+          estimatedDays: product.shipping?.estimatedDays || 3,
+        },
+        returnPolicy: {
+          isReturnable: product.returnPolicy?.isReturnable !== false,
+          returnDays: product.returnPolicy?.returnDays || 30,
+          returnFee: product.returnPolicy?.returnFee || 0,
+        },
+      });
+      setPreviewImages(productImages);
+    }
+  }, [isEditMode, product]);
 
-  useEffect(() => {
+  const loadCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const categoriesData = await fetchCategories();
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+
+    if (name.startsWith('shipping.')) {
+      const field = name.split('.')[1];
+      setFormData((prev) => ({
+        ...prev,
+        shipping: {
+          ...prev.shipping,
+          [field]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) || 0 : value,
+        },
+      }));
+    } else if (name.startsWith('returnPolicy.')) {
+      const field = name.split('.')[1];
+      setFormData((prev) => ({
+        ...prev,
+        returnPolicy: {
+          ...prev.returnPolicy,
+          [field]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) || 0 : value,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === 'number' ? (value === '' ? '' : parseInt(value)) : value,
+      }));
+    }
+  };
+
+  const uploadToCloudinary = async (file, onProgress) => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      setError(
-        'Cloudinary 환경 변수가 설정되지 않았어요. .env 파일에서 VITE_CLOUDINARY_CLOUD_NAME과 VITE_CLOUDINARY_UPLOAD_PRESET 값을 확인해주세요.'
-      );
+      throw new Error('Cloudinary 설정이 없습니다. 환경 변수를 확인해주세요.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('folder', 'products');
+
+    const xhr = new XMLHttpRequest();
+    return new Promise((resolve, reject) => {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          onProgress(percentComplete);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response.secure_url);
+        } else {
+          reject(new Error('이미지 업로드에 실패했습니다.'));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('네트워크 오류가 발생했습니다.'));
+      });
+
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
+      xhr.send(formData);
+    });
+  };
+
+  const handleImageFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // 최대 4개 제한 확인
+    const currentImageCount = formData.images.length;
+    if (currentImageCount + files.length > 4) {
+      alert(`이미지는 최대 4개까지 업로드할 수 있습니다. (현재: ${currentImageCount}개)`);
+      e.target.value = '';
       return;
     }
 
-    if (window.cloudinary) {
-      setIsWidgetReady(true);
+    // 파일 유효성 검사
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        e.target.value = '';
       return;
     }
 
-    const scriptId = 'cloudinary-widget-script';
-    if (document.getElementById(scriptId)) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('파일 크기는 5MB 이하여야 합니다.');
+        e.target.value = '';
+      return;
+      }
+    }
+
+    setUploading(true);
+    const newImages = [...formData.images];
+    const newPreviewImages = [...previewImages];
+    const uploadProgressMap = { ...uploadProgress };
+
+    try {
+      // 각 파일을 순차적으로 업로드
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileId = `file-${Date.now()}-${i}`;
+        
+        // 로컬 미리보기 추가
+        const localPreview = URL.createObjectURL(file);
+        newPreviewImages.push(localPreview);
+        setPreviewImages([...newPreviewImages]);
+
+        try {
+          const imageUrl = await uploadToCloudinary(file, (progress) => {
+            uploadProgressMap[fileId] = progress;
+            setUploadProgress({ ...uploadProgressMap });
+          });
+
+          // 업로드 성공 시 실제 URL로 교체
+          newImages.push(imageUrl);
+          const previewIndex = newPreviewImages.indexOf(localPreview);
+          if (previewIndex >= 0) {
+            newPreviewImages[previewIndex] = imageUrl;
+          }
+          
+          URL.revokeObjectURL(localPreview);
+          
+          setFormData((prev) => ({
+            ...prev,
+            image: prev.image || imageUrl, // 첫 번째 이미지는 image 필드에도 저장
+            images: newImages,
+          }));
+          setPreviewImages([...newPreviewImages]);
+        } catch (error) {
+          console.error(`Image ${i + 1} upload error:`, error);
+          // 실패한 파일의 미리보기 제거
+          const previewIndex = newPreviewImages.indexOf(localPreview);
+          if (previewIndex >= 0) {
+            newPreviewImages.splice(previewIndex, 1);
+            setPreviewImages([...newPreviewImages]);
+          }
+          URL.revokeObjectURL(localPreview);
+          alert(`이미지 ${i + 1} 업로드에 실패했습니다: ${error.message}`);
+        }
+      }
+    } finally {
+      setUploading(false);
+      setUploadProgress({});
+      e.target.value = '';
+    }
+  };
+
+  const handleImageUrlChange = (e) => {
+    setImageUrlInput(e.target.value);
+  };
+
+  const handleImageUrlSubmit = () => {
+    const url = imageUrlInput.trim();
+    if (!url) return;
+    
+    if (formData.images.length >= 4) {
+      alert('이미지는 최대 4개까지 업로드할 수 있습니다.');
+      setImageUrlInput('');
       return;
     }
 
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = 'https://widget.cloudinary.com/v2.0/global/all.js';
-    script.async = true;
-    script.onload = () => setIsWidgetReady(true);
-    script.onerror = () => setError('이미지 업로드 도구를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.');
-    document.body.appendChild(script);
-  }, []);
+    const newImages = [...formData.images, url];
+    setFormData((prev) => ({
+      ...prev,
+      image: prev.image || url,
+      images: newImages,
+    }));
+    setPreviewImages([...previewImages, url]);
+    setImageUrlInput('');
+  };
 
-  const openUploadWidget = useCallback(() => {
-    if (!isWidgetReady || !window.cloudinary) {
-      setError('이미지 업로드 도구가 아직 준비되지 않았어요.');
-      return;
-    }
+  const handleRemoveImage = (index) => {
+    const newImages = formData.images.filter((_, i) => i !== index);
+    const newPreviewImages = previewImages.filter((_, i) => i !== index);
+    
+    setFormData((prev) => ({
+      ...prev,
+      image: newImages[0] || '',
+      images: newImages,
+    }));
+    setPreviewImages(newPreviewImages);
+  };
 
+  const uploadDescriptionImageToCloudinary = async (file) => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      setError(
-        'Cloudinary 환경 변수가 설정되지 않아 업로드할 수 없어요. 관리자에게 설정을 요청해주세요.'
-      );
+      throw new Error('Cloudinary 설정이 없습니다. 환경 변수를 확인해주세요.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('folder', 'products/description');
+
+    const xhr = new XMLHttpRequest();
+    return new Promise((resolve, reject) => {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          setDescriptionImageProgress(percentComplete);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response.secure_url);
+        } else {
+          reject(new Error('이미지 업로드에 실패했습니다.'));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('네트워크 오류가 발생했습니다.'));
+      });
+
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
+      xhr.send(formData);
+    });
+  };
+
+  const handleDescriptionImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드 가능합니다.');
       return;
     }
 
-    const widget = window.cloudinary.createUploadWidget(
-      {
-        cloudName: CLOUD_NAME,
-        uploadPreset: UPLOAD_PRESET,
-        sources: ['local', 'url', 'camera'],
-        multiple: false,
-        maxImageFileSize: 5_000_000,
-        cropping: false,
-        resourceType: 'image',
-        clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
-        folder: UPLOAD_FOLDER,
-      },
-      (errorResult, result) => {
-        if (errorResult) {
-          setError(
-            errorResult.message || '이미지 업로드 중 문제가 발생했어요. 다시 시도해주세요.'
-          );
+    if (file.size > 5 * 1024 * 1024) {
+      alert('파일 크기는 5MB 이하여야 합니다.');
           return;
         }
 
-        if (result?.event === 'success' && result.info?.secure_url) {
-          setForm((prev) => ({ ...prev, image: result.info.secure_url }));
-          setError('');
-        }
+    setUploadingDescriptionImage(true);
+    setDescriptionImageProgress(0);
+
+    try {
+      const imageUrl = await uploadDescriptionImageToCloudinary(file);
+      
+      // 현재 커서 위치에 이미지 삽입
+      const textarea = document.getElementById('description');
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const textBefore = formData.description.substring(0, start);
+        const textAfter = formData.description.substring(end);
+        const imageMarkdown = `\n![이미지](${imageUrl})\n`;
+        const newDescription = textBefore + imageMarkdown + textAfter;
+        
+        setFormData((prev) => ({ ...prev, description: newDescription }));
+        
+        // 커서 위치 조정
+        setTimeout(() => {
+          textarea.focus();
+          const newCursorPos = start + imageMarkdown.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      } else {
+        // textarea가 없으면 끝에 추가
+        setFormData((prev) => ({
+          ...prev,
+          description: prev.description + `\n![이미지](${imageUrl})\n`,
+        }));
       }
-    );
-
-    widget.open();
-  }, [isWidgetReady]);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    if (name === 'price') {
-      const cleanValue = value.replace(/[^0-9.]/g, '');
-      setForm((prev) => ({ ...prev, [name]: cleanValue }));
-      return;
+    } catch (error) {
+      console.error('Description image upload error:', error);
+      alert(error.message || '이미지 업로드에 실패했습니다.');
+    } finally {
+      setUploadingDescriptionImage(false);
+      setDescriptionImageProgress(0);
+      e.target.value = '';
     }
-    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
     setSuccess(false);
 
-    if (!form.sku.trim() || !form.name.trim() || !form.price || !form.category || !form.image.trim()) {
-      setError('필수 입력값을 모두 채워주세요.');
+    if (!formData.name || !formData.category || !formData.price || !formData.image) {
+      setError('필수 항목(상품명, 카테고리, 가격, 이미지)을 모두 입력해주세요.');
       return;
     }
 
-    setStatus('loading');
+    setLoading(true);
 
     try {
+      const productImages = formData.images.length > 0 
+        ? formData.images.filter(img => img && img.trim())
+        : (formData.image ? [formData.image.trim()] : []);
+
       const payload = {
-        sku: form.sku.trim(),
-        name: form.name.trim(),
-        price: Number(form.price),
-        category: form.category,
-        image: form.image.trim(),
-        description: form.description.trim(),
+        sku: formData.sku.trim().toUpperCase(),
+        name: formData.name.trim(),
+        price: Number(formData.price),
+        category: formData.category,
+        image: productImages[0] || formData.image.trim(),
+        images: productImages,
+        description: formData.description.trim(),
+        colors: formData.colors.filter(c => c.name && c.value),
+        sizes: formData.sizes.filter(s => s.label && s.value),
+        stockManagement: formData.stockManagement,
+        totalStock: formData.stockManagement === 'track' ? Number(formData.totalStock) : undefined,
+        status: formData.status,
+        shipping: formData.shipping,
+        returnPolicy: formData.returnPolicy,
       };
 
       let result;
-
       if (isEditMode) {
         result = await updateProduct(product._id, payload);
       } else {
@@ -155,174 +414,688 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       }
 
       setSuccess(true);
-      setStatus('idle');
       setError('');
-
-      if (isEditMode) {
-        setForm({
-          sku: result.sku,
-          name: result.name,
-          price: result.price?.toString() || '',
-          category: result.category,
-          image: result.image,
-          description: result.description || '',
-        });
-      } else {
-        setForm(EMPTY_FORM);
-      }
-
       onSubmitSuccess(result);
     } catch (submitError) {
-      setStatus('idle');
-      setError(submitError.message || '상품 등록 중 문제가 발생했어요.');
+      setError(submitError.message || `상품 ${isEditMode ? '수정' : '등록'}에 실패했습니다.`);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleDelete = async () => {
+    if (!isEditMode || !product?._id) return;
+
+    if (!window.confirm('정말로 이 상품을 삭제하시겠습니까? 삭제된 상품은 복구할 수 없습니다.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteProduct(product._id);
+      alert('상품이 삭제되었습니다.');
+      onBack();
+    } catch (error) {
+      alert(error.message || '상품 삭제에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && isEditMode && !product) {
+    return (
+      <div className="product-register">
+        <div className="product-register-header">
+          <button className="product-register-back" onClick={onBack}>
+            <ArrowLeft className="icon" />
+            관리자 대시보드로
+          </button>
+          <div className="product-register-title">
+            <h1>상품 수정</h1>
+            <p>상품 정보를 불러오는 중...</p>
+          </div>
+        </div>
+        <div className="product-register-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="loading-spinner"></div>
+            <p>상품 정보를 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="product-create">
-      <div className="product-create__header">
-        <button type="button" className="product-create__back" onClick={onBack}>
-          <ArrowLeft className="product-create__back-icon" />
+    <div className="product-register">
+      <div className="product-register-header">
+        <button className="product-register-back" onClick={onBack}>
+          <ArrowLeft className="icon" />
           관리자 대시보드로
         </button>
-        <div>
-          <h1>{isEditMode ? '상품 정보 수정' : '새 상품 등록'}</h1>
+        <div className="product-register-title">
+          <h1>{isEditMode ? '상품 수정' : '새 상품 등록'}</h1>
           <p>
             {isEditMode
-              ? '상품 정보를 수정하고 저장하면 목록에서 즉시 업데이트됩니다.'
-              : 'SKU, 가격, 카테고리 등 주요 정보를 입력하고 쇼핑몰에 상품을 추가하세요.'}
+              ? '상품 정보를 수정하고 저장하세요.'
+              : 'SKU, 가격, 카테고리 등 핵심 정보를 입력하고 쇼핑몰에 상품을 추가하세요.'}
           </p>
         </div>
       </div>
 
-      <div className="product-create__layout">
-        <section className="product-create__card">
-          <header>
-            <h2>상품 기본 정보</h2>
-            <p>판매에 필요한 핵심 정보를 입력하세요.</p>
-          </header>
+      <div className="product-register-content">
+        <div className="product-register-main">
+          <form onSubmit={handleSubmit} className="product-register-form">
+            <section className="product-register-section">
+              <h2>{isEditMode ? '상품 수정' : '상품 기본 정보'}</h2>
+              <p className="section-subtitle">
+                {isEditMode ? '상품 정보를 수정하세요.' : '판매에 필요한 핵심 정보를 입력하세요.'}
+              </p>
 
-          <form className="product-create__form" onSubmit={handleSubmit}>
-            <div className="product-create__grid">
-              <label className="product-create__field">
-                <span>SKU (고유코드) *</span>
+              <div className="form-group">
+                <label htmlFor="sku">
+                  SKU (고유코드) <span className="required">*</span>
+                </label>
                 <input
                   type="text"
+                  id="sku"
                   name="sku"
+                  value={formData.sku}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase().replace(/\s/g, '');
+                    setFormData((prev) => ({ ...prev, sku: value }));
+                  }}
                   placeholder="예: TOP-001"
-                  value={form.sku}
-                  onChange={handleChange}
+                  maxLength={50}
                   required
                 />
-              </label>
+              </div>
 
-              <label className="product-create__field">
-                <span>상품명 *</span>
+              <div className="form-group">
+                <label htmlFor="name">
+                  상품명 <span className="required">*</span>
+              </label>
                 <input
                   type="text"
+                  id="name"
                   name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
                   placeholder="상품명을 입력하세요"
-                  value={form.name}
-                  onChange={handleChange}
                   required
                 />
-              </label>
+              </div>
 
-              <label className="product-create__field">
-                <span>판매가 (₩) *</span>
+              <div className="form-group">
+                <label htmlFor="price">
+                  판매가 (₩) <span className="required">*</span>
+              </label>
                 <input
-                  type="text"
+                  type="number"
+                  id="price"
                   name="price"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={form.price}
-                  onChange={handleChange}
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  min="0"
                   required
                 />
-              </label>
+              </div>
 
-              <label className="product-create__field">
-                <span>카테고리 *</span>
-                <select name="category" value={form.category} onChange={handleChange} required>
-                  {CATEGORY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+              <div className="form-group">
+                <label htmlFor="category">
+                  카테고리 <span className="required">*</span>
+              </label>
+                <select
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  disabled={categoriesLoading}
+                >
+                  <option value="">
+                    {categoriesLoading ? '카테고리를 불러오는 중...' : '카테고리를 선택하세요'}
+                  </option>
+                  {!categoriesLoading &&
+                    Array.isArray(categories) &&
+                    categories.length > 0 &&
+                    categories.map((category) => (
+                      <option key={category._id || category.id} value={category.name}>
+                        {category.name}
                     </option>
                   ))}
                 </select>
-              </label>
+                {!categoriesLoading && Array.isArray(categories) && categories.length === 0 && (
+                  <div className="form-hint" style={{ color: '#dc3545', marginTop: '0.5rem' }}>
+                    <p style={{ margin: '0 0 0.5rem' }}>카테고리가 없습니다. 서버에서 카테고리를 생성해주세요.</p>
+                  </div>
+                )}
             </div>
 
-            <div className="product-create__field">
-              <span>상품 이미지 *</span>
-              <div className="product-create__upload">
-                <button
-                  type="button"
-                  className="product-create__upload-button"
-                  onClick={openUploadWidget}
-                  disabled={!isWidgetReady || !CLOUD_NAME || !UPLOAD_PRESET}
+              <div className="form-group">
+                <label htmlFor="stockManagement">재고 관리</label>
+                <select
+                  id="stockManagement"
+                  name="stockManagement"
+                  value={formData.stockManagement}
+                  onChange={handleInputChange}
                 >
-                  <ImagePlus className="product-create__upload-icon" />
-                  {!CLOUD_NAME || !UPLOAD_PRESET
-                    ? '환경 설정 필요'
-                    : isWidgetReady
-                      ? '이미지 업로드'
-                      : '업로드 도구 준비 중...'}
-                </button>
-                {form.image && (
+                  <option value="track">재고 추적</option>
+                  <option value="unlimited">무제한</option>
+                </select>
+              </div>
+
+              {formData.stockManagement === 'track' && (
+                <div className="form-group">
+                  <label htmlFor="totalStock">재고 수량</label>
                   <input
-                    type="url"
-                    name="image"
-                    value={form.image}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                    className="product-create__upload-input"
-                    required
+                    type="number"
+                    id="totalStock"
+                    name="totalStock"
+                    value={formData.totalStock}
+                    onChange={handleInputChange}
+                    min="0"
                   />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="status">판매 상태</label>
+                <select id="status" name="status" value={formData.status} onChange={handleInputChange}>
+                  <option value="draft">임시저장</option>
+                  <option value="active">판매중</option>
+                  <option value="inactive">판매중지</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="imageFile">
+                  상품 이미지 <span className="required">*</span> (최대 4개)
+                </label>
+                <input
+                  type="file"
+                  id="imageFile"
+                  name="imageFile"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageFileSelect}
+                  disabled={uploading || formData.images.length >= 4}
+                  style={{ display: 'none' }}
+                />
+                <label 
+                  htmlFor="imageFile" 
+                  className="image-upload-button-large"
+                  style={{
+                    opacity: (uploading || formData.images.length >= 4) ? 0.6 : 1,
+                    cursor: (uploading || formData.images.length >= 4) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Upload className="icon" size={24} />
+                  {uploading 
+                    ? `업로드 중...` 
+                    : formData.images.length >= 4 
+                      ? '이미지 최대 개수 도달 (4개)'
+                      : `이미지 업로드 (${formData.images.length}/4)`}
+                </label>
+                {Object.keys(uploadProgress).length > 0 && (
+                  <div className="upload-progress" style={{ marginTop: '0.5rem' }}>
+                    {Object.entries(uploadProgress).map(([fileId, progress]) => (
+                      <div key={fileId} style={{ marginBottom: '0.25rem' }}>
+                        <div className="upload-progress-bar" style={{ width: `${progress}%` }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {previewImages.length > 0 && (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
+                    gap: '1rem', 
+                    marginTop: '1rem' 
+                  }}>
+                    {previewImages.map((imageUrl, index) => (
+                      <div key={`${imageUrl}-${index}`} style={{ position: 'relative', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img 
+                          src={imageUrl} 
+                          alt={`상품 이미지 ${index + 1}`}
+                          style={{ 
+                            width: '100%', 
+                            height: '150px', 
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '28px',
+                            height: '28px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '18px',
+                            lineHeight: 1,
+                          }}
+                          aria-label="이미지 제거"
+                        >
+                          ×
+                        </button>
+                        {index === 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '0.5rem',
+                            left: '0.5rem',
+                            background: 'rgba(99, 102, 241, 0.9)',
+                            color: 'white',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                          }}>
+                            대표 이미지
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="form-hint">
+                  Cloudinary 업로드를 통해 이미지를 추가하세요. 최대 4개, 각 5MB 이하 JPG, PNG, WebP 지원.
+                </p>
+                <details style={{ marginTop: '0.5rem' }}>
+                  <summary style={{ cursor: 'pointer', color: '#666', fontSize: '0.85rem' }}>
+                    URL로 직접 입력하기
+                  </summary>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <input
+                      type="url"
+                      id="imageUrl"
+                      name="imageUrl"
+                      value={imageUrlInput}
+                      onChange={handleImageUrlChange}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleImageUrlSubmit();
+                        }
+                      }}
+                      placeholder="https://example.com/image.jpg"
+                      disabled={formData.images.length >= 4}
+                      style={{
+                        flex: 1,
+                        padding: '0.65rem 0.75rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImageUrlSubmit}
+                      disabled={formData.images.length >= 4 || !imageUrlInput.trim()}
+                      style={{
+                        padding: '0.65rem 1rem',
+                        background: formData.images.length >= 4 || !imageUrlInput.trim() ? '#ccc' : '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: formData.images.length >= 4 || !imageUrlInput.trim() ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      추가
+                    </button>
+                  </div>
+                </details>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="description">
+                  상세 설명 <span className="required">*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <input
+                    type="file"
+                    id="descriptionImageFile"
+                    name="descriptionImageFile"
+                    accept="image/*"
+                    onChange={handleDescriptionImageUpload}
+                    disabled={uploadingDescriptionImage}
+                    style={{ display: 'none' }}
+                  />
+                  <label
+                    htmlFor="descriptionImageFile"
+                    className="image-upload-button"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#6366f1',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: uploadingDescriptionImage ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      opacity: uploadingDescriptionImage ? 0.6 : 1,
+                    }}
+                  >
+                    <Upload className="icon" size={16} />
+                    {uploadingDescriptionImage
+                      ? `업로드 중... ${Math.round(descriptionImageProgress)}%`
+                      : '이미지 추가'}
+                  </label>
+                  {uploadingDescriptionImage && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                      <div
+                        style={{
+                          width: '100px',
+                          height: '4px',
+                          background: '#e5e7eb',
+                          borderRadius: '2px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${descriptionImageProgress}%`,
+                            height: '100%',
+                            background: '#6366f1',
+                            transition: 'width 0.3s',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+            </div>
+              <textarea
+                  id="description"
+                name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="상품 특징, 소재, 배송 정보 등을 입력하세요. 이미지를 추가하려면 위의 '이미지 추가' 버튼을 클릭하세요."
+                  rows="8"
+                  required
+                  style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
+                />
+                <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                  이미지를 추가하면 마크다운 형식으로 삽입됩니다. 예: ![이미지](이미지URL)
+                </p>
+              </div>
+
+              <div className="form-section">
+                <h3>상품 옵션 (선택사항)</h3>
+                <div className="form-group">
+                  <label htmlFor="colors">컬러 옵션</label>
+                  <div style={{ marginBottom: '1rem' }}>
+                    {formData.colors.map((color, index) => (
+                      <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="컬러 이름 (예: Black)"
+                          value={color.name || ''}
+                          onChange={(e) => {
+                            const newColors = [...formData.colors];
+                            newColors[index] = { ...newColors[index], name: e.target.value };
+                            setFormData((prev) => ({ ...prev, colors: newColors }));
+                          }}
+                          style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
+                        <input
+                          type="color"
+                          value={color.value || '#000000'}
+                          onChange={(e) => {
+                            const newColors = [...formData.colors];
+                            newColors[index] = { ...newColors[index], value: e.target.value };
+                            setFormData((prev) => ({ ...prev, colors: newColors }));
+                          }}
+                          style={{ width: '60px', height: '40px', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <input
+                          type="url"
+                          placeholder="컬러별 이미지 URL (선택)"
+                          value={color.image || ''}
+                          onChange={(e) => {
+                            const newColors = [...formData.colors];
+                            newColors[index] = { ...newColors[index], image: e.target.value };
+                            setFormData((prev) => ({ ...prev, colors: newColors }));
+                          }}
+                          style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newColors = formData.colors.filter((_, i) => i !== index);
+                            setFormData((prev) => ({ ...prev, colors: newColors }));
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          colors: [...prev.colors, { name: '', value: '#000000', image: '' }],
+                        }));
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      + 컬러 추가
+                    </button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="sizes">사이즈 옵션</label>
+                  <div style={{ marginBottom: '1rem' }}>
+                    {formData.sizes.map((size, index) => (
+                      <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="사이즈 라벨 (예: XS (KR 90))"
+                          value={size.label || ''}
+                          onChange={(e) => {
+                            const newSizes = [...formData.sizes];
+                            newSizes[index] = { ...newSizes[index], label: e.target.value };
+                            setFormData((prev) => ({ ...prev, sizes: newSizes }));
+                          }}
+                          style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="사이즈 값 (예: XS)"
+                          value={size.value || ''}
+                          onChange={(e) => {
+                            const newSizes = [...formData.sizes];
+                            newSizes[index] = { ...newSizes[index], value: e.target.value };
+                            setFormData((prev) => ({ ...prev, sizes: newSizes }));
+                          }}
+                          style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={size.available !== false}
+                            onChange={(e) => {
+                              const newSizes = [...formData.sizes];
+                              newSizes[index] = { ...newSizes[index], available: e.target.checked };
+                              setFormData((prev) => ({ ...prev, sizes: newSizes }));
+                            }}
+                          />
+                          <span style={{ fontSize: '0.875rem' }}>재고 있음</span>
+            </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newSizes = formData.sizes.filter((_, i) => i !== index);
+                            setFormData((prev) => ({ ...prev, sizes: newSizes }));
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          sizes: [...prev.sizes, { label: '', value: '', available: true }],
+                        }));
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      + 사이즈 추가
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>배송 정보</h3>
+                <div className="form-group">
+                  <label htmlFor="shipping.estimatedDays">예상 배송일 (일)</label>
+                  <input
+                    type="number"
+                    id="shipping.estimatedDays"
+                    name="shipping.estimatedDays"
+                    value={formData.shipping.estimatedDays}
+                    onChange={handleInputChange}
+                    min="1"
+                  />
+                </div>
+                <div className="checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="shipping.isFree"
+                      checked={formData.shipping.isFree}
+                      onChange={handleInputChange}
+                    />
+                    <span>무료배송</span>
+                  </label>
+                </div>
+                {!formData.shipping.isFree && (
+                  <div className="form-group">
+                    <label htmlFor="shipping.fee">배송비 (₩)</label>
+                    <input
+                      type="number"
+                      id="shipping.fee"
+                      name="shipping.fee"
+                      value={formData.shipping.fee}
+                      onChange={handleInputChange}
+                      min="0"
+                    />
+                  </div>
                 )}
               </div>
-              <small>Cloudinary 업로드 위젯을 통해 이미지를 추가하세요. 5MB 이하 JPG, PNG, WebP 지원.</small>
-            </div>
 
-            <label className="product-create__field">
-              <span>상세 설명</span>
-              <textarea
-                name="description"
-                placeholder="상품 특징, 소재, 배송 정보 등을 입력하세요"
-                rows={5}
-                value={form.description}
-                onChange={handleChange}
-              />
-            </label>
-
-            {error && (
-              <div className="product-create__alert product-create__alert--error">
-                <AlertCircle className="product-create__alert-icon" />
-                <span>{error}</span>
+              <div className="form-section">
+                <h3>반품/환불 정책</h3>
+                <div className="checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="returnPolicy.isReturnable"
+                      checked={formData.returnPolicy.isReturnable}
+                      onChange={handleInputChange}
+                    />
+                    <span>반품 가능</span>
+                  </label>
+                </div>
+                {formData.returnPolicy.isReturnable && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="returnPolicy.returnDays">반품 가능 기간 (일)</label>
+                      <input
+                        type="number"
+                        id="returnPolicy.returnDays"
+                        name="returnPolicy.returnDays"
+                        value={formData.returnPolicy.returnDays}
+                        onChange={handleInputChange}
+                        min="1"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="returnPolicy.returnFee">반품 배송비 (₩)</label>
+                      <input
+                        type="number"
+                        id="returnPolicy.returnFee"
+                        name="returnPolicy.returnFee"
+                        value={formData.returnPolicy.returnFee}
+                        onChange={handleInputChange}
+                        min="0"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-            )}
 
-            {success && (
-              <div className="product-create__alert product-create__alert--success">
-                <CheckCircle2 className="product-create__alert-icon" />
-                <span>상품이 성공적으로 등록되었어요.</span>
-              </div>
-            )}
+              {error && <p className="status-message error">{error}</p>}
+              {success && (
+                <p className="status-message success">
+                  상품이 성공적으로 {isEditMode ? '수정' : '등록'}되었어요.
+                </p>
+              )}
 
-            <div className="product-create__actions">
+              <div className="form-actions">
+                {isEditMode && (
+                  <button type="button" className="btn btn-delete" onClick={handleDelete} disabled={loading}>
+                    <Trash2 size={18} />
+                    삭제
+                  </button>
+                )}
+                <div className="btn-group">
               <button
                 type="button"
-                className="product-create__button product-create__button--ghost"
+                    className="btn btn-cancel"
                 onClick={onBack}
+                    disabled={loading}
               >
-                {isEditMode ? '돌아가기' : '취소'}
+                    취소
               </button>
-              <button
-                type="submit"
-                className="product-create__button product-create__button--primary"
-                disabled={status === 'loading'}
-              >
-                {status === 'loading'
+                  <button type="submit" className="btn btn-submit" disabled={loading}>
+                    {loading
                   ? isEditMode
                     ? '수정 중...'
                     : '등록 중...'
@@ -331,40 +1104,40 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                     : '상품 등록하기'}
               </button>
             </div>
+              </div>
+            </section>
           </form>
-        </section>
+        </div>
 
-        <aside className="product-create__sidebar">
-          <article className="product-create__card product-create__card--summary">
+        <div className="product-register-sidebar">
+          <div className="sidebar-section">
             <h3>등록 가이드</h3>
-            <ul>
+            <ul className="guide-list">
               <li>SKU는 대문자/숫자 조합으로 고유하게 등록하세요.</li>
               <li>가격은 숫자만 입력하며, 통화 기호는 자동으로 처리됩니다.</li>
               <li>이미지 URL은 외부 스토리지 혹은 CDN 링크를 입력할 수 있습니다.</li>
               <li>상세 설명에는 소재, 관리 방법, 배송 안내 등 고객이 궁금해할 내용을 담으세요.</li>
             </ul>
-          </article>
+          </div>
 
-          <article className="product-create__card product-create__preview">
+          <div className="sidebar-section">
             <h3>이미지 미리보기</h3>
-            <div className="product-create__preview-frame">
-              {form.image ? (
-                <img src={form.image} alt={form.name || form.sku || '상품 이미지 미리보기'} />
+            <div className="image-preview">
+              {previewImages[0] || formData.image ? (
+                <img src={previewImages[0] || formData.image} alt="상품 미리보기" />
               ) : (
-                <div className="product-create__preview-empty">
-                  <Upload className="product-create__placeholder-icon" />
+                <div className="image-preview-placeholder">
+                  <Upload className="icon" />
                   <p>이미지를 업로드하면 미리보기가 표시됩니다.</p>
                 </div>
               )}
+              {formData.name && <p className="preview-product-name">{formData.name}</p>}
             </div>
-            <p>{form.name || '상품명을 입력하면 여기 표시돼요.'}</p>
-          </article>
-        </aside>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default ProductCreatePage;
-
-

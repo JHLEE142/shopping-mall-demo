@@ -11,7 +11,17 @@ export async function createUser(userPayload) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);
-    const message = data?.message || '회원가입에 실패했어요. 잠시 후 다시 시도해주세요.';
+    let message = data?.message || '회원가입에 실패했어요. 잠시 후 다시 시도해주세요.';
+    
+    // 기술적인 에러 메시지 필터링
+    if (message.includes('E11000') || message.includes('duplicate key') || message.includes('index:')) {
+      message = '이미 사용 중인 이메일입니다.';
+    } else if (message.includes('ValidationError') || message.includes('validation')) {
+      message = '입력 정보를 확인해주세요.';
+    } else if (message.includes('Internal Server Error') || message.includes('500')) {
+      message = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    }
+    
     throw new Error(message);
   }
 
@@ -24,7 +34,11 @@ export async function loginUser(credentials) {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(credentials),
+    body: JSON.stringify({
+      email: credentials.email,
+      password: credentials.password,
+      rememberMe: credentials.rememberMe || false,
+    }),
   });
 
   if (!response.ok) {

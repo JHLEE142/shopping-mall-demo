@@ -48,9 +48,10 @@ function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () 
       const data = await loginUser({
         email: trimmedEmail,
         password: form.password,
+        rememberMe: form.remember,
       });
 
-      const expiresInMs = form.remember ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000; // 60분
+      const expiresInMs = 60 * 60 * 1000; // 60분
       const expiresAt = Date.now() + expiresInMs;
 
       saveSession({
@@ -58,6 +59,9 @@ function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () 
         user: data.user,
         expiresAt,
         lastActivityTime: Date.now(),
+        deviceId: data.deviceId,
+        rememberToken: data.rememberToken,
+        deviceExpiresAt: data.deviceExpiresAt,
       });
 
       setForm((prev) => ({ ...INITIAL_FORM, remember: prev.remember }));
@@ -119,7 +123,7 @@ function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () 
                 checked={form.remember}
                 onChange={handleChange}
               />
-              로그인 상태 유지
+              이 기기에서 자동 로그인 유지
             </label>
             <button type="button" className="link-button">
               비밀번호 찾기

@@ -1,5 +1,6 @@
 const Order = require('../models/order');
 const Cart = require('../models/cart');
+const { Coupon, UserCoupon } = require('../models/coupon');
 
 const PORTONE_API_BASE_URL = 'https://api.iamport.kr';
 
@@ -123,13 +124,14 @@ async function generateUniqueOrderNumber() {
   return uniqueNumber;
 }
 
-function computeOrderTotals(items = [], summaryOverrides = {}) {
+function computeOrderTotals(items = [], summaryOverrides = {}, couponDiscount = 0) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const discountTotal = items.reduce((sum, item) => sum + item.lineDiscount, 0);
   const shippingFee = Number(summaryOverrides.shippingFee ?? 0);
   const tax = Number(summaryOverrides.tax ?? 0);
+  const couponDiscountAmount = Number(couponDiscount ?? 0);
   const grandTotal =
-    Number(summaryOverrides.grandTotal ?? subtotal - discountTotal + shippingFee + tax);
+    Number(summaryOverrides.grandTotal ?? subtotal - discountTotal - couponDiscountAmount + shippingFee + tax);
 
   return {
     currency: (summaryOverrides.currency || 'KRW').toUpperCase(),
@@ -137,7 +139,8 @@ function computeOrderTotals(items = [], summaryOverrides = {}) {
     discountTotal,
     shippingFee,
     tax,
-    grandTotal,
+    couponDiscount: couponDiscountAmount,
+    grandTotal: Math.max(0, grandTotal), // 최소 0원
   };
 }
 
@@ -167,6 +170,7 @@ async function createOrder(req, res, next) {
       sourceCart = null,
       orderNumber: providedOrderNumber,
       paymentVerification = {},
+      coupon: couponData = null,
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -199,7 +203,79 @@ async function createOrder(req, res, next) {
       };
     });
 
-    const computedSummary = computeOrderTotals(normalizedItems, summary);
+    // 쿠폰 적용 처리
+    let couponDiscount = 0;
+    let couponInfo = null;
+    let userCouponId = null;
+
+    if (couponData && couponData.userCouponId) {
+      const userId = req.user?._id || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: '쿠폰 사용을 위해 로그인이 필요합니다.' });
+      }
+
+      // 사용자 쿠폰 확인
+      const userCoupon = await UserCoupon.findOne({
+        _id: couponData.userCouponId,
+        userId: userId,
+        isUsed: false,
+      }).populate('couponId');
+
+      if (!userCoupon || !userCoupon.couponId) {
+        return res.status(400).json({ message: '유효하지 않은 쿠폰입니다.' });
+      }
+
+      const coupon = userCoupon.couponId;
+      const now = new Date();
+
+      // 쿠폰 유효성 검증
+      if (!coupon.isActive) {
+        return res.status(400).json({ message: '사용할 수 없는 쿠폰입니다.' });
+      }
+
+      if (new Date(coupon.validFrom) > now || new Date(coupon.validUntil) < now) {
+        return res.status(400).json({ message: '쿠폰 유효기간이 지났습니다.' });
+      }
+
+      // 최소 구매 금액 확인
+      const subtotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      if (coupon.minPurchaseAmount && subtotal < coupon.minPurchaseAmount) {
+        return res.status(400).json({ 
+          message: `최소 구매 금액 ${coupon.minPurchaseAmount.toLocaleString()}원 이상 구매 시 사용 가능합니다.` 
+        });
+      }
+
+      // 할인 금액 계산
+      if (coupon.type === 'freeShipping') {
+        // 무료배송은 shippingFee에서 차감
+        couponDiscount = 0; // shippingFee는 별도 처리
+      } else if (coupon.type === 'fixedAmount') {
+        couponDiscount = coupon.discountValue;
+      } else if (coupon.type === 'percentage') {
+        const percentageDiscount = Math.floor(subtotal * (coupon.discountValue / 100));
+        couponDiscount = coupon.maxDiscountAmount 
+          ? Math.min(percentageDiscount, coupon.maxDiscountAmount)
+          : percentageDiscount;
+      }
+
+      couponInfo = {
+        couponId: coupon._id,
+        userCouponId: userCoupon._id,
+        discountAmount: couponDiscount,
+      };
+      userCouponId = userCoupon._id;
+    }
+
+    // 무료배송 쿠폰 처리
+    let finalShippingFee = Number(summary.shippingFee ?? 0);
+    if (couponInfo) {
+      const coupon = await Coupon.findById(couponInfo.couponId).lean();
+      if (coupon && coupon.type === 'freeShipping') {
+        finalShippingFee = 0;
+      }
+    }
+    
+    const computedSummary = computeOrderTotals(normalizedItems, { ...summary, shippingFee: finalShippingFee }, couponDiscount);
 
     if (payment?.transactionId) {
       const duplicateOrder = await Order.findOne({
@@ -245,6 +321,7 @@ async function createOrder(req, res, next) {
       status: 'pending',
       items: normalizedItems,
       summary: computedSummary,
+      coupon: couponInfo || undefined,
       payment: {
         method: normalizeString(payment.method),
         status: verifiedPaymentInfo ? 'paid' : normalizeString(payment.status || 'ready'),
@@ -289,12 +366,30 @@ async function createOrder(req, res, next) {
 
     const order = await Order.create(orderPayload);
 
-    if (order.sourceCart) {
-      await Cart.findByIdAndUpdate(order.sourceCart, {
-        status: 'ordered',
-        lockedAt: new Date(),
+    // 쿠폰 사용 처리
+    if (userCouponId) {
+      await UserCoupon.findByIdAndUpdate(userCouponId, {
+        isUsed: true,
+        usedAt: new Date(),
+        orderId: order._id,
       });
+
+      // 쿠폰 사용 횟수 증가
+      if (couponInfo && couponInfo.couponId) {
+        await Coupon.findByIdAndUpdate(couponInfo.couponId, {
+          $inc: { usedCount: 1 },
+        });
+      }
     }
+
+    // 바로 구매가 아닌 경우에도 장바구니를 유지하기 위해 상태 변경하지 않음
+    // 주문 기록은 sourceCart 필드로 추적 가능
+    // if (order.sourceCart) {
+    //   await Cart.findByIdAndUpdate(order.sourceCart, {
+    //     status: 'ordered',
+    //     lockedAt: new Date(),
+    //   });
+    // }
 
     const populatedOrder = await order.populate('user', 'name email user_type');
     return res.status(201).json(populatedOrder);

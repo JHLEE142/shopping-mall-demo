@@ -135,6 +135,25 @@ const orderSchema = new Schema(
         required: true,
         min: [0, '결제 금액은 0 이상이어야 합니다.'],
       },
+      couponDiscount: {
+        type: Number,
+        default: 0,
+        min: [0, '쿠폰 할인액은 0 이상이어야 합니다.'],
+      },
+    },
+    coupon: {
+      couponId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Coupon',
+      },
+      userCouponId: {
+        type: Schema.Types.ObjectId,
+        ref: 'UserCoupon',
+      },
+      discountAmount: {
+        type: Number,
+        default: 0,
+      },
     },
     payment: {
       method: {

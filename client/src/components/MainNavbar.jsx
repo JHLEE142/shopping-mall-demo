@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { LogOut, UserRound, ChevronDown } from 'lucide-react';
+import { LogOut, UserRound, ChevronDown, Bell, Heart, Settings } from 'lucide-react';
 import SessionTimer from './SessionTimer';
+import { fetchCategories } from '../services/categoryService';
+import { getUnreviewedProducts } from '../services/reviewService';
 
 const NAV_LINKS = ['New', 'Collections', 'Categories', 'About'];
-const CATEGORIES = ['상의', '하의', '악세사리', '아우터', '신발', '기타'];
 
 function MainNavbar({
   user = null,
@@ -14,19 +15,82 @@ function MainNavbar({
   onMoveToCart = () => {},
   onMoveToLookbook = () => {},
   onNavigateToCategory = () => {},
+  onMoveToWishlist = () => {},
+  onMoveToSettings = () => {},
+  onMoveToPoints = () => {},
   cartCount = 0,
+  wishlistCount = 0,
+  pointsBalance = 0,
   onLogout = () => {},
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [unreviewedProducts, setUnreviewedProducts] = useState([]);
+  const [unreviewedLoading, setUnreviewedLoading] = useState(false);
   const userMenuRef = useRef(null);
   const categoriesRef = useRef(null);
+  const notificationRef = useRef(null);
   const isAdmin = user?.user_type === 'admin';
+
+  // 카테고리 목록 로드
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        setCategoriesLoading(true);
+        const data = await fetchCategories({ includeProductCount: false });
+        console.log('카테고리 로드 성공:', data?.length || 0, '개');
+        setCategories(data || []);
+      } catch (error) {
+        console.error('카테고리 로드 실패:', error.message);
+        // 에러가 발생해도 빈 배열로 설정하여 UI가 깨지지 않도록 함
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
+  // 리뷰 미작성 상품 목록 로드
+  useEffect(() => {
+    if (!user) {
+      setUnreviewedProducts([]);
+      return;
+    }
+
+    async function loadUnreviewedProducts() {
+      try {
+        setUnreviewedLoading(true);
+        const data = await getUnreviewedProducts();
+        setUnreviewedProducts(data.items || []);
+      } catch (error) {
+        console.error('리뷰 미작성 상품 로드 실패:', error.message);
+        setUnreviewedProducts([]);
+      } finally {
+        setUnreviewedLoading(false);
+      }
+    }
+
+    loadUnreviewedProducts();
+    // 30초마다 갱신
+    const interval = setInterval(loadUnreviewedProducts, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const closeMenu = () => setIsMenuOpen(false);
   const closeUserMenu = () => setIsUserMenuOpen(false);
   const closeCategories = () => setIsCategoriesOpen(false);
+  const closeNotification = () => setIsNotificationOpen(false);
+
+  const toggleNotification = () => {
+    setIsNotificationOpen((prev) => !prev);
+    closeUserMenu();
+    closeMenu();
+  };
 
   const handleNavigateHome = () => {
     closeMenu();
@@ -34,9 +98,11 @@ function MainNavbar({
     onNavigateHome();
   };
 
-  const handleMoveToLogin = () => {
+  const handleMoveToLogin = (e) => {
+    e?.preventDefault();
     closeMenu();
     closeUserMenu();
+    window.scrollTo({ top: 0, behavior: 'instant' });
     onMoveToLogin();
   };
 
@@ -85,11 +151,33 @@ function MainNavbar({
       }
     }
 
+    // 약간의 지연을 두어 버튼 클릭 이벤트가 먼저 처리되도록 함
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCategoriesOpen]);
+
+  useEffect(() => {
+    if (!isNotificationOpen) {
+      return undefined;
+    }
+
+    function handleClickOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+    }
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isCategoriesOpen]);
+  }, [isNotificationOpen]);
 
   const toggleUserMenu = () => {
     setIsUserMenuOpen((prev) => !prev);
@@ -105,6 +193,25 @@ function MainNavbar({
     closeMenu();
     closeUserMenu();
     onMoveToCart();
+  };
+
+
+  const handleMoveToWishlist = () => {
+    closeMenu();
+    closeUserMenu();
+    onMoveToWishlist();
+  };
+
+  const handleMoveToSettings = () => {
+    closeMenu();
+    closeUserMenu();
+    onMoveToSettings();
+  };
+
+  const handleMoveToPoints = () => {
+    closeMenu();
+    closeUserMenu();
+    onMoveToPoints();
   };
 
   const handleMoveToLookbook = () => {
@@ -153,25 +260,42 @@ function MainNavbar({
                     key={link}
                     className="nav-link-dropdown"
                     ref={categoriesRef}
-                    onMouseEnter={() => setIsCategoriesOpen(true)}
-                    onMouseLeave={() => setIsCategoriesOpen(false)}
                   >
-                    <button type="button" className="nav-link-button nav-link-button--dropdown">
+                    <button 
+                      type="button" 
+                      className="nav-link-button nav-link-button--dropdown"
+                      onClick={() => setIsCategoriesOpen((prev) => !prev)}
+                      aria-expanded={isCategoriesOpen}
+                      aria-haspopup="true"
+                    >
                       {link}
-                      <ChevronDown size={16} />
+                      <ChevronDown size={16} style={{ transform: isCategoriesOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                     </button>
                     {isCategoriesOpen && (
                       <div className="nav-dropdown-menu">
-                        {CATEGORIES.map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            className="nav-dropdown-item"
-                            onClick={() => handleNavigateToCategory(category)}
-                          >
-                            {category}
-                          </button>
-                        ))}
+                        {categoriesLoading ? (
+                          <div className="nav-dropdown-item" style={{ color: '#6b7280', cursor: 'default' }}>
+                            로딩 중...
+                          </div>
+                        ) : categories.length > 0 ? (
+                          categories.map((category) => (
+                            <button
+                              key={category._id || category.code}
+                              type="button"
+                              className="nav-dropdown-item"
+                              onClick={() => {
+                                handleNavigateToCategory(category.name);
+                                setIsCategoriesOpen(false);
+                              }}
+                            >
+                              {category.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="nav-dropdown-item" style={{ color: '#6b7280', cursor: 'default' }}>
+                            카테고리가 없습니다
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -202,6 +326,181 @@ function MainNavbar({
               <button type="button" className="nav-cta nav-cta--solid" onClick={handleMoveToAdmin}>
                 Admin Dashboard
               </button>
+            )}
+            {user && (
+              <div className="nav-cart" style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="nav-cart__button"
+                  onClick={handleMoveToWishlist}
+                  aria-label="찜하기"
+                  style={{ position: 'relative' }}
+                >
+                  <Heart size={20} fill="#ef4444" color="#ef4444" strokeWidth={0} />
+                  {wishlistCount > 0 && <span className="nav-cart__badge">{wishlistCount}</span>}
+                </button>
+              </div>
+            )}
+            {user && (
+              <div className="nav-cart" ref={notificationRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="nav-cart__button"
+                  onClick={toggleNotification}
+                  aria-label="알림"
+                  style={{ position: 'relative' }}
+                >
+                  <Bell size={20} />
+                  {unreviewedProducts.length > 0 && (
+                    <span
+                      className="nav-cart__badge"
+                      style={{
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        minWidth: '18px',
+                        height: '18px',
+                        fontSize: '11px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {unreviewedProducts.length}
+                    </span>
+                  )}
+                </button>
+                {isNotificationOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '0.5rem',
+                      width: '320px',
+                      maxHeight: '400px',
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '1rem',
+                        borderBottom: '1px solid #e5e7eb',
+                        fontWeight: 600,
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      알림 ({unreviewedProducts.length}개)
+                    </div>
+                    <div style={{ overflowY: 'auto', maxHeight: '300px' }}>
+                      {unreviewedLoading ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                          로딩 중...
+                        </div>
+                      ) : unreviewedProducts.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                          알림이 없습니다.
+                        </div>
+                      ) : (
+                        unreviewedProducts.map((item) => (
+                          <div
+                            key={`${item.productId}-${item.orderNumber}`}
+                            style={{
+                              padding: '1rem',
+                              borderBottom: '1px solid #f3f4f6',
+                              display: 'flex',
+                              gap: '0.75rem',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fff')}
+                            onClick={() => {
+                              closeNotification();
+                              // 상품 상세 페이지로 이동 (App.jsx에서 처리)
+                              if (window.location.pathname.includes('product-detail')) {
+                                const url = new URL(window.location);
+                                url.searchParams.set('productId', item.productId);
+                                window.location.href = url.toString();
+                              } else {
+                                window.location.href = `/product-detail?productId=${item.productId}`;
+                              }
+                            }}
+                          >
+                            <img
+                              src={item.productImage || '/placeholder.png'}
+                              alt={item.productName}
+                              style={{
+                                width: '60px',
+                                height: '60px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                flexShrink: 0,
+                              }}
+                              onError={(e) => {
+                                e.target.src = '/placeholder.png';
+                              }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: '0.85rem',
+                                  fontWeight: 500,
+                                  marginBottom: '0.25rem',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.productName}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                주문일: {new Date(item.orderedAt).toLocaleDateString('ko-KR')}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '0.7rem',
+                                  color: '#6366f1',
+                                  marginTop: '0.25rem',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                리뷰 작성하기 →
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {user && (
+              <div className="nav-points">
+                <span className="nav-points__label">적립금 :</span>
+                <span 
+                  className="nav-points__amount" 
+                  onClick={handleMoveToPoints}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleMoveToPoints();
+                    }
+                  }}
+                >
+                  {pointsBalance.toLocaleString()}원
+                </span>
+              </div>
             )}
             {user ? (
               <div className="nav-user" ref={userMenuRef}>
@@ -235,6 +534,15 @@ function MainNavbar({
                         <span className="nav-user__role">{user?.user_type || 'member'}</span>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      className="nav-cta nav-cta--ghost"
+                      onClick={handleMoveToSettings}
+                      style={{ width: '100%', marginBottom: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                      <Settings size={16} />
+                      환경설정
+                    </button>
                     <button type="button" className="nav-user__logout" onClick={handleLogout}>
                       <LogOut size={16} />
                       로그아웃
@@ -244,7 +552,12 @@ function MainNavbar({
               </div>
             ) : (
               <>
-                <button type="button" className="nav-cta nav-cta--ghost" onClick={handleMoveToLogin}>
+                <button 
+                  type="button" 
+                  className="nav-cta nav-cta--ghost" 
+                  onClick={handleMoveToLogin}
+                  onMouseDown={(e) => e.preventDefault()}
+                >
                   로그인
                 </button>
                 <button type="button" className="nav-cta nav-cta--solid" onClick={handleMoveToSignUp}>
