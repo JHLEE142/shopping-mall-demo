@@ -1,0 +1,10 @@
+
+# deps
+node_modules/
+
+# transformers cache
+**/.cache/
+server/node_modules/@xenova/transformers/.cache/
+
+# onnx models
+*.onnx
