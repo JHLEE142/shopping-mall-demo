@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -46,6 +46,13 @@ import {
   getUserCouponsByAdmin,
 } from '../services/couponService';
 import {
+  fetchCategories,
+  fetchCategoryHierarchy,
+  createCategory,
+  updateCategory,
+  deleteCategory as deleteCategoryApi,
+} from '../services/categoryService';
+import {
   getDashboardStats,
   getRevenueTrend,
   getCategorySales,
@@ -56,7 +63,7 @@ import {
   getStatisticsHighlights,
 } from '../services/statisticsService';
 
-const NAV_ITEMS = ['Dashboard', 'Sales', 'Inventory', 'Customers', 'Statistics', 'Products', 'Coupons'];
+const NAV_ITEMS = ['Dashboard', 'Sales', 'Inventory', 'Customers', 'Statistics', 'Products', 'Categories', 'Coupons'];
 const PRODUCTS_PAGE_SIZE = 10;
 
 // Inventory Row Component
@@ -466,6 +473,7 @@ const NAV_DESCRIPTION = {
   Customers: 'View and manage customer information',
   Statistics: 'Detailed analytics and insights',
   Products: '신규 등록 상품 관리',
+  Categories: '카테고리 관리 (대분류/중분류/소분류)',
   Coupons: '쿠폰 발급 및 관리',
 };
 
@@ -571,6 +579,25 @@ function AdminDashboard({
   const [userCouponSearch, setUserCouponSearch] = useState('');
   const [userCouponFilter, setUserCouponFilter] = useState('');
   const [allUsersForFilter, setAllUsersForFilter] = useState([]);
+
+  // Categories 데이터 상태
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [categoriesStatus, setCategoriesStatus] = useState('idle');
+  const [categoriesError, setCategoriesError] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    slug: '',
+    code: '',
+    description: '',
+    isActive: true,
+    order: 0,
+    metaTitle: '',
+    metaDescription: '',
+    parentId: null,
+    level: 1,
+  });
 
   useEffect(() => {
     setActiveNav(initialNav);
@@ -3081,6 +3108,312 @@ function AdminDashboard({
     </>
   );
 
+  // Categories 데이터 로드
+  const loadCategories = useCallback(async () => {
+    try {
+      setCategoriesStatus('loading');
+      setCategoriesError('');
+      const hierarchy = await fetchCategoryHierarchy(false);
+      setCategoriesList(hierarchy);
+      setCategoriesStatus('success');
+    } catch (error) {
+      setCategoriesStatus('error');
+      setCategoriesError(error.message || '카테고리 목록을 불러오지 못했습니다.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === 'Categories' && categoriesStatus === 'idle') {
+      loadCategories();
+    }
+  }, [activeNav, categoriesStatus, loadCategories]);
+
+  const handleAddSubCategory = useCallback(
+    (parentCategory) => {
+      setSelectedCategory(null);
+      setCategoryFormData({
+        name: '',
+        slug: '',
+        code: '',
+        description: '',
+        isActive: true,
+        order: 0,
+        metaTitle: '',
+        metaDescription: '',
+        parentId: parentCategory._id,
+        level: parentCategory.level + 1,
+      });
+      // 부모 카테고리 펼치기
+      setExpandedCategories((prev) => new Set(prev).add(parentCategory._id));
+    },
+    []
+  );
+
+  const handleToggleExpand = useCallback((categoryId) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSelectCategory = useCallback((category) => {
+    setSelectedCategory(category);
+    setCategoryFormData({
+      name: category.name || '',
+      slug: category.slug || '',
+      code: category.code || '',
+      description: category.description || '',
+      isActive: category.isActive !== undefined ? category.isActive : true,
+      order: category.order || 0,
+      metaTitle: category.metaTitle || '',
+      metaDescription: category.metaDescription || '',
+      parentId: category.parentId || null,
+      level: category.level || 1,
+    });
+  }, []);
+
+  const handleCategorySubmit = useCallback(
+    async (categoryData) => {
+      try {
+        if (selectedCategory) {
+          await updateCategory(selectedCategory._id, categoryData);
+        } else {
+          await createCategory(categoryData);
+        }
+        setSelectedCategory(null);
+        setCategoryFormData({
+          name: '',
+          slug: '',
+          code: '',
+          description: '',
+          isActive: true,
+          order: 0,
+          metaTitle: '',
+          metaDescription: '',
+          parentId: null,
+          level: 1,
+        });
+        setCategoriesStatus('idle');
+        await loadCategories();
+        alert(selectedCategory ? '카테고리가 수정되었습니다.' : '카테고리가 생성되었습니다.');
+      } catch (error) {
+        alert(error.message || '카테고리 저장에 실패했습니다.');
+      }
+    },
+    [selectedCategory, loadCategories]
+  );
+
+  const handleDeleteCategory = useCallback(
+    async (categoryId) => {
+      const confirmed = window.confirm('이 카테고리를 삭제하시겠습니까? 하위 카테고리가 있으면 삭제할 수 없습니다.');
+      if (!confirmed) return;
+
+      try {
+        await deleteCategoryApi(categoryId);
+        setCategoriesStatus('idle');
+        await loadCategories();
+      } catch (error) {
+        alert(error.message || '카테고리 삭제에 실패했습니다.');
+      }
+    },
+    [loadCategories]
+  );
+
+  // 카테고리 트리 렌더링 헬퍼 함수
+  const renderCategoryTree = (category, level = 0, parentPath = '') => {
+    const isExpanded = expandedCategories.has(category._id);
+    const hasChildren = category.children && category.children.length > 0;
+    const isSelected = selectedCategory?._id === category._id;
+    const currentPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
+    const indent = level * 20;
+
+    return (
+      <div key={category._id}>
+        <div
+          className={`admin-category-tree-item ${isSelected ? 'is-selected' : ''}`}
+          style={{
+            paddingLeft: `${indent + 12}px`,
+            padding: '8px 12px',
+            paddingLeft: `${indent + 12}px`,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: isSelected ? '#eef2ff' : 'transparent',
+            borderLeft: isSelected ? '3px solid #4f46e5' : '3px solid transparent',
+          }}
+          onClick={() => handleSelectCategory(category)}
+        >
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleExpand(category._id);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#6b7280',
+              }}
+            >
+              {isExpanded ? '−' : '+'}
+            </button>
+          ) : (
+            <span style={{ width: '24px', display: 'inline-block' }}></span>
+          )}
+          <span style={{ flex: 1 }}>{category.name}</span>
+          <span style={{ color: '#9ca3af', fontSize: '0.875rem', marginRight: '8px' }}>
+            {category.productCount || 0}
+          </span>
+          {level < 2 && (
+            <button
+              type="button"
+              className="admin-filter-button"
+              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddSubCategory(category);
+              }}
+            >
+              <Plus className="admin-icon" style={{ width: '14px', height: '14px' }} />
+            </button>
+          )}
+        </div>
+        {hasChildren && isExpanded && (
+          <div>
+            {category.children.map((child) => renderCategoryTree(child, level + 1, currentPath))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCategories = () => (
+    <div style={{ display: 'flex', gap: '1.5rem', height: 'calc(100vh - 200px)' }}>
+      {/* 왼쪽 패널: 카테고리 트리 */}
+      <div style={{ flex: '0 0 350px', display: 'flex', flexDirection: 'column' }}>
+        <div className="admin-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <header style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="admin-filter-button admin-filter-button--primary"
+              onClick={() => {
+                setSelectedCategory(null);
+                setCategoryFormData({
+                  name: '',
+                  slug: '',
+                  code: '',
+                  description: '',
+                  isActive: true,
+                  order: 0,
+                  metaTitle: '',
+                  metaDescription: '',
+                  parentId: null,
+                  level: 1,
+                });
+              }}
+            >
+              <Plus className="admin-icon" />
+              대분류추가
+            </button>
+            <button
+              type="button"
+              className="admin-filter-button"
+              onClick={() => {
+                if (selectedCategory) {
+                  handleDeleteCategory(selectedCategory._id);
+                } else {
+                  alert('삭제할 카테고리를 선택해주세요.');
+                }
+              }}
+            >
+              삭제
+            </button>
+          </header>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0' }}>
+            {categoriesStatus === 'loading' && (
+              <div className="admin-empty-state" style={{ padding: '2rem' }}>
+                <Loader2 className="admin-icon admin-icon--spin" />
+                <p>카테고리 목록을 불러오는 중입니다...</p>
+              </div>
+            )}
+            {categoriesStatus === 'error' && (
+              <div className="admin-alert admin-alert--error" style={{ margin: '1rem' }}>
+                <AlertCircle className="admin-icon" />
+                <div>
+                  <strong>카테고리 목록을 불러오지 못했습니다.</strong>
+                  <p>{categoriesError}</p>
+                </div>
+                <button type="button" className="admin-filter-button" onClick={loadCategories}>
+                  다시 시도
+                </button>
+              </div>
+            )}
+            {categoriesStatus === 'success' && categoriesList.length === 0 && (
+              <div className="admin-empty-state" style={{ padding: '2rem' }}>
+                <Package className="admin-icon" />
+                <h3>등록된 카테고리가 없습니다.</h3>
+                <p>대분류추가 버튼을 눌러 카테고리를 추가하세요.</p>
+              </div>
+            )}
+            {categoriesStatus === 'success' && categoriesList.length > 0 && (
+              <div>
+                {categoriesList.map((category) => renderCategoryTree(category))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 오른쪽 패널: 카테고리 상세 정보 */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="admin-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <header style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+            <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600 }}>
+              {selectedCategory 
+                ? '분류정보' 
+                : categoryFormData.parentId 
+                  ? categoryFormData.level === 2 
+                    ? '중분류 추가' 
+                    : '소분류 추가'
+                  : categoryFormData.name 
+                    ? '대분류 추가'
+                    : '분류정보'}
+            </h3>
+          </header>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+            {!selectedCategory && !categoryFormData.name && !categoryFormData.parentId ? (
+              <div className="admin-empty-state" style={{ padding: '2rem' }}>
+                <Package className="admin-icon" />
+                <h3>카테고리를 선택하거나 추가하세요</h3>
+                <p>왼쪽에서 카테고리를 선택하거나 "대분류추가" 버튼을 클릭하세요.</p>
+              </div>
+            ) : (
+              <CategoryDetailForm
+                formData={categoryFormData}
+                setFormData={setCategoryFormData}
+                selectedCategory={selectedCategory}
+                categoriesList={categoriesList}
+                onSubmit={handleCategorySubmit}
+                onAddSubCategory={handleAddSubCategory}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const activeContent = {
     Dashboard: renderDashboard(),
     Sales: renderSales(),
@@ -3088,6 +3421,7 @@ function AdminDashboard({
     Customers: renderCustomers(),
     Statistics: renderStatistics(),
     Products: renderProducts(),
+    Categories: renderCategories(),
     Coupons: renderCoupons(),
   }[activeNav];
 
@@ -3422,6 +3756,612 @@ function CouponModal({ coupon, onClose, onSubmit }) {
             </button>
             <button type="submit" className="admin-filter-button admin-filter-button--primary" disabled={submitting}>
               {submitting ? '저장 중...' : coupon ? '수정' : '생성'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Category Detail Form Component
+function CategoryDetailForm({ formData, setFormData, selectedCategory, categoriesList, onSubmit, onAddSubCategory }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedLargeCategory, setSelectedLargeCategory] = useState('');
+  const [selectedMidCategory, setSelectedMidCategory] = useState('');
+
+  useEffect(() => {
+    if (formData.parentId && formData.level >= 2) {
+      // 부모 카테고리 찾기
+      if (formData.level === 2) {
+        const largeCat = categoriesList.find(lc => {
+          const idStr = lc._id?.toString() || lc._id;
+          const parentIdStr = formData.parentId?.toString() || formData.parentId;
+          return idStr === parentIdStr;
+        });
+        if (largeCat) {
+          setSelectedLargeCategory(largeCat._id);
+        }
+      } else if (formData.level === 3) {
+        for (const largeCat of categoriesList) {
+          const midCat = largeCat.children?.find(mc => {
+            const idStr = mc._id?.toString() || mc._id;
+            const parentIdStr = formData.parentId?.toString() || formData.parentId;
+            return idStr === parentIdStr;
+          });
+          if (midCat) {
+            const largeIdStr = largeCat._id?.toString() || largeCat._id;
+            setSelectedLargeCategory(largeIdStr);
+            const midIdStr = midCat._id?.toString() || midCat._id;
+            setSelectedMidCategory(midIdStr);
+            break;
+          }
+        }
+      }
+    } else if (!formData.parentId && formData.level === 1) {
+      // 대분류 추가 시 선택 리셋
+      setSelectedLargeCategory('');
+      setSelectedMidCategory('');
+    }
+  }, [formData.parentId, formData.level, categoriesList]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' || type === 'radio' ? checked : type === 'number' ? (value === '' ? 0 : Number(value)) : value,
+    }));
+  };
+
+  const handleLargeCategoryChange = (e) => {
+    const value = e.target.value;
+    setSelectedLargeCategory(value);
+    setSelectedMidCategory('');
+    if (value) {
+      setFormData((prev) => ({ ...prev, parentId: value, level: 2 }));
+    } else {
+      setFormData((prev) => ({ ...prev, parentId: null, level: 1 }));
+    }
+  };
+
+  const handleMidCategoryChange = (e) => {
+    const value = e.target.value;
+    setSelectedMidCategory(value);
+    if (value) {
+      setFormData((prev) => ({ ...prev, parentId: value, level: 3 }));
+    }
+  };
+
+  // slug 자동 생성
+  const generateSlug = (name) => {
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-가-힣]/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  };
+
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      name,
+      slug: prev.slug || generateSlug(name),
+    }));
+  };
+
+  const handleSlugChange = (e) => {
+    const slug = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      slug,
+      code: prev.code || slug,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.slug || !formData.code) {
+      alert('이름, 슬러그, 코드는 필수 입력 항목입니다.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Category submit error:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedLargeCategoryObj = categoriesList.find(lc => lc._id === selectedLargeCategory);
+  const midCategories = selectedLargeCategoryObj?.children || [];
+
+  // 부모 카테고리 정보 표시 (하위 카테고리 추가 시)
+  const parentCategoryInfo = useMemo(() => {
+    if (formData.parentId && formData.level >= 2) {
+      if (formData.level === 2) {
+        const parent = categoriesList.find(lc => {
+          const idStr = lc._id?.toString() || lc._id;
+          const parentIdStr = formData.parentId?.toString() || formData.parentId;
+          return idStr === parentIdStr;
+        });
+        return parent ? `대분류: ${parent.name}` : null;
+      } else if (formData.level === 3) {
+        for (const largeCat of categoriesList) {
+          const midCat = largeCat.children?.find(mc => {
+            const idStr = mc._id?.toString() || mc._id;
+            const parentIdStr = formData.parentId?.toString() || formData.parentId;
+            return idStr === parentIdStr;
+          });
+          if (midCat) {
+            return `대분류: ${largeCat.name} > 중분류: ${midCat.name}`;
+          }
+        }
+      }
+    }
+    return null;
+  }, [formData.parentId, formData.level, categoriesList]);
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {parentCategoryInfo && (
+        <div style={{ 
+          padding: '0.75rem', 
+          backgroundColor: '#f0f9ff', 
+          border: '1px solid #bae6fd', 
+          borderRadius: '6px',
+          fontSize: '0.875rem',
+          color: '#0369a1'
+        }}>
+          <strong>하위 카테고리 추가:</strong> {parentCategoryInfo}
+        </div>
+      )}
+      <div className="admin-form-group">
+        <label>분류명 (필수) *</label>
+        <input
+          type="text"
+          name="name"
+          value={formData.name}
+          onChange={handleNameChange}
+          required
+          placeholder="카테고리 이름"
+        />
+      </div>
+
+      <div className="admin-form-group">
+        <label>슬러그 *</label>
+        <input
+          type="text"
+          name="slug"
+          value={formData.slug}
+          onChange={handleSlugChange}
+          required
+          placeholder="카테고리 slug"
+        />
+      </div>
+
+      <div className="admin-form-group">
+        <label>코드 *</label>
+        <input
+          type="text"
+          name="code"
+          value={formData.code}
+          onChange={handleChange}
+          required
+          placeholder="카테고리 코드"
+        />
+      </div>
+
+      <div className="admin-form-group">
+        <label>설명</label>
+        <input
+          type="text"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="카테고리 설명"
+        />
+      </div>
+
+      <div className="admin-form-group">
+        <label>표시상태</label>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="radio"
+              name="isActive"
+              checked={formData.isActive === true}
+              onChange={() => setFormData((prev) => ({ ...prev, isActive: true }))}
+            />
+            표시함
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="radio"
+              name="isActive"
+              checked={formData.isActive === false}
+              onChange={() => setFormData((prev) => ({ ...prev, isActive: false }))}
+            />
+            표시안함
+          </label>
+        </div>
+      </div>
+
+      <div className="admin-form-group">
+        <label>정렬 순서</label>
+        <input
+          type="number"
+          name="order"
+          value={formData.order}
+          onChange={handleChange}
+          min="0"
+          placeholder="0"
+        />
+      </div>
+
+      {/* SEO 설정 */}
+      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem' }}>
+        <h4 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: 600 }}>검색엔진 최적화(SEO)</h4>
+        
+        <div className="admin-form-group">
+          <label>검색 엔진 노출 설정?</label>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="radio"
+                name="seoExpose"
+                checked={formData.metaTitle !== '' || formData.metaDescription !== ''}
+                onChange={() => {}}
+              />
+              노출함
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="radio"
+                name="seoExpose"
+                checked={formData.metaTitle === '' && formData.metaDescription === ''}
+                onChange={() => {
+                  setFormData((prev) => ({ ...prev, metaTitle: '', metaDescription: '' }));
+                }}
+              />
+              노출안함
+            </label>
+          </div>
+        </div>
+
+        {(formData.metaTitle !== '' || formData.metaDescription !== '') && (
+          <>
+            <div className="admin-form-group">
+              <label>브라우저 타이틀 : Title ?</label>
+              <input
+                type="text"
+                name="metaTitle"
+                value={formData.metaTitle}
+                onChange={handleChange}
+                placeholder="브라우저 타이틀"
+              />
+            </div>
+
+            <div className="admin-form-group">
+              <label>메타 설명</label>
+              <textarea
+                name="metaDescription"
+                value={formData.metaDescription}
+                onChange={handleChange}
+                placeholder="메타 설명"
+                rows={3}
+                style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+        <button type="submit" className="admin-filter-button admin-filter-button--primary" disabled={submitting}>
+          {submitting ? '저장 중...' : selectedCategory ? '수정' : '저장'}
+        </button>
+        {selectedCategory && selectedCategory.level < 3 && (
+          <button
+            type="button"
+            className="admin-filter-button"
+            onClick={() => onAddSubCategory(selectedCategory)}
+          >
+            <Plus className="admin-icon" />
+            하위 카테고리 추가
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+// Category Modal Component
+function CategoryModal({ category, categoriesList, onClose, onSubmit }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    code: '',
+    parentId: null,
+    level: 1,
+    description: '',
+    order: 0,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedLargeCategory, setSelectedLargeCategory] = useState('');
+  const [selectedMidCategory, setSelectedMidCategory] = useState('');
+
+  // 편집 모드일 때 초기값 설정
+  useEffect(() => {
+    if (category) {
+      setFormData({
+        name: category.name || '',
+        slug: category.slug || '',
+        code: category.code || '',
+        parentId: category.parentId || null,
+        level: category.level || 1,
+        description: category.description || '',
+        order: category.order || 0,
+      });
+      
+      // 편집 중일 때 부모 카테고리 설정
+      if (category.level === 2) {
+        // 중분류인 경우 대분류 찾기
+        const largeCat = categoriesList.find(lc => 
+          lc.children?.some(mc => mc._id === category._id)
+        );
+        if (largeCat) {
+          setSelectedLargeCategory(largeCat._id);
+        }
+      } else if (category.level === 3) {
+        // 소분류인 경우 중분류와 대분류 찾기
+        for (const largeCat of categoriesList) {
+          const midCat = largeCat.children?.find(mc => 
+            mc.children?.some(sc => sc._id === category._id)
+          );
+          if (midCat) {
+            setSelectedLargeCategory(largeCat._id);
+            setSelectedMidCategory(midCat._id);
+            break;
+          }
+        }
+      }
+    } else {
+      // 새로 생성하는 경우
+      setFormData({
+        name: '',
+        slug: '',
+        code: '',
+        parentId: null,
+        level: 1,
+        description: '',
+        order: 0,
+      });
+      setSelectedLargeCategory('');
+      setSelectedMidCategory('');
+    }
+  }, [category, categoriesList]);
+
+  // level과 parentId 자동 설정
+  useEffect(() => {
+    if (selectedMidCategory) {
+      setFormData(prev => ({ ...prev, level: 3, parentId: selectedMidCategory }));
+    } else if (selectedLargeCategory) {
+      setFormData(prev => ({ ...prev, level: 2, parentId: selectedLargeCategory }));
+    } else {
+      setFormData(prev => ({ ...prev, level: 1, parentId: null }));
+    }
+  }, [selectedLargeCategory, selectedMidCategory]);
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) || 0 : value,
+    }));
+  };
+
+  const handleLargeCategoryChange = (e) => {
+    const value = e.target.value;
+    setSelectedLargeCategory(value);
+    setSelectedMidCategory(''); // 중분류 리셋
+  };
+
+  const handleMidCategoryChange = (e) => {
+    const value = e.target.value;
+    setSelectedMidCategory(value);
+  };
+
+  // slug 자동 생성 (name 기반)
+  const generateSlug = (name) => {
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-가-힣]/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  };
+
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      name,
+      slug: prev.slug || generateSlug(name), // slug가 비어있을 때만 자동 생성
+    }));
+  };
+
+  // code 자동 생성 (slug 기반)
+  const handleSlugChange = (e) => {
+    const slug = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      slug,
+      code: prev.code || slug, // code가 비어있을 때만 자동 생성
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // 필수 필드 검증
+    if (!formData.name || !formData.slug || !formData.code) {
+      alert('이름, 슬러그, 코드는 필수 입력 항목입니다.');
+      return;
+    }
+
+    // 대분류/중분류 필수 검증 (소분류 생성 시)
+    if (formData.level === 3 && !selectedMidCategory) {
+      alert('소분류를 생성하려면 대분류와 중분류를 선택해야 합니다.');
+      return;
+    }
+
+    if (formData.level === 2 && !selectedLargeCategory) {
+      alert('중분류를 생성하려면 대분류를 선택해야 합니다.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Category submit error:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedLargeCategoryObj = categoriesList.find(lc => lc._id === selectedLargeCategory);
+  const midCategories = selectedLargeCategoryObj?.children || [];
+
+  return (
+    <div className="admin-modal-overlay" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="admin-modal__header">
+          <h2>{category ? '카테고리 수정' : '신규 카테고리 추가'}</h2>
+          <button type="button" className="admin-modal__close" onClick={onClose}>
+            <X className="admin-icon" />
+          </button>
+        </header>
+        <form onSubmit={handleSubmit} className="admin-modal__form">
+          <div className="admin-form-group">
+            <label>대분류 {formData.level >= 2 && '*'}</label>
+            <select
+              value={selectedLargeCategory}
+              onChange={handleLargeCategoryChange}
+              disabled={category && category.level === 1} // 편집 중인 대분류는 변경 불가
+              required={formData.level >= 2}
+            >
+              <option value="">대분류 선택 {formData.level >= 2 && '(필수)'}</option>
+              {categoriesList.map((largeCat) => (
+                <option key={largeCat._id} value={largeCat._id}>
+                  {largeCat.name}
+                </option>
+              ))}
+            </select>
+            {formData.level >= 2 && !selectedLargeCategory && (
+              <p style={{ color: '#ef4444', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                중분류/소분류를 생성하려면 대분류를 선택해야 합니다.
+              </p>
+            )}
+          </div>
+
+          {(formData.level >= 2 || selectedLargeCategory) && (
+            <div className="admin-form-group">
+              <label>중분류 {formData.level === 3 && '*'}</label>
+              <select
+                value={selectedMidCategory}
+                onChange={handleMidCategoryChange}
+                disabled={!selectedLargeCategory || (category && category.level === 2)} // 편집 중인 중분류는 변경 불가
+                required={formData.level === 3}
+              >
+                <option value="">중분류 선택 {formData.level === 3 && '(필수)'}</option>
+                {midCategories.map((midCat) => (
+                  <option key={midCat._id} value={midCat._id}>
+                    {midCat.name}
+                  </option>
+                ))}
+              </select>
+              {formData.level === 3 && !selectedMidCategory && (
+                <p style={{ color: '#ef4444', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                  소분류를 생성하려면 중분류를 선택해야 합니다.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="admin-form-group">
+            <label>카테고리 이름 *</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleNameChange}
+              required
+              placeholder="예: 주방용품"
+            />
+          </div>
+
+          <div className="admin-form-group">
+            <label>슬러그 *</label>
+            <input
+              type="text"
+              name="slug"
+              value={formData.slug}
+              onChange={handleSlugChange}
+              required
+              placeholder="예: kitchen-supplies"
+            />
+          </div>
+
+          <div className="admin-form-group">
+            <label>코드 *</label>
+            <input
+              type="text"
+              name="code"
+              value={formData.code}
+              onChange={handleChange}
+              required
+              placeholder="예: kitchen"
+            />
+          </div>
+
+          <div className="admin-form-group">
+            <label>설명</label>
+            <input
+              type="text"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="카테고리 설명"
+            />
+          </div>
+
+          <div className="admin-form-group">
+            <label>정렬 순서</label>
+            <input
+              type="number"
+              name="order"
+              value={formData.order}
+              onChange={handleChange}
+              min="0"
+              placeholder="0"
+            />
+          </div>
+
+          <div className="admin-modal__actions">
+            <button type="button" className="admin-filter-button" onClick={onClose}>
+              취소
+            </button>
+            <button type="submit" className="admin-filter-button admin-filter-button--primary" disabled={submitting}>
+              {submitting ? '저장 중...' : category ? '수정' : '생성'}
             </button>
           </div>
         </form>

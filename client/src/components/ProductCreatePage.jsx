@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Upload, Trash2 } from 'lucide-react';
 import { createProduct, updateProduct, deleteProduct } from '../services/productService';
-import { fetchCategories } from '../services/categoryService';
+import { fetchCategoryHierarchy } from '../services/categoryService';
 import './ProductCreatePage.css';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -35,8 +35,11 @@ const EMPTY_FORM = {
 function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} }) {
   const isEditMode = Boolean(product?._id);
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const [categoryHierarchy, setCategoryHierarchy] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [selectedMainCategory, setSelectedMainCategory] = useState('');
+  const [selectedMidCategory, setSelectedMidCategory] = useState('');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [previewImages, setPreviewImages] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +52,60 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
   useEffect(() => {
     loadCategories();
-    if (isEditMode && product) {
+  }, []);
+
+  useEffect(() => {
+    if (isEditMode && product && categoryHierarchy.length > 0) {
+      // 수정 모드: categoryId가 있으면 우선 사용, 없으면 기존 방식 사용
+      if (product.categoryId) {
+        // categoryId로 카테고리 찾기
+        let foundCategory = null;
+        let foundMain = null;
+        let foundMid = null;
+        
+        // 전체 계층 구조를 탐색하여 categoryId와 일치하는 카테고리 찾기
+        for (const mainCat of categoryHierarchy) {
+          if (mainCat._id?.toString() === product.categoryId?.toString()) {
+            foundCategory = mainCat;
+            foundMain = mainCat;
+            setSelectedMainCategory(mainCat._id);
+            break;
+          }
+          
+          for (const midCat of mainCat.children || []) {
+            if (midCat._id?.toString() === product.categoryId?.toString()) {
+              foundCategory = midCat;
+              foundMain = mainCat;
+              foundMid = midCat;
+              setSelectedMainCategory(mainCat._id);
+              setSelectedMidCategory(midCat._id);
+              break;
+            }
+            
+            for (const subCat of midCat.children || []) {
+              if (subCat._id?.toString() === product.categoryId?.toString()) {
+                foundCategory = subCat;
+                foundMain = mainCat;
+                foundMid = midCat;
+                setSelectedMainCategory(mainCat._id);
+                setSelectedMidCategory(midCat._id);
+                setSelectedSubCategory(subCat._id);
+                break;
+              }
+            }
+            
+            if (foundCategory) break;
+          }
+          
+          if (foundCategory) break;
+        }
+      } else if (product.categoryMain) {
+        // 하위 호환성: categoryMain, categoryMid, categorySub로 찾기
+        findAndSetCategoryFromName(product.categoryMain, product.categoryMid, product.categorySub);
+      } else if (product.category) {
+        // 하위 호환성: 기존 category 필드로 찾기
+        findAndSetCategoryFromName(product.category);
+      }
       const productImages = product.images && Array.isArray(product.images) && product.images.length > 0
         ? product.images
         : (product.image ? [product.image] : []);
@@ -59,6 +115,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         sku: product.sku || '',
         description: product.description || '',
         category: product.category || '',
+        categoryMain: product.categoryMain || '',
+        categoryMid: product.categoryMid || '',
+        categorySub: product.categorySub || '',
         price: product.price?.toString() || '',
         image: productImages[0] || product.image || '',
         images: productImages,
@@ -80,18 +139,79 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       });
       setPreviewImages(productImages);
     }
-  }, [isEditMode, product]);
+  }, [isEditMode, product, categoryHierarchy]);
 
   const loadCategories = async () => {
     setCategoriesLoading(true);
     try {
-      const categoriesData = await fetchCategories();
-      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      const hierarchyData = await fetchCategoryHierarchy();
+      const hierarchy = Array.isArray(hierarchyData) ? hierarchyData : [];
+      console.log('카테고리 계층 구조 로드:', hierarchy);
+      setCategoryHierarchy(hierarchy);
     } catch (error) {
       console.error('Failed to load categories:', error);
-      setCategories([]);
+      setCategoryHierarchy([]);
     } finally {
       setCategoriesLoading(false);
+    }
+  };
+
+  // 카테고리 이름으로부터 계층 구조 찾기 (children 구조 사용)
+  const findAndSetCategoryFromName = (categoryMainOrName, categoryMid, categorySub) => {
+    if (!categoryHierarchy.length) return;
+    
+    // 3개 파라미터가 모두 있으면 계층 구조로 찾기
+    if (categoryMainOrName && categoryMid !== undefined && categorySub !== undefined) {
+      const mainCat = categoryHierarchy.find(m => m.name === categoryMainOrName);
+      if (!mainCat) return;
+      
+      setSelectedMainCategory(mainCat._id);
+      
+      if (categoryMid) {
+        // children 구조 사용 (중분류는 대분류의 children)
+        const midCat = mainCat.children?.find(m => m.name === categoryMid);
+        if (midCat) {
+          setSelectedMidCategory(midCat._id);
+          
+          if (categorySub) {
+            // 소분류는 중분류의 children
+            const subCat = midCat.children?.find(s => s.name === categorySub);
+            if (subCat) {
+              setSelectedSubCategory(subCat._id);
+            }
+          }
+        }
+      }
+      return;
+    }
+    
+    // 하위 호환성: categoryName만 있는 경우
+    const categoryName = categoryMainOrName;
+    if (!categoryName) return;
+    
+    for (const mainCat of categoryHierarchy) {
+      if (mainCat.name === categoryName) {
+        setSelectedMainCategory(mainCat._id);
+        return;
+      }
+      
+      // children 구조 사용
+      for (const midCat of mainCat.children || []) {
+        if (midCat.name === categoryName) {
+          setSelectedMainCategory(mainCat._id);
+          setSelectedMidCategory(midCat._id);
+          return;
+        }
+        
+        for (const subCat of midCat.children || []) {
+          if (subCat.name === categoryName) {
+            setSelectedMainCategory(mainCat._id);
+            setSelectedMidCategory(midCat._id);
+            setSelectedSubCategory(subCat._id);
+            return;
+          }
+        }
+      }
     }
   };
 
@@ -377,7 +497,58 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     setError('');
     setSuccess(false);
 
-    if (!formData.name || !formData.category || !formData.price || !formData.image) {
+    // 카테고리 정보 가져오기
+    const selectedMain = categoryHierarchy.find(m => {
+      const mainId = m._id?.toString() || m._id;
+      return mainId === (selectedMainCategory?.toString() || selectedMainCategory);
+    });
+
+    if (!selectedMain) {
+      setError('대분류를 선택해주세요.');
+      return;
+    }
+
+    // children 구조 사용
+    const selectedMid = selectedMidCategory ? selectedMain?.children?.find(m => {
+      const midId = m._id?.toString() || m._id;
+      return midId === (selectedMidCategory?.toString() || selectedMidCategory);
+    }) : null;
+
+    const selectedSub = selectedSubCategory && selectedMid ? selectedMid?.children?.find(s => {
+      const subId = s._id?.toString() || s._id;
+      return subId === (selectedSubCategory?.toString() || selectedSubCategory);
+    }) : null;
+
+    // 최종 카테고리: 소분류가 있으면 소분류, 없으면 중분류, 둘 다 없으면 대분류
+    // 소분류는 isLeaf=true이므로 소분류를 categoryId로 사용
+    const finalCategory = selectedSub?.name || selectedMid?.name || selectedMain?.name;
+    const categoryMain = selectedMain.name;
+    const categoryMid = selectedMid?.name || null;
+    const categorySub = selectedSub?.name || null;
+    
+    // categoryId는 최종 선택된 카테고리의 ID (우선순위: 소분류 > 중분류 > 대분류)
+    // 상품은 소분류에만 연결되어야 하지만, 소분류가 없을 수도 있으므로 유연하게 처리
+    const finalCategoryId = selectedSub?._id || selectedMid?._id || selectedMain?._id;
+    
+    // categoryPathIds 계산 (경로상의 모든 카테고리 ID)
+    const categoryPathIds = [];
+    if (selectedMain?._id) {
+      categoryPathIds.push(selectedMain._id);
+      if (selectedMid?._id) {
+        categoryPathIds.push(selectedMid._id);
+        if (selectedSub?._id) {
+          categoryPathIds.push(selectedSub._id);
+        }
+      }
+    }
+    
+    // categoryPathText 계산
+    const pathParts = [selectedMain?.name];
+    if (selectedMid?.name) pathParts.push(selectedMid.name);
+    if (selectedSub?.name) pathParts.push(selectedSub.name);
+    const categoryPathText = pathParts.join(' > ');
+
+    if (!formData.name || !categoryMain || !formData.price || !formData.image) {
       setError('필수 항목(상품명, 카테고리, 가격, 이미지)을 모두 입력해주세요.');
       return;
     }
@@ -393,7 +564,14 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         sku: formData.sku.trim().toUpperCase(),
         name: formData.name.trim(),
         price: Number(formData.price),
-        category: formData.category,
+        categoryId: finalCategoryId, // 최종 선택된 카테고리 ID (필수)
+        categoryPathIds: categoryPathIds, // 경로상의 모든 카테고리 ID 배열
+        categoryPathText: categoryPathText, // 경로 텍스트 (표시용)
+        // 하위 호환성 유지
+        category: finalCategory,
+        categoryMain: categoryMain,
+        categoryMid: categoryMid,
+        categorySub: categorySub,
         image: productImages[0] || formData.image.trim(),
         images: productImages,
         description: formData.description.trim(),
@@ -541,35 +719,202 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
               </div>
 
               <div className="form-group">
-                <label htmlFor="category">
+                <label>
                   카테고리 <span className="required">*</span>
-              </label>
-                <select
-                  id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  required
-                  disabled={categoriesLoading}
-                >
-                  <option value="">
-                    {categoriesLoading ? '카테고리를 불러오는 중...' : '카테고리를 선택하세요'}
-                  </option>
-                  {!categoriesLoading &&
-                    Array.isArray(categories) &&
-                    categories.length > 0 &&
-                    categories.map((category) => (
-                      <option key={category._id || category.id} value={category.name}>
-                        {category.name}
-                    </option>
-                  ))}
-                </select>
-                {!categoriesLoading && Array.isArray(categories) && categories.length === 0 && (
+                </label>
+                {categoriesLoading ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+                    카테고리를 불러오는 중...
+                  </div>
+                ) : categoryHierarchy.length === 0 ? (
                   <div className="form-hint" style={{ color: '#dc3545', marginTop: '0.5rem' }}>
                     <p style={{ margin: '0 0 0.5rem' }}>카테고리가 없습니다. 서버에서 카테고리를 생성해주세요.</p>
                   </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* 대분류 선택 */}
+                    <div>
+                      <label htmlFor="mainCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                        대분류
+                      </label>
+                      <select
+                        id="mainCategory"
+                        name="mainCategory"
+                        value={selectedMainCategory}
+                        onChange={(e) => {
+                          const mainId = e.target.value;
+                          const selectedMain = categoryHierarchy.find(m => {
+                            const mainIdStr = m._id?.toString() || m._id;
+                            return mainIdStr === mainId;
+                          });
+                          setSelectedMainCategory(mainId);
+                          setSelectedMidCategory('');
+                          setSelectedSubCategory('');
+                          setFormData((prev) => ({ 
+                            ...prev, 
+                            category: selectedMain ? selectedMain.name : '',
+                            categoryMain: selectedMain ? selectedMain.name : '',
+                            categoryMid: '',
+                            categorySub: ''
+                          }));
+                        }}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                        }}
+                      >
+                        <option value="">대분류를 선택하세요</option>
+                        {categoryHierarchy.map((mainCat) => (
+                          <option key={mainCat._id} value={mainCat._id}>
+                            {mainCat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 중분류 선택 */}
+                    {selectedMainCategory && (() => {
+                      const selectedMain = categoryHierarchy.find(m => {
+                        const mainId = m._id?.toString() || m._id;
+                        const selectedId = selectedMainCategory?.toString() || selectedMainCategory;
+                        return mainId === selectedId;
+                      });
+                      // children 구조 사용 (중분류는 대분류의 children)
+                      const midCategories = selectedMain?.children || [];
+                      
+                      return (
+                        <div>
+                          <label htmlFor="midCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                            중분류 {midCategories.length > 0 ? `(${midCategories.length}개)` : '(없음)'}
+                          </label>
+                          <select
+                            id="midCategory"
+                            name="midCategory"
+                            value={selectedMidCategory}
+                            onChange={(e) => {
+                              const midId = e.target.value;
+                              setSelectedMidCategory(midId);
+                              setSelectedSubCategory('');
+                              const selectedMid = midCategories.find(m => {
+                                const midIdStr = m._id?.toString() || m._id;
+                                return midIdStr === midId;
+                              });
+                              setFormData((prev) => ({ 
+                                ...prev, 
+                                category: selectedMid ? selectedMid.name : (selectedMain ? selectedMain.name : ''),
+                                categoryMain: selectedMain ? selectedMain.name : prev.categoryMain,
+                                categoryMid: selectedMid ? selectedMid.name : '',
+                                categorySub: ''
+                              }));
+                            }}
+                            disabled={midCategories.length === 0}
+                            style={{
+                              width: '100%',
+                              padding: '0.65rem 0.75rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '1rem',
+                              opacity: midCategories.length === 0 ? 0.6 : 1,
+                            }}
+                          >
+                            <option value="">
+                              {midCategories.length === 0 
+                                ? '중분류가 없습니다' 
+                                : '중분류를 선택하세요 (선택사항)'}
+                            </option>
+                            {midCategories.map((midCat) => (
+                              <option key={midCat._id} value={midCat._id}>
+                                {midCat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 소분류 선택 */}
+                    {selectedMidCategory && (() => {
+                      const selectedMain = categoryHierarchy.find(m => {
+                        const mainId = m._id?.toString() || m._id;
+                        return mainId === (selectedMainCategory?.toString() || selectedMainCategory);
+                      });
+                      // children 구조 사용
+                      const selectedMid = selectedMain?.children?.find(m => {
+                        const midId = m._id?.toString() || m._id;
+                        return midId === (selectedMidCategory?.toString() || selectedMidCategory);
+                      });
+                      // 소분류는 중분류의 children
+                      const subCategories = selectedMid?.children || [];
+                      
+                      return (
+                        <div>
+                          <label htmlFor="subCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                            소분류 {subCategories.length > 0 ? `(${subCategories.length}개)` : '(없음)'}
+                          </label>
+                          <select
+                            id="subCategory"
+                            name="subCategory"
+                            value={selectedSubCategory}
+                            onChange={(e) => {
+                              const subId = e.target.value;
+                              setSelectedSubCategory(subId);
+                              const selectedSub = subCategories.find(s => {
+                                const subIdStr = s._id?.toString() || s._id;
+                                return subIdStr === subId;
+                              });
+                              setFormData((prev) => ({ 
+                                ...prev, 
+                                category: selectedSub ? selectedSub.name : (selectedMid ? selectedMid.name : (selectedMain ? selectedMain.name : '')),
+                                categoryMain: selectedMain ? selectedMain.name : prev.categoryMain,
+                                categoryMid: selectedMid ? selectedMid.name : prev.categoryMid,
+                                categorySub: selectedSub ? selectedSub.name : ''
+                              }));
+                            }}
+                            disabled={subCategories.length === 0}
+                            style={{
+                              width: '100%',
+                              padding: '0.65rem 0.75rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '1rem',
+                              opacity: subCategories.length === 0 ? 0.6 : 1,
+                            }}
+                          >
+                            <option value="">
+                              {subCategories.length === 0 
+                                ? '소분류가 없습니다' 
+                                : '소분류를 선택하세요 (선택사항)'}
+                            </option>
+                            {subCategories.map((subCat) => (
+                              <option key={subCat._id} value={subCat._id}>
+                                {subCat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 선택된 카테고리 표시 */}
+                    {formData.category && (
+                      <div style={{ 
+                        padding: '0.75rem', 
+                        background: '#f0f9ff', 
+                        border: '1px solid #bae6fd', 
+                        borderRadius: '4px',
+                        fontSize: '0.875rem',
+                        color: '#0369a1'
+                      }}>
+                        선택된 카테고리: <strong>{formData.category}</strong>
+                      </div>
+                    )}
+                  </div>
                 )}
-            </div>
+              </div>
 
               <div className="form-group">
                 <label htmlFor="stockManagement">재고 관리</label>
