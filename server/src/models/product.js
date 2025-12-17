@@ -39,11 +39,46 @@ const productSchema = new Schema(
       required: true,
       min: [0, 'Price must be a positive number'],
     },
+    // 카테고리 ID (소분류를 가리키는 ObjectId)
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true,
+      index: true
+    },
+    // 카테고리 경로 ID 배열 (조회 성능 최적화용, 옵션)
+    categoryPathIds: {
+      type: [Schema.Types.ObjectId],
+      default: [],
+      ref: 'Category'
+    },
+    // 카테고리 경로 텍스트 (표시용) - "주방용품 > 조리도구 > 건지기/망"
+    categoryPathText: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    // 하위 호환성을 위해 유지 (최종 선택된 카테고리 이름)
     category: {
       type: String,
-      required: true,
-      // enum 제거 - 새로운 카테고리 목록으로 자유롭게 설정 가능하도록
-      // enum: PRODUCT_CATEGORIES,
+      default: '',
+      trim: true
+    },
+    // 계층 구조 카테고리 (하위 호환성 유지)
+    categoryMain: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    categoryMid: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    categorySub: {
+      type: String,
+      default: null,
+      trim: true,
     },
     image: {
       type: String,

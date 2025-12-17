@@ -35,6 +35,29 @@ const categorySchema = new Schema({
     ref: 'Category',
     default: null
   },
+  // 카테고리 레벨 (1: 대분류, 2: 중분류, 3: 소분류)
+  level: {
+    type: Number,
+    required: true,
+    enum: [1, 2, 3],
+    default: 1
+  },
+  // 경로 ID 배열 (조회 최적화용) - [대분류_id, 중분류_id, 소분류_id]
+  pathIds: {
+    type: [Schema.Types.ObjectId],
+    default: [],
+    ref: 'Category'
+  },
+  // 경로 이름 배열 (표시 최적화용) - ["주방용품", "조리도구", "건지기/망"]
+  pathNames: {
+    type: [String],
+    default: []
+  },
+  // 리프 노드 여부 (소분류일 때만 true)
+  isLeaf: {
+    type: Boolean,
+    default: false
+  },
   // 정렬 순서
   order: {
     type: Number,
@@ -67,10 +90,13 @@ const categorySchema = new Schema({
 // 인덱스
 categorySchema.index({ slug: 1 }, { unique: true });
 // code 필드는 필드 정의에서 unique: true로 이미 인덱스가 생성되므로 중복 정의 제거
-categorySchema.index({ parentId: 1 });
+categorySchema.index({ parentId: 1, order: 1 }); // 하위 카테고리 리스트 빠르게 조회
+categorySchema.index({ level: 1 });
 categorySchema.index({ isActive: 1 });
 categorySchema.index({ order: 1 });
 categorySchema.index({ productCount: -1 }); // 인기 카테고리 조회용
+categorySchema.index({ pathIds: 1 }); // 검색/필터 최적화
+categorySchema.index({ pathNames: 1 }); // 검색/필터 최적화
 
 module.exports = model('Category', categorySchema);
 

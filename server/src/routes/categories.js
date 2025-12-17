@@ -4,6 +4,18 @@ const { authenticate, authorize } = require('../middleware/authMiddleware');
 
 const router = Router();
 
+// 계층 구조 카테고리 조회 (대분류 > 중분류 > 소분류)
+router.get('/hierarchy', categoryController.getCategoryHierarchy);
+
+// 대량 카테고리 저장 (관리자) - 객체 형식
+router.post('/bulk', authenticate, authorize('admin'), categoryController.bulkCreateCategories);
+
+// 대량 카테고리 저장 (관리자) - ">" 구분자 문자열 형식
+router.post('/bulk-string', authenticate, authorize('admin'), categoryController.bulkCreateCategoriesFromString);
+
+// 대분류에 중분류/소분류 자동 추가 (관리자)
+router.post('/add-default-subcategories', authenticate, authorize('admin'), categoryController.addDefaultSubCategories);
+
 // 카테고리 목록 조회 (계층 구조)
 router.get('/', categoryController.getCategories);
 

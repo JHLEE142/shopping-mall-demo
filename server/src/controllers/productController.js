@@ -32,6 +32,47 @@ function calculateInventoryStatus(inventory) {
 async function createProduct(req, res, next) {
   try {
     const payload = { ...req.body };
+    
+    // 카테고리 정보 처리
+    // categoryId가 있으면 우선 사용 (새로운 방식)
+    if (payload.categoryId) {
+      // categoryId, categoryPathIds, categoryPathText는 그대로 사용
+      // categoryPathIds는 배열로 변환 (문자열 배열이 올 수 있음)
+      if (payload.categoryPathIds && Array.isArray(payload.categoryPathIds)) {
+        payload.categoryPathIds = payload.categoryPathIds.map(id => 
+          typeof id === 'string' ? id : id.toString()
+        );
+      }
+      
+      // 하위 호환성을 위해 categoryMain, categoryMid, categorySub도 설정
+      if (!payload.categoryMain && payload.categoryPathText) {
+        // categoryPathText에서 파싱
+        const pathParts = payload.categoryPathText.split(' > ').map(p => p.trim());
+        if (pathParts.length >= 1) payload.categoryMain = pathParts[0];
+        if (pathParts.length >= 2) payload.categoryMid = pathParts[1];
+        if (pathParts.length >= 3) payload.categorySub = pathParts[2];
+      }
+      
+      // category 필드는 최종 선택된 카테고리 (categoryPathText의 마지막 또는 categorySub/categoryMid/categoryMain)
+      if (!payload.category) {
+        payload.category = payload.categorySub || payload.categoryMid || payload.categoryMain || '';
+      }
+    } else if (payload.categoryMain) {
+      // categoryMain이 있으면 계층 구조 카테고리 사용 (하위 호환성)
+      payload.categoryMain = payload.categoryMain.trim();
+      payload.categoryMid = payload.categoryMid ? payload.categoryMid.trim() : null;
+      payload.categorySub = payload.categorySub ? payload.categorySub.trim() : null;
+      // category 필드는 최종 선택된 카테고리 (소분류 > 중분류 > 대분류)
+      if (!payload.category) {
+        payload.category = payload.categorySub || payload.categoryMid || payload.categoryMain;
+      }
+    } else if (payload.category) {
+      // 하위 호환성: category만 있으면 categoryMain으로 설정
+      payload.categoryMain = payload.category.trim();
+      payload.categoryMid = null;
+      payload.categorySub = null;
+    }
+    
     if (payload.inventory) {
       payload.inventory.updatedAt = new Date();
       // 재고 상태 자동 계산
@@ -167,6 +208,53 @@ async function updateProduct(req, res, next) {
   try {
     const payload = { ...req.body };
     const updateQuery = {};
+    
+    // 카테고리 정보 처리
+    // categoryId가 있으면 우선 사용 (새로운 방식)
+    if (payload.categoryId) {
+      // categoryId, categoryPathIds, categoryPathText 업데이트
+      updateQuery.categoryId = payload.categoryId;
+      
+      if (payload.categoryPathIds && Array.isArray(payload.categoryPathIds)) {
+        updateQuery.categoryPathIds = payload.categoryPathIds.map(id => 
+          typeof id === 'string' ? id : id.toString()
+        );
+      } else if (payload.categoryPathIds === null || payload.categoryPathIds === undefined) {
+        updateQuery.categoryPathIds = [];
+      }
+      
+      if (payload.categoryPathText !== undefined) {
+        updateQuery.categoryPathText = payload.categoryPathText || '';
+      }
+      
+      // 하위 호환성을 위해 categoryMain, categoryMid, categorySub도 설정
+      if (payload.categoryPathText) {
+        const pathParts = payload.categoryPathText.split(' > ').map(p => p.trim());
+        if (pathParts.length >= 1) updateQuery.categoryMain = pathParts[0];
+        if (pathParts.length >= 2) updateQuery.categoryMid = pathParts[1];
+        if (pathParts.length >= 3) updateQuery.categorySub = pathParts[2];
+      } else if (payload.categoryMain) {
+        updateQuery.categoryMain = payload.categoryMain.trim();
+        updateQuery.categoryMid = payload.categoryMid ? payload.categoryMid.trim() : null;
+        updateQuery.categorySub = payload.categorySub ? payload.categorySub.trim() : null;
+      }
+      
+      // category 필드는 최종 선택된 카테고리
+      updateQuery.category = payload.category || (payload.categorySub || payload.categoryMid || payload.categoryMain || '');
+    } else if (payload.categoryMain) {
+      // categoryMain이 있으면 계층 구조 카테고리 사용 (하위 호환성)
+      updateQuery.categoryMain = payload.categoryMain.trim();
+      updateQuery.categoryMid = payload.categoryMid ? payload.categoryMid.trim() : null;
+      updateQuery.categorySub = payload.categorySub ? payload.categorySub.trim() : null;
+      // category 필드는 최종 선택된 카테고리 (소분류 > 중분류 > 대분류)
+      updateQuery.category = payload.category || (payload.categorySub || payload.categoryMid || payload.categoryMain);
+    } else if (payload.category) {
+      // 하위 호환성: category만 있으면 categoryMain으로 설정
+      updateQuery.categoryMain = payload.category.trim();
+      updateQuery.categoryMid = null;
+      updateQuery.categorySub = null;
+      updateQuery.category = payload.category.trim();
+    }
     
     // inventory 필드가 있으면 nested object 업데이트 처리
     if (payload.inventory) {
