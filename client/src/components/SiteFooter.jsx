@@ -9,25 +9,22 @@ const BOARD_LINKS = [
 
 const CUSTOMER_SUPPORT = {
   phone: '1577-1577',
-  hours: ['평일 : 오전10:00~오후04:00', '점심 : 오후01:00~오후02:00', '토/일/공휴일 휴무'],
+  hours: ['평일 : 오전 10:00 ~ 오후 04:00', '점심 : 오후 12:00 ~ 오후 02:00', '토/일/공휴일 휴무'],
 };
 
 const BANK_INFOS = [
-  { label: '예금주', value: '(주)코로라' },
-  { label: '신한', value: '000-000-000000' },
-  { label: '우리', value: '000-000-000000' },
-  { label: '농협', value: '000-000-000000' },
-  { label: '국민', value: '000-000-000000' },
+  { label: '예금주', value: '커멧랩스' },
+  { label: '하나', value: '455-910458-16907' },
 ];
 
 const FOOTER_LINKS = ['이용안내', '이용약관', '개인정보취급방침', 'instagram'];
 
 const COMPANY_INFO = [
-  '주식회사 코로라',
+  '커멧랩스',
   '서울특별시 종로구 ㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇ  대표 : ㅇㅇㅇ  사업자등록번호 : 000-00-00000',
   '통신판매업 신고 : 0000-ㅇㅇㅇㅇ-0000호  팩스 : 02)000-0000  개인정보관리책임자 : ㅇㅇㅇ',
   '반품주소 : 경기도 양주시 ㅇㅇㅇ 0000 ㅇㅇ빌딩 (ㅇㅇ동)',
-  'COPYRIGHT(C) 주식회사 코로라 ALL RIGHT RESERVED.',
+  'COPYRIGHT(C) 주식회사 코로라 ALL RIGHT RESERVED. / Hosting By 커멧랩스',
 ];
 
 function SiteFooter() {

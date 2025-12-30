@@ -1,0 +1,271 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Response Schema",
+  "description": "Schema for AI Shopping Assistant responses - Operational Reference",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "ANSWER"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "description": "Text response content (English only)"
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "Request identifier (UUID)"
+        }
+      },
+      "required": ["type", "content", "requestId"],
+      "additionalProperties": false,
+      "title": "AnswerResponse"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "BRIEFING_WITH_PRODUCTS"
+        },
+        "briefing": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "enum": ["Trend", "Fit", "Popularity", "Value", "Quality", "Price", "Shipping"]
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": ["label", "text"],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "followUps": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          },
+          "required": ["title", "summary", "reasons"],
+          "additionalProperties": false
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "price": {
+                "type": "number",
+                "minimum": 0
+              },
+              "currency": {
+                "type": "string",
+                "const": "KRW"
+              },
+              "imageUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "detailUrl": {
+                "type": "string",
+                "pattern": "^/products/[a-zA-Z0-9_-]+$"
+              }
+            },
+            "required": ["id", "title", "price", "currency", "reason", "detailUrl"],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "Request identifier (UUID)"
+        }
+      },
+      "required": ["type", "briefing", "products", "requestId"],
+      "additionalProperties": false,
+      "title": "BriefingWithProductsResponse"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "MONGO_QUERY"
+        },
+        "collection": {
+          "type": "string",
+          "enum": [
+            "products",
+            "categories",
+            "orders",
+            "reviews",
+            "users",
+            "carts",
+            "wishlists",
+            "coupons",
+            "points"
+          ]
+        },
+        "query": {
+          "type": "object",
+          "description": "MongoDB query object (read-only operations only)"
+        },
+        "projection": {
+          "type": "object",
+          "description": "MongoDB projection object"
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "sort": {
+              "type": "object",
+              "description": "MongoDB sort specification"
+            },
+            "skip": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Human-readable purpose of the query"
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "Request identifier (UUID)"
+        }
+      },
+      "required": ["type", "collection", "query", "purpose", "requestId"],
+      "additionalProperties": false,
+      "title": "MongoQueryResponse"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "TOOL_CALL"
+        },
+        "tool": {
+          "type": "string",
+          "enum": [
+            "addToCart",
+            "toggleWishlist",
+            "goToCheckout",
+            "requestCancel",
+            "requestRefund",
+            "sellerProductRegister"
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "description": "Tool-specific payload (validated against action_schema.json)"
+        },
+        "userFacingSummary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "User-friendly summary of the action (English)"
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "Request identifier (UUID)"
+        }
+      },
+      "required": ["type", "tool", "payload", "userFacingSummary", "requestId"],
+      "additionalProperties": false,
+      "title": "ToolCallResponse"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "NEED_MORE_INFO"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "missingSlots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of missing required slots (optional)"
+        },
+        "requestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "Request identifier (UUID)"
+        }
+      },
+      "required": ["type", "questions", "requestId"],
+      "additionalProperties": false,
+      "title": "NeedMoreInfoResponse"
+    }
+  ]
+}

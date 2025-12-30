@@ -8,3 +8,16 @@ server/node_modules/@xenova/transformers/.cache/
 
 # onnx models
 *.onnx
+
+# AI models and datasets (gitignore)
+agents/models/**
+!agents/models/README.md
+agents/datasets/**
+
+# Model file formats
+**/*.safetensors
+**/*.gguf
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.ckpt

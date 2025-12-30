@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Action Schema",
+  "description": "Schema for tool/action calls in AI Shopping Assistant - Operational Reference",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": [
+        "addToCart",
+        "toggleWishlist",
+        "goToCheckout",
+        "requestCancel",
+        "requestRefund",
+        "sellerProductRegister"
+      ],
+      "description": "Tool name identifier"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Tool-specific payload",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "productId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Product identifier"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "description": "Quantity to add (1-20)"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Product options (color, size, etc.)"
+            }
+          },
+          "required": ["productId", "quantity"],
+          "additionalProperties": false,
+          "title": "addToCart"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "productId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Product identifier"
+            }
+          },
+          "required": ["productId"],
+          "additionalProperties": false,
+          "title": "toggleWishlist"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cartId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Cart identifier (optional if items provided)"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "productId": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]+$"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  }
+                },
+                "required": ["productId", "quantity"],
+                "additionalProperties": false
+              },
+              "description": "Cart items array (optional if cartId provided)"
+            }
+          },
+          "anyOf": [
+            { "required": ["cartId"] },
+            { "required": ["items"] }
+          ],
+          "additionalProperties": false,
+          "title": "goToCheckout"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Order identifier"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 500,
+              "description": "Cancellation reason (optional)"
+            }
+          },
+          "required": ["orderId"],
+          "additionalProperties": false,
+          "title": "requestCancel"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Order identifier"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Refund reason (required)"
+            },
+            "evidenceUrls": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uri"
+              },
+              "maxItems": 5,
+              "description": "Evidence URLs (optional, max 5)"
+            }
+          },
+          "required": ["orderId", "reason"],
+          "additionalProperties": false,
+          "title": "requestRefund"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sellerId": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Seller identifier (required)"
+            },
+            "product": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "category": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "stock": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["name", "price", "category"],
+              "additionalProperties": true,
+              "description": "Product data object"
+            }
+          },
+          "required": ["sellerId", "product"],
+          "additionalProperties": false,
+          "title": "sellerProductRegister"
+        }
+      ]
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Unique request identifier (UUID format) for tracking"
+    },
+    "actorRole": {
+      "type": "string",
+      "enum": ["consumer", "seller"],
+      "description": "Actor role (consumer or seller)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    }
+  },
+  "required": ["tool", "payload", "requestId", "actorRole", "timestamp"],
+  "additionalProperties": false,
+  "not": {
+    "anyOf": [
+      {
+        "properties": {
+          "payload": {
+            "properties": {
+              "sql": true
+            }
+          }
+        }
+      },
+      {
+        "properties": {
+          "payload": {
+            "properties": {
+              "rawQuery": true
+            }
+          }
+        }
+      },
+      {
+        "properties": {
+          "payload": {
+            "properties": {
+              "adminOverride": true
+            }
+          }
+        }
+      }
+    ]
+  }
+}

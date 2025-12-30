@@ -1,0 +1,175 @@
+.shipping-return-policy-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.shipping-return-policy-page__header {
+  margin-bottom: 2rem;
+}
+
+.shipping-return-policy-page__back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #666;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.shipping-return-policy-page__back-button:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111;
+}
+
+.shipping-return-policy-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.shipping-return-policy-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.shipping-return-policy-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.shipping-return-policy-section__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #6366f1;
+}
+
+.shipping-return-policy-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.shipping-return-policy-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shipping-return-policy-item__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.shipping-return-policy-item__list {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.shipping-return-policy-item__list li {
+  margin-bottom: 0.5rem;
+}
+
+.shipping-return-policy-item__list li:last-child {
+  margin-bottom: 0;
+}
+
+.shipping-return-policy-item__ordered-list {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.shipping-return-policy-item__ordered-list li {
+  margin-bottom: 0.75rem;
+}
+
+.shipping-return-policy-item__ordered-list li:last-child {
+  margin-bottom: 0;
+}
+
+.shipping-return-policy-notice {
+  padding: 1.25rem;
+  border-radius: 6px;
+  line-height: 1.8;
+  color: #4b5563;
+}
+
+.shipping-return-policy-notice--important {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  color: #92400e;
+}
+
+.shipping-return-policy-notice--important strong {
+  color: #78350f;
+}
+
+.shipping-return-policy-notice--warning {
+  background: #fee2e2;
+  border: 1px solid #f87171;
+  color: #991b1b;
+}
+
+.shipping-return-policy-notice--warning strong {
+  color: #7f1d1d;
+}
+
+.shipping-return-policy-notice ul {
+  margin: 0.75rem 0 0 0;
+  padding-left: 1.5rem;
+}
+
+.shipping-return-policy-notice ul li {
+  margin-bottom: 0.5rem;
+}
+
+.shipping-return-policy-notice ul li:last-child {
+  margin-bottom: 0;
+}
+
+.shipping-return-policy-notice p {
+  margin: 0 0 0.75rem 0;
+}
+
+.shipping-return-policy-notice p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .shipping-return-policy-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .shipping-return-policy-section {
+    padding: 1.5rem;
+  }
+
+  .shipping-return-policy-page__title {
+    font-size: 1.5rem;
+  }
+
+  .shipping-return-policy-section__title {
+    font-size: 1.25rem;
+  }
+}
+

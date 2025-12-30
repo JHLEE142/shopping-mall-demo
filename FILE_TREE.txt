@@ -1,0 +1,47 @@
+Generated File Tree
+===================
+
+agents/
+├── specs/                          # Agent specifications (moved from root)
+│   ├── 00_orchestrator.md
+│   ├── 01_policy_safety.md
+│   ├── 02_tool_gateway.md
+│   ├── 10_intent_router.md
+│   ├── 11_slot_collector.md
+│   ├── 12_product_search.md
+│   ├── 13_reco_fit.md
+│   ├── 14_price_compare.md
+│   ├── 15_order_flow.md
+│   ├── 16_after_sales.md
+│   ├── 17_review_assistant.md
+│   ├── 18_account_rewards.md
+│   ├── 20_seller_analytics.md
+│   ├── 21_pricing_simulator.md
+│   ├── 22_product_efficiency.md
+│   ├── 23_listing_assistant.md
+│   ├── 30_spend_behavior_analyst.md
+│   ├── 31_reflection_coach.md
+│   ├── 40_data_curator.md
+│   ├── 41_critic_grader.md
+│   ├── 42_testcase_generator.md
+│   └── 43_finetune_packager.md
+└── README.md
+
+server/src/ai_runtime/              # AI Runtime Implementation
+├── mdLoader.js                     # Loads and parses agent specs
+├── promptBuilder.js                # Builds system prompts from specs
+├── orchestrator.js                 # Main orchestration logic
+├── policySafety.js                 # Policy safety validation
+├── toolGateway.js                  # Tool call validation
+├── mongoQueryGate.js               # MongoDB query validation
+├── mongoQueryExecutor.js           # MongoDB query execution
+├── schemas.js                      # Zod validation schemas
+├── types.js                        # Type definitions (JSDoc)
+└── agents/                         # (Reserved for future agent implementations)
+
+server/src/routes/
+└── ai.js                           # AI API endpoint (/api/ai)
+
+Documentation:
+├── agents/README.md                # Agent specifications overview
+└── AI_RUNTIME_TESTING.md           # Testing guide and examples

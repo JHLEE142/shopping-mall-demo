@@ -31,7 +31,14 @@ function ProductGrid({ products = [], onProductClick, options = {} }) {
           gap: gap
         }}
       >
-        {products.map((product, index) => (
+        {products.map((product, index) => {
+          // 가격 정보 처리: price, originalPrice, discountRate 사용
+          const currentPrice = product.price || 0;
+          const originalPrice = product.originalPrice || null;
+          const discountRate = product.discountRate || 0;
+          const hasDiscount = discountRate > 0 && originalPrice && originalPrice > currentPrice;
+          
+          return (
           <div
             key={product._id || product.id || index}
             className="product-grid-item"
@@ -43,9 +50,9 @@ function ProductGrid({ products = [], onProductClick, options = {} }) {
                 alt={product.name}
                 className="product-grid-image"
               />
-              {product.salePrice && product.basePrice > product.salePrice && (
+              {hasDiscount && (
                 <span className="product-grid-discount">
-                  {Math.round((1 - product.salePrice / product.basePrice) * 100)}%
+                  {Math.round(discountRate)}%
                 </span>
               )}
             </div>
@@ -53,11 +60,11 @@ function ProductGrid({ products = [], onProductClick, options = {} }) {
               <h3 className="product-grid-name">{product.name}</h3>
               <div className="product-grid-price-row">
                 <span className="product-grid-price">
-                  {new Intl.NumberFormat('ko-KR').format(product.salePrice || product.basePrice)}원
+                  {new Intl.NumberFormat('ko-KR').format(currentPrice)}원
                 </span>
-                {product.salePrice && (
+                {hasDiscount && (
                   <span className="product-grid-original-price">
-                    {new Intl.NumberFormat('ko-KR').format(product.basePrice)}원
+                    {new Intl.NumberFormat('ko-KR').format(originalPrice)}원
                   </span>
                 )}
               </div>
@@ -71,7 +78,8 @@ function ProductGrid({ products = [], onProductClick, options = {} }) {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   )

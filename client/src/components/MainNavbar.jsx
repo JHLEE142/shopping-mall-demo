@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LogOut, UserRound, ChevronDown, Bell, Heart, Settings } from 'lucide-react';
 import SessionTimer from './SessionTimer';
-import { fetchCategories } from '../services/categoryService';
+import { fetchCategoryHierarchy } from '../services/categoryService';
 import { getUnreviewedProducts } from '../services/reviewService';
 
 const NAV_LINKS = ['New', 'Collections', 'Categories', 'About'];
@@ -18,6 +18,7 @@ function MainNavbar({
   onMoveToWishlist = () => {},
   onMoveToSettings = () => {},
   onMoveToPoints = () => {},
+  onMoveToMyPage = () => {},
   cartCount = 0,
   wishlistCount = 0,
   pointsBalance = 0,
@@ -36,14 +37,16 @@ function MainNavbar({
   const notificationRef = useRef(null);
   const isAdmin = user?.user_type === 'admin';
 
-  // 카테고리 목록 로드
+  // 카테고리 목록 로드 (대분류만 표시)
   useEffect(() => {
     async function loadCategories() {
       try {
         setCategoriesLoading(true);
-        const data = await fetchCategories({ includeProductCount: false });
-        console.log('카테고리 로드 성공:', data?.length || 0, '개');
-        setCategories(data || []);
+        const hierarchy = await fetchCategoryHierarchy(false);
+        // 계층 구조에서 대분류(level 1)만 추출
+        const mainCategories = hierarchy.filter(cat => cat.level === 1);
+        console.log('대분류 카테고리 로드 성공:', mainCategories?.length || 0, '개');
+        setCategories(mainCategories || []);
       } catch (error) {
         console.error('카테고리 로드 실패:', error.message);
         // 에러가 발생해도 빈 배열로 설정하여 UI가 깨지지 않도록 함
@@ -214,6 +217,12 @@ function MainNavbar({
     onMoveToPoints();
   };
 
+  const handleMoveToMyPage = () => {
+    closeMenu();
+    closeUserMenu();
+    onMoveToMyPage();
+  };
+
   const handleMoveToLookbook = () => {
     closeMenu();
     closeUserMenu();
@@ -322,11 +331,6 @@ function MainNavbar({
                 {cartCount > 0 && <span className="nav-cart__badge">{cartCount}</span>}
               </button>
             </div>
-            {isAdmin && (
-              <button type="button" className="nav-cta nav-cta--solid" onClick={handleMoveToAdmin}>
-                Admin Dashboard
-              </button>
-            )}
             {user && (
               <div className="nav-cart" style={{ position: 'relative' }}>
                 <button
@@ -483,24 +487,38 @@ function MainNavbar({
                 )}
               </div>
             )}
+            {isAdmin && (
+              <button type="button" className="nav-cta nav-cta--solid" onClick={handleMoveToAdmin}>
+                Admin Dashboard
+              </button>
+            )}
             {user && (
-              <div className="nav-points">
-                <span className="nav-points__label">적립금 :</span>
-                <span 
-                  className="nav-points__amount" 
-                  onClick={handleMoveToPoints}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleMoveToPoints();
-                    }
-                  }}
+              <>
+                <div className="nav-points">
+                  <span className="nav-points__label">적립금 :</span>
+                  <span 
+                    className="nav-points__amount" 
+                    onClick={handleMoveToPoints}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMoveToPoints();
+                      }
+                    }}
+                  >
+                    {pointsBalance.toLocaleString()}원
+                  </span>
+                </div>
+                <button 
+                  type="button" 
+                  className="nav-cta nav-cta--ghost" 
+                  onClick={handleMoveToMyPage}
                 >
-                  {pointsBalance.toLocaleString()}원
-                </span>
-              </div>
+                  마이페이지
+                </button>
+              </>
             )}
             {user ? (
               <div className="nav-user" ref={userMenuRef}>

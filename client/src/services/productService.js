@@ -108,6 +108,94 @@ export async function fetchProductById(productId) {
 }
 
 /**
+ * 엑셀 파일 업로드 및 미리보기
+ * @param {File} file - 업로드할 엑셀 파일
+ * @returns {Promise<Object>} - 미리보기 데이터
+ */
+export async function importExcel(file) {
+  console.log('[importExcel] Starting API call:', {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    url: `${API_BASE_URL}/api/products/import/excel`
+  });
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const requestStartTime = Date.now();
+  
+  try {
+    console.log('[importExcel] Sending fetch request...');
+    const response = await fetch(`${API_BASE_URL}/api/products/import/excel`, {
+      method: 'POST',
+      headers: {
+        ...buildAuthHeaders(),
+      },
+      body: formData,
+    });
+
+    const requestDuration = Date.now() - requestStartTime;
+    console.log('[importExcel] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      duration: requestDuration + 'ms'
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch((err) => {
+        console.error('[importExcel] Failed to parse error response:', err);
+        return null;
+      });
+      console.error('[importExcel] Error response data:', data);
+      const message = data?.message || 'Excel file upload failed. Please try again.';
+      throw new Error(message);
+    }
+
+    const result = await response.json();
+    console.log('[importExcel] Success response:', {
+      totalRows: result.totalRows,
+      validRows: result.validRows,
+      invalidRows: result.invalidRows,
+      previewLength: result.preview?.length || 0
+    });
+    
+    return result;
+  } catch (error) {
+    const requestDuration = Date.now() - requestStartTime;
+    console.error('[importExcel] Request failed after', requestDuration + 'ms:', error);
+    console.error('[importExcel] Error type:', error.constructor.name);
+    console.error('[importExcel] Error message:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 상품 등록 커밋 (테스트 버전: 상위 5개만)
+ * @param {Array} preview - 미리보기 데이터 배열
+ * @returns {Promise<Object>} - 커밋 결과 리포트
+ */
+export async function commitImport(preview) {
+  const response = await fetch(`${API_BASE_URL}/api/products/import/commit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildAuthHeaders(),
+    },
+    body: JSON.stringify({ preview }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = data?.message || 'Failed to commit products. Please try again.';
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/**
  * Hybrid 검색 API 호출
  * @param {string} query - 검색 쿼리
  * @param {number} limit - 반환할 결과 수
@@ -137,5 +225,3 @@ export async function searchProducts(query, limit = 20, phonemeWeight = 0.4, emb
 
   return response.json();
 }
-
-

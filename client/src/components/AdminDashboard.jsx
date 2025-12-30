@@ -17,6 +17,10 @@ import {
   Users,
   Users as UsersIcon,
   X,
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
 } from 'lucide-react';
 import {
   Area,
@@ -494,6 +498,8 @@ function AdminDashboard({
   const [productsStatus, setProductsStatus] = useState('idle');
   const [productsError, setProductsError] = useState('');
   const [deletingProductId, setDeletingProductId] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
   const [productPage, setProductPage] = useState(1);
   const [productPagination, setProductPagination] = useState({
     totalPages: 1,
@@ -527,6 +533,7 @@ function AdminDashboard({
     totalItems: 0,
   });
   const [allCustomers, setAllCustomers] = useState([]); // VIP/Regular/New 계산용 전체 고객 목록
+  const [customerOrderStats, setCustomerOrderStats] = useState(new Map()); // 사용자별 주문 통계
 
   // Dashboard 데이터 상태
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -624,11 +631,55 @@ function AdminDashboard({
     []
   );
 
-  // VIP/Regular/New 계산을 위한 전체 고객 목록 로드
+  // VIP/Regular/New 계산을 위한 전체 고객 목록 로드 및 주문 통계 계산
   const loadAllCustomers = useCallback(async () => {
     try {
       const data = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
       setAllCustomers(data?.items ?? []);
+      
+      // 모든 주문을 가져와서 사용자별 통계 계산
+      try {
+        const { fetchOrders } = await import('../services/orderService');
+        const ordersData = await fetchOrders({ page: 1, limit: 10000 });
+        const allOrders = ordersData.items || ordersData.orders || [];
+        
+        // 사용자별 주문 통계 계산
+        const statsMap = new Map();
+        
+        allOrders.forEach((order) => {
+          // user 필드가 populate된 경우 _id 사용, 아니면 직접 사용
+          const userId = order.user?._id || order.user?.id || (typeof order.user === 'string' ? order.user : null) || order.userId;
+          if (!userId) return;
+          
+          const userIdStr = userId.toString();
+          
+          if (!statsMap.has(userIdStr)) {
+            statsMap.set(userIdStr, {
+              orderCount: 0,
+              totalSpent: 0,
+              lastOrderDate: null,
+            });
+          }
+          
+          const stats = statsMap.get(userIdStr);
+          stats.orderCount += 1;
+          
+          // 총 구매 금액 계산 (grandTotal 또는 summary.grandTotal 사용)
+          const orderTotal = order.summary?.grandTotal || order.grandTotal || 0;
+          stats.totalSpent += orderTotal;
+          
+          // 마지막 주문일 업데이트
+          const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+          if (orderDate && (!stats.lastOrderDate || orderDate > stats.lastOrderDate)) {
+            stats.lastOrderDate = orderDate;
+          }
+        });
+        
+        setCustomerOrderStats(statsMap);
+      } catch (orderError) {
+        console.error('Failed to load order statistics:', orderError);
+        // 주문 통계 로드 실패해도 사용자 목록은 표시
+      }
     } catch (error) {
       // 에러가 나도 무시 (요약 정보만 실패)
       console.error('Failed to load all customers for summary:', error);
@@ -995,6 +1046,12 @@ function AdminDashboard({
       try {
         setDeletingProductId(product._id);
         await deleteProduct(product._id);
+        // 선택 목록에서도 제거
+        setSelectedProducts((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(product._id);
+          return newSet;
+        });
         await loadProducts(productPage);
       } catch (error) {
         setProductsStatus('error');
@@ -1003,8 +1060,100 @@ function AdminDashboard({
         setDeletingProductId(null);
       }
     },
-    [loadProducts]
+    [loadProducts, productPage]
   );
+
+  // 선택 삭제 핸들러
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedProducts.size === 0) {
+      alert('삭제할 상품을 선택해주세요.');
+      return;
+    }
+
+    if (!window.confirm(`선택한 ${selectedProducts.size}개의 상품을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      setIsDeletingSelected(true);
+      const productIds = Array.from(selectedProducts);
+      await Promise.all(productIds.map(id => deleteProduct(id)));
+      setSelectedProducts(new Set());
+      await loadProducts(productPage);
+      alert(`${productIds.length}개의 상품이 삭제되었습니다.`);
+    } catch (error) {
+      alert(error.message || '상품 삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  }, [selectedProducts, loadProducts, productPage]);
+
+  // 모두 삭제 핸들러
+  const handleDeleteAll = useCallback(async () => {
+    if (productPagination.totalItems === 0) {
+      alert('삭제할 상품이 없습니다.');
+      return;
+    }
+
+    if (!window.confirm(`정말로 모든 상품(${productPagination.totalItems}개)을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    if (!window.confirm('이 작업은 매우 위험합니다. 정말로 모든 상품을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      setIsDeletingSelected(true);
+      // 모든 페이지의 상품을 삭제하기 위해 여러 페이지를 순회
+      let currentPage = 1;
+      let totalDeleted = 0;
+      
+      while (true) {
+        const data = await fetchProducts(currentPage, PRODUCTS_PAGE_SIZE, null, null);
+        const products = data?.items || [];
+        
+        if (products.length === 0) break;
+        
+        await Promise.all(products.map(product => deleteProduct(product._id)));
+        totalDeleted += products.length;
+        
+        if (currentPage >= (data?.totalPages || 1)) break;
+        currentPage++;
+      }
+      
+      setSelectedProducts(new Set());
+      await loadProducts(1);
+      alert(`모든 상품(${totalDeleted}개)이 삭제되었습니다.`);
+    } catch (error) {
+      alert(error.message || '상품 삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  }, [productPagination.totalItems]);
+
+  // 개별 상품 선택/해제 핸들러
+  const handleToggleProductSelection = useCallback((productId) => {
+    setSelectedProducts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // 전체 선택/해제 핸들러
+  const handleToggleSelectAll = useCallback((checked) => {
+    if (checked) {
+      const allIds = new Set(productList.map(p => p._id));
+      setSelectedProducts(allIds);
+    } else {
+      setSelectedProducts(new Set());
+    }
+  }, [productList]);
 
   const renderDashboard = () => {
     // 통계 카드 데이터 계산
@@ -2057,13 +2206,31 @@ function AdminDashboard({
               <div className="admin-table__body">
                 {customersList.map((user) => {
                   const joinDate = user.createdAt
-                    ? new Date(user.createdAt).toLocaleDateString('ko-KR')
+                    ? new Date(user.createdAt).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                      }).replace(/\. /g, '.').replace(/\.$/, '')
                     : '-';
-                  // 주문 정보는 아직 없으므로 임시 값
-                  const orders = 0;
-                  const totalSpent = 0;
-                  const avgOrderValue = 0;
-                  const lastOrder = '-';
+                  
+                  // 사용자별 주문 통계 가져오기
+                  const userIdStr = (user._id || user.id).toString();
+                  const orderStats = customerOrderStats.get(userIdStr) || {
+                    orderCount: 0,
+                    totalSpent: 0,
+                    lastOrderDate: null,
+                  };
+                  
+                  const orders = orderStats.orderCount;
+                  const totalSpent = orderStats.totalSpent;
+                  const avgOrderValue = orders > 0 ? totalSpent / orders : 0;
+                  const lastOrder = orderStats.lastOrderDate
+                    ? orderStats.lastOrderDate.toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                      }).replace(/\. /g, '.').replace(/\.$/, '')
+                    : '-';
                   
                   // 세그먼트 계산 (가입일 기준)
                   const now = new Date();
@@ -3024,19 +3191,84 @@ function AdminDashboard({
             </div>
           )}
           {productsStatus === 'success' && productList.length > 0 && (
-            <div className="admin-table admin-table--inventory admin-table--products-list">
-              <div className="admin-table__header">
-                <span>이미지</span>
-                <span>SKU</span>
-                <span>상품명</span>
-                <span>카테고리</span>
-                <span>가격</span>
-                <span>등록일</span>
-                <span>관리</span>
+            <>
+              {/* 선택 삭제 및 모두 삭제 버튼 */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '0.5rem', 
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                alignItems: 'center'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={productList.length > 0 && productList.every(p => selectedProducts.has(p._id))}
+                  onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                  style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                />
+                <span style={{ color: '#374151', fontSize: '0.875rem', marginRight: 'auto' }}>
+                  전체 선택 ({selectedProducts.size}/{productList.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedProducts.size === 0 || isDeletingSelected}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: selectedProducts.size === 0 || isDeletingSelected ? '#f3f4f6' : '#ef4444',
+                    color: selectedProducts.size === 0 || isDeletingSelected ? '#9ca3af' : 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: selectedProducts.size === 0 || isDeletingSelected ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {isDeletingSelected ? '삭제 중...' : `선택 삭제 (${selectedProducts.size})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAll}
+                  disabled={isDeletingSelected || productList.length === 0}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: isDeletingSelected || productList.length === 0 ? '#f3f4f6' : '#dc2626',
+                    color: isDeletingSelected || productList.length === 0 ? '#9ca3af' : 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: isDeletingSelected || productList.length === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  모두 삭제
+                </button>
               </div>
-              <div className="admin-table__body">
-                {productList.map((product) => (
-                  <div key={product._id || product.sku} className="admin-table__row">
+              <div className="admin-table admin-table--inventory admin-table--products-list">
+                <div className="admin-table__header">
+                  <span style={{ width: '40px' }}>선택</span>
+                  <span>이미지</span>
+                  <span>SKU</span>
+                  <span>상품명</span>
+                  <span>카테고리</span>
+                  <span>가격</span>
+                  <span>등록일</span>
+                  <span>관리</span>
+                </div>
+                <div className="admin-table__body">
+                  {productList.map((product) => (
+                    <div key={product._id || product.sku} className="admin-table__row">
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.has(product._id)}
+                          onChange={() => handleToggleProductSelection(product._id)}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        />
+                      </span>
                     <span className="admin-table__image">
                       {product.image ? (
                         <img src={product.image} alt={product.name} loading="lazy" />
@@ -3102,6 +3334,7 @@ function AdminDashboard({
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
       </section>
@@ -3224,32 +3457,41 @@ function AdminDashboard({
     [loadCategories]
   );
 
-  // 카테고리 트리 렌더링 헬퍼 함수
+  // 카테고리 트리 렌더링 헬퍼 함수 (폴더 구조처럼 표시)
   const renderCategoryTree = (category, level = 0, parentPath = '') => {
     const isExpanded = expandedCategories.has(category._id);
     const hasChildren = category.children && category.children.length > 0;
     const isSelected = selectedCategory?._id === category._id;
     const currentPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
-    const indent = level * 20;
+    
+    // 레벨별 들여쓰기 및 스타일
+    const indentPx = level * 24; // 각 레벨마다 24px 들여쓰기
+    const levelLabel = level === 0 ? '대분류' : level === 1 ? '중분류' : '소분류';
+    const levelColor = level === 0 ? '#1f2937' : level === 1 ? '#374151' : '#6b7280';
+    const fontWeight = level === 0 ? '600' : level === 1 ? '500' : '400';
+    const fontSize = level === 0 ? '0.9375rem' : level === 1 ? '0.875rem' : '0.8125rem';
 
     return (
       <div key={category._id}>
         <div
           className={`admin-category-tree-item ${isSelected ? 'is-selected' : ''}`}
           style={{
-            paddingLeft: `${indent + 12}px`,
-            padding: '8px 12px',
-            paddingLeft: `${indent + 12}px`,
+            padding: '10px 12px',
+            paddingLeft: `${indentPx + 12}px`,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            backgroundColor: isSelected ? '#eef2ff' : 'transparent',
-            borderLeft: isSelected ? '3px solid #4f46e5' : '3px solid transparent',
+            backgroundColor: isSelected ? '#eef2ff' : level === 0 ? '#f9fafb' : 'transparent',
+            borderLeft: isSelected ? '3px solid #4f46e5' : level === 0 ? '2px solid #e5e7eb' : 'none',
+            borderTop: level === 0 ? '1px solid #e5e7eb' : 'none',
+            marginTop: level === 0 ? '4px' : '0',
           }}
           onClick={() => handleSelectCategory(category)}
+          title={levelLabel}
         >
-          {hasChildren ? (
+          {/* 확장/축소 아이콘 */}
+          {hasChildren && (
             <button
               type="button"
               onClick={(e) => {
@@ -3259,38 +3501,89 @@ function AdminDashboard({
               style={{
                 background: 'none',
                 border: 'none',
-                padding: '4px',
+                padding: '2px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                color: '#6b7280',
+                justifyContent: 'center',
+                color: levelColor,
+                flexShrink: 0,
               }}
             >
-              {isExpanded ? '−' : '+'}
+              {isExpanded ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronRight size={16} />
+              )}
             </button>
-          ) : (
-            <span style={{ width: '24px', display: 'inline-block' }}></span>
           )}
-          <span style={{ flex: 1 }}>{category.name}</span>
-          <span style={{ color: '#9ca3af', fontSize: '0.875rem', marginRight: '8px' }}>
+          {!hasChildren && <span style={{ width: '20px', flexShrink: 0 }} />}
+          
+  
+          
+          {/* 레벨 라벨 (대분류만 표시) */}
+          {level === 0 && (
+            <span
+              style={{
+                fontSize: '0.75rem',
+                color: '#9ca3af',
+                fontWeight: '500',
+                padding: '2px 6px',
+                backgroundColor: '#e5e7eb',
+                borderRadius: '4px',
+                flexShrink: 0,
+              }}
+            >
+              {levelLabel}
+            </span>
+          )}
+          
+          {/* 카테고리 이름 */}
+          <span
+            style={{
+              flex: 1,
+              fontWeight,
+              fontSize,
+              color: levelColor,
+            }}
+          >
+            {category.name}
+          </span>
+          
+          {/* 상품 개수 */}
+          <span
+            style={{
+              color: '#9ca3af',
+              fontSize: '0.75rem',
+              marginRight: '8px',
+              fontWeight: '400',
+            }}
+          >
             {category.productCount || 0}
           </span>
+          
+          {/* 하위 카테고리 추가 버튼 */}
           {level < 2 && (
             <button
               type="button"
               className="admin-filter-button"
-              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                flexShrink: 0,
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddSubCategory(category);
               }}
+              title={`${level === 0 ? '중분류' : '소분류'} 추가`}
             >
               <Plus className="admin-icon" style={{ width: '14px', height: '14px' }} />
             </button>
           )}
         </div>
-        {hasChildren && isExpanded && (
-          <div>
+        {isExpanded && hasChildren && (
+          <div style={{ borderLeft: level === 0 ? '2px solid #e5e7eb' : 'none', marginLeft: level === 0 ? '12px' : '0' }}>
             {category.children.map((child) => renderCategoryTree(child, level + 1, currentPath))}
           </div>
         )}

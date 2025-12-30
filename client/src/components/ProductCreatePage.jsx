@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Upload, Trash2 } from 'lucide-react';
-import { createProduct, updateProduct, deleteProduct } from '../services/productService';
+import { ArrowLeft, Upload, Trash2, FileSpreadsheet, CheckCircle, XCircle } from 'lucide-react';
+import { createProduct, updateProduct, deleteProduct, importExcel, commitImport } from '../services/productService';
 import { fetchCategoryHierarchy } from '../services/categoryService';
+import * as XLSX from 'xlsx';
 import './ProductCreatePage.css';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -13,6 +14,8 @@ const EMPTY_FORM = {
   description: '',
   category: '',
   price: '',
+  discountRate: '',
+  originalPrice: '',
   image: '',
   images: [],
   colors: [],
@@ -22,12 +25,12 @@ const EMPTY_FORM = {
   status: 'draft',
   shipping: {
     isFree: false,
-    fee: 0,
+    fee: 3000,
     estimatedDays: 3,
   },
   returnPolicy: {
     isReturnable: true,
-    returnDays: 30,
+    returnDays: 15,
     returnFee: 0,
   },
 };
@@ -49,6 +52,16 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  
+  // 엑셀 업로드 관련 상태
+  const [excelUploadMode, setExcelUploadMode] = useState(false);
+  const [excelPreview, setExcelPreview] = useState(null);
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelCommitting, setExcelCommitting] = useState(false);
+  const [excelResult, setExcelResult] = useState(null);
+  const [excelFileName, setExcelFileName] = useState(null);
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const [duplicateSkus, setDuplicateSkus] = useState(new Set()); // 중복된 SKU 집합
 
   useEffect(() => {
     loadCategories();
@@ -119,6 +132,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         categoryMid: product.categoryMid || '',
         categorySub: product.categorySub || '',
         price: product.price?.toString() || '',
+        discountRate: product.discountRate?.toString() || '',
+        originalPrice: product.originalPrice?.toString() || '',
         image: productImages[0] || product.image || '',
         images: productImages,
         colors: product.colors && Array.isArray(product.colors) ? product.colors : [],
@@ -128,12 +143,12 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         status: product.status || 'draft',
         shipping: {
           isFree: product.shipping?.isFree || false,
-          fee: product.shipping?.fee || 0,
+          fee: product.shipping?.fee || 3000,
           estimatedDays: product.shipping?.estimatedDays || 3,
         },
         returnPolicy: {
           isReturnable: product.returnPolicy?.isReturnable !== false,
-          returnDays: product.returnPolicy?.returnDays || 30,
+          returnDays: product.returnPolicy?.returnDays || 15,
           returnFee: product.returnPolicy?.returnFee || 0,
         },
       });
@@ -236,6 +251,25 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           [field]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) || 0 : value,
         },
       }));
+    } else if (name === 'discountRate') {
+      // 할인율 입력 시 원래 가격 역산
+      const discountRate = value === '' ? '' : parseFloat(value);
+      setFormData((prev) => {
+        let originalPrice = prev.originalPrice;
+        if (prev.price && discountRate !== '' && !isNaN(discountRate) && discountRate > 0 && discountRate <= 100) {
+          const price = parseFloat(prev.price);
+          if (!isNaN(price) && price > 0) {
+            // 원래 가격 = 현재 가격 / (1 - 할인율/100)
+            const calculatedOriginalPrice = price / (1 - discountRate / 100);
+            originalPrice = Math.floor(calculatedOriginalPrice / 100) * 100; // 100원 단위로 절삭
+          }
+        }
+        return {
+          ...prev,
+          discountRate: value,
+          originalPrice: originalPrice === '' ? '' : originalPrice.toString(),
+        };
+      });
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -548,8 +582,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     if (selectedSub?.name) pathParts.push(selectedSub.name);
     const categoryPathText = pathParts.join(' > ');
 
-    if (!formData.name || !categoryMain || !formData.price || !formData.image) {
-      setError('필수 항목(상품명, 카테고리, 가격, 이미지)을 모두 입력해주세요.');
+    if (!formData.name || !categoryMain || !formData.price) {
+      setError('필수 항목(상품명, 카테고리, 가격)을 모두 입력해주세요.');
       return;
     }
 
@@ -560,10 +594,16 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         ? formData.images.filter(img => img && img.trim())
         : (formData.image ? [formData.image.trim()] : []);
 
+      // 할인율과 원래 가격 처리
+      const discountRate = formData.discountRate ? Number(formData.discountRate) : 0;
+      const originalPrice = formData.originalPrice ? Number(formData.originalPrice) : null;
+
       const payload = {
         sku: formData.sku.trim().toUpperCase(),
         name: formData.name.trim(),
         price: Number(formData.price),
+        discountRate: discountRate >= 0 && discountRate <= 100 ? discountRate : 0,
+        originalPrice: originalPrice && originalPrice > 0 ? originalPrice : null,
         categoryId: finalCategoryId, // 최종 선택된 카테고리 ID (필수)
         categoryPathIds: categoryPathIds, // 경로상의 모든 카테고리 ID 배열
         categoryPathText: categoryPathText, // 경로 텍스트 (표시용)
@@ -572,9 +612,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         categoryMain: categoryMain,
         categoryMid: categoryMid,
         categorySub: categorySub,
-        image: productImages[0] || formData.image.trim(),
+        image: productImages[0] || formData.image?.trim() || '',
         images: productImages,
-        description: formData.description.trim(),
+        description: formData.description?.trim() || '',
         colors: formData.colors.filter(c => c.name && c.value),
         sizes: formData.sizes.filter(s => s.label && s.value),
         stockManagement: formData.stockManagement,
@@ -620,6 +660,379 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     }
   };
 
+  // 행 선택/해제 핸들러
+  const handleRowToggle = (rowIndex) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(rowIndex)) {
+        newSet.delete(rowIndex);
+      } else {
+        newSet.add(rowIndex);
+      }
+      return newSet;
+    });
+  };
+
+  // 전체 선택/해제 핸들러
+  const handleSelectAll = (checked) => {
+    if (!excelPreview || !excelPreview.preview) return;
+    
+    if (checked) {
+      // 유효한 행만 선택 (중복 제외, 최대 30개)
+      const validRows = excelPreview.preview
+        .filter((item) => {
+          const sku = item.mapped?.sku;
+          const isDuplicate = sku && duplicateSkus.has(sku);
+          return item.validation.ok && !isDuplicate;
+        })
+        .slice(0, 30)
+        .map((item) => item.rowIndex);
+      setSelectedRows(new Set(validRows));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  // 엑셀 파일 업로드 핸들러
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      console.log('[Excel Upload] No file selected');
+      return;
+    }
+
+    console.log('[Excel Upload] File selected:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      sizeMB: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+    });
+
+    // 파일 확장자 검증
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+      console.log('[Excel Upload] Invalid file type:', file.name);
+      alert('Only Excel files (.xlsx, .xls) are allowed.');
+      e.target.value = '';
+      return;
+    }
+
+    // 파일명 저장
+    setExcelFileName(file.name);
+
+    console.log('[Excel Upload] Starting upload...');
+    setExcelUploading(true);
+    setExcelPreview(null);
+    setExcelResult(null);
+    setError('');
+    setSelectedRows(new Set()); // 파일 업로드 시 선택 초기화
+    setDuplicateSkus(new Set());
+
+    const uploadStartTime = Date.now();
+
+    try {
+      // 클라이언트에서 Excel 파일 읽기
+      console.log('[Excel Upload] Reading file locally...');
+      const fileData = await file.arrayBuffer();
+      const workbook = XLSX.read(fileData, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // 헤더 포함 전체 데이터 가져오기
+      const data = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        defval: null
+      });
+      
+      const headers = data[0] || [];
+      const allRows = data.slice(1);
+      
+      // 최대 30개 행만 처리 (먼저 slice하여 효율성 향상)
+      const maxRowsToProcess = 30;
+      const rows = allRows.slice(0, maxRowsToProcess);
+      
+      console.log(`[Excel Upload] Total rows in file: ${allRows.length}, Processing: ${rows.length} rows`);
+      
+      // 컬럼명으로 매핑된 객체 배열로 변환 (30개만)
+      const mappedData = rows.map(row => {
+        const obj = {};
+        headers.forEach((header, index) => {
+          obj[header] = row[index] !== undefined ? row[index] : null;
+        });
+        // G열(인덱스 6) 데이터 직접 추가
+        obj['__G_COLUMN__'] = row[6] !== undefined ? row[6] : null;
+        return obj;
+      });
+      
+      const maxRows = mappedData.length; // 이미 30개로 제한됨
+      console.log(`[Excel Upload] File parsed: ${maxRows} rows found`);
+      
+      // 컬럼 찾기 헬퍼
+      const findColumn = (row, possibleNames) => {
+        for (const name of possibleNames) {
+          if (row.hasOwnProperty(name)) {
+            return row[name];
+          }
+        }
+        return null;
+      };
+      
+      // 실시간 미리보기를 위한 상태 초기화
+      const initialPreview = {
+        preview: [],
+        totalRows: maxRows,
+        validRows: 0,
+        invalidRows: 0,
+      };
+      setExcelPreview(initialPreview);
+      
+      // 1개씩 처리하여 실시간 미리보기 업데이트
+      const previewItems = [];
+      const skuMap = new Map();
+      const duplicates = new Set();
+      
+      for (let i = 0; i < maxRows; i++) {
+        const row = mappedData[i];
+        const rowIndex = i + 2; // 엑셀 행 번호 (헤더 제외, 1-based)
+        
+        // 1개씩 읽을 때마다 콘솔 로그
+        const percentage = ((i + 1) / maxRows * 100).toFixed(1);
+        console.log(`📊 [Excel Upload] Row ${i + 1}/${maxRows} (${percentage}%): Processing...`);
+        
+        // 원본 데이터 추출
+        const barcode = findColumn(row, ['바코드', 'barcode', 'Barcode', 'BARCODE', 'SKU', 'sku']);
+        const name = findColumn(row, ['상품명', 'name', 'Name', 'NAME', '제품명', 'product_name']);
+        const vip5 = row['__G_COLUMN__'] !== null && row['__G_COLUMN__'] !== undefined 
+          ? row['__G_COLUMN__'] 
+          : findColumn(row, ['우수회원5', 'VIP5', 'vip5', '우수회원', 'member_price']);
+        const categoryPath = findColumn(row, ['카테고리', 'category', 'Category', 'CATEGORY', 'category_path']);
+        
+        const raw = { barcode, name, vip5, categoryPath };
+        
+        // 검증 및 매핑
+        const validation = { ok: true, errors: [] };
+        const mapped = { sku: null, name: null, price: null, category: { l1: null, l2: null, l3: null }, categoryId: null };
+        
+        // SKU 검증
+        if (!barcode || (typeof barcode === 'string' && !barcode.trim())) {
+          validation.ok = false;
+          validation.errors.push('Barcode is required');
+        } else {
+          mapped.sku = String(barcode).trim().toUpperCase();
+        }
+        
+        // 상품명 검증
+        if (!name || (typeof name === 'string' && !name.trim())) {
+          validation.ok = false;
+          validation.errors.push('Product name is required');
+        } else {
+          mapped.name = String(name).trim();
+        }
+        
+        // 할인율 랜덤 배정 함수 (10~60%, 비율에 따라 가중치 적용)
+        function getRandomDiscountRate() {
+          const discountOptions = [
+            // 10%대: 가중치 1
+            ...Array(1).fill().map(() => Math.floor(Math.random() * 10) + 10),
+            // 20%대: 가중치 2
+            ...Array(2).fill().map(() => Math.floor(Math.random() * 10) + 20),
+            // 30%대: 가중치 3
+            ...Array(3).fill().map(() => Math.floor(Math.random() * 10) + 30),
+            // 40%: 가중치 2
+            ...Array(2).fill(40),
+            // 50%: 가중치 1
+            ...Array(1).fill(50),
+            // 60%: 가중치 1
+            ...Array(1).fill(60),
+          ];
+          return discountOptions[Math.floor(Math.random() * discountOptions.length)];
+        }
+        
+        // 가격 계산: 1.91 곱한 후 10원 단위로 절삭
+        if (vip5 !== null && vip5 !== undefined && vip5 !== '') {
+          const vip5Num = Number(vip5);
+          if (!isNaN(vip5Num) && vip5Num >= 0) {
+            const calculatedPrice = vip5Num * 1.91;
+            mapped.price = Math.floor(calculatedPrice / 10) * 10;
+            
+            // 할인율 랜덤 배정
+            const discountRate = getRandomDiscountRate();
+            mapped.discountRate = discountRate;
+            
+            // 원래 가격 역산: 현재 가격 / (1 - 할인율/100), 100원 단위로 절삭
+            const originalPrice = mapped.price / (1 - discountRate / 100);
+            mapped.originalPrice = Math.floor(originalPrice / 100) * 100;
+          } else {
+            validation.ok = false;
+            validation.errors.push(`VIP5 price must be a valid number`);
+          }
+        } else {
+          validation.ok = false;
+          validation.errors.push('VIP5 price is required');
+        }
+        
+        // 카테고리 처리
+        if (categoryPath && String(categoryPath).trim()) {
+          const categoryPathStr = String(categoryPath).trim();
+          const parts = categoryPathStr.split('>').map(p => p.trim()).filter(p => p);
+          mapped.category.l1 = parts[0] || null;
+          mapped.category.l2 = parts[1] || null;
+          mapped.category.l3 = parts[2] || null;
+        } else {
+          validation.ok = false;
+          validation.errors.push('Category is required');
+        }
+        
+        // 미리보기 아이템 생성
+        const previewItem = {
+          rowIndex,
+          raw,
+          mapped,
+          validation,
+        };
+        
+        previewItems.push(previewItem);
+        
+        // 실시간 미리보기 업데이트 (1개씩 추가)
+        const currentValidCount = previewItems.filter(item => item.validation.ok).length;
+        const currentInvalidCount = previewItems.length - currentValidCount;
+        
+        setExcelPreview({
+          preview: [...previewItems],
+          totalRows: maxRows,
+          validRows: currentValidCount,
+          invalidRows: currentInvalidCount,
+        });
+        
+        // 1개씩 처리 완료 후 콘솔 로그
+        const status = validation.ok ? '✅ Valid' : '❌ Invalid';
+        const errors = validation.errors.length > 0 ? ` - ${validation.errors.join(', ')}` : '';
+        console.log(`📦 [Excel Upload] Row ${rowIndex} processed: ${status} | SKU: ${mapped.sku || 'N/A'} | Name: ${mapped.name || 'N/A'}${errors}`);
+        
+        // 중복 체크
+        const sku = mapped.sku;
+        if (sku && validation.ok) {
+          if (skuMap.has(sku)) {
+            duplicates.add(sku);
+          } else {
+            skuMap.set(sku, rowIndex);
+          }
+        }
+        
+        // UI 업데이트를 위한 짧은 딜레이 (너무 빠르면 브라우저가 업데이트를 따라가지 못할 수 있음)
+        if ((i + 1) % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      
+      // 중복 SKU 설정
+      setDuplicateSkus(duplicates);
+      
+      // 최종 결과를 서버로 보내서 검증 및 카테고리 처리
+      console.log('[Excel Upload] Sending to server for validation and category processing...');
+      const finalResult = await importExcel(file);
+      
+      // 서버에서 받은 최종 결과로 업데이트 (카테고리 ID 등 서버 검증 결과 포함)
+      setExcelPreview(finalResult);
+      
+      // 서버 결과 기반 중복 재계산
+      const finalSkuMap = new Map();
+      const finalDuplicates = new Set();
+      if (finalResult.preview) {
+        finalResult.preview.forEach((item) => {
+          const sku = item.mapped?.sku;
+          if (sku && item.validation?.ok) {
+            if (finalSkuMap.has(sku)) {
+              finalDuplicates.add(sku);
+            } else {
+              finalSkuMap.set(sku, item.rowIndex);
+            }
+          }
+        });
+      }
+      setDuplicateSkus(finalDuplicates);
+      
+      const uploadDuration = Date.now() - uploadStartTime;
+      console.log('[Excel Upload] Upload completed successfully:', {
+        duration: uploadDuration + 'ms',
+        validRows: finalResult.validRows,
+        invalidRows: finalResult.invalidRows,
+        totalRows: finalResult.totalRows,
+        preview: finalResult.preview?.length || 0
+      });
+    } catch (uploadError) {
+      const uploadDuration = Date.now() - uploadStartTime;
+      console.error('[Excel Upload] Upload failed after', uploadDuration + 'ms:', uploadError);
+      console.error('[Excel Upload] Error details:', {
+        message: uploadError.message,
+        stack: uploadError.stack,
+        name: uploadError.name
+      });
+      
+      // 네트워크 타임아웃 등 체크
+      let errorMessage = uploadError.message || 'Failed to upload Excel file. Please try again.';
+      if (uploadError.name === 'TypeError' && uploadError.message.includes('fetch')) {
+        errorMessage = 'Network error: Unable to connect to server. Please check your connection.';
+      } else if (uploadDuration > 30000) {
+        errorMessage = 'Upload timeout: The server took too long to respond. The file might be too large or the server is busy.';
+      }
+      
+      setError(errorMessage);
+      setExcelFileName(null); // 에러 시 파일명 제거
+    } finally {
+      console.log('[Excel Upload] Setting uploading to false');
+      setExcelUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  // 엑셀 상품 등록 커밋 핸들러
+  const handleExcelCommit = async () => {
+    if (!excelPreview || !excelPreview.preview || excelPreview.preview.length === 0) {
+      setError('No preview data to commit.');
+      return;
+    }
+
+    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 30개)
+    let rowsToCommit = excelPreview.preview;
+    if (selectedRows.size > 0) {
+      rowsToCommit = excelPreview.preview.filter((item) => selectedRows.has(item.rowIndex));
+    } else {
+      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 30개)
+      const skuSet = new Set();
+      rowsToCommit = excelPreview.preview
+        .filter((item) => {
+          if (!item.validation.ok) return false;
+          const sku = item.mapped?.sku;
+          if (sku && duplicateSkus.has(sku)) return false; // 중복 제외
+          if (sku && skuSet.has(sku)) return false; // 엑셀 내 중복 제외
+          if (sku) skuSet.add(sku);
+          return true;
+        })
+        .slice(0, 30);
+    }
+
+    if (rowsToCommit.length === 0) {
+      setError('No valid rows selected to commit.');
+      return;
+    }
+
+    setExcelCommitting(true);
+    setExcelResult(null);
+    setError('');
+    setSelectedRows(new Set()); // 커밋 시 선택 초기화
+
+    try {
+      const result = await commitImport(rowsToCommit);
+      setExcelResult(result);
+      setSuccess(true);
+    } catch (commitError) {
+      setError(commitError.message || 'Failed to commit products. Please try again.');
+      console.error('Excel commit error:', commitError);
+    } finally {
+      setExcelCommitting(false);
+    }
+  };
+
   if (loading && isEditMode && !product) {
     return (
       <div className="product-register">
@@ -660,8 +1073,556 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         </div>
       </div>
 
+      {/* 모드 전환 버튼 (수정 모드가 아닐 때만) */}
+      {!isEditMode && (
+        <div style={{ 
+          padding: '1rem 2rem', 
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'center'
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              setExcelUploadMode(false);
+              setExcelPreview(null);
+              setExcelResult(null);
+              setExcelFileName(null);
+              setDuplicateSkus(new Set());
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              background: !excelUploadMode ? '#6366f1' : '#e5e7eb',
+              color: !excelUploadMode ? 'white' : '#666',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            Manual Entry
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExcelUploadMode(true);
+              setExcelPreview(null);
+              setExcelResult(null);
+              setExcelFileName(null);
+              setDuplicateSkus(new Set());
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              background: excelUploadMode ? '#6366f1' : '#e5e7eb',
+              color: excelUploadMode ? 'white' : '#666',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            Excel Upload
+          </button>
+        </div>
+      )}
+
       <div className="product-register-content">
-        <div className="product-register-main">
+        {/* 엑셀 업로드 모드 */}
+        {!isEditMode && excelUploadMode ? (
+          <>
+          <div className="product-register-main">
+            <section className="product-register-section">
+              <h2>Excel Upload Based Product Registration</h2>
+              <p className="section-subtitle">
+                Upload an Excel file to automatically register products. Only the first 5 valid items will be registered in test mode.
+              </p>
+
+              {/* 처리 범위 안내 */}
+              <div style={{
+                padding: '1rem',
+                background: '#dbeafe',
+                border: '1px solid #3b82f6',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
+                <span style={{ fontWeight: 600, color: '#1e40af' }}>
+                  최대 30개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
+                </span>
+              </div>
+
+              {/* 파일 업로드 */}
+              <div className="form-group">
+                <label htmlFor="excelFile" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Excel File (.xlsx, .xls)
+                </label>
+                <input
+                  type="file"
+                  id="excelFile"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                  disabled={excelUploading}
+                  style={{ display: 'none' }}
+                />
+                <label
+                  htmlFor="excelFile"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.5rem',
+                    background: excelUploading ? '#f59e0b' : (excelFileName && excelPreview ? '#10b981' : '#6366f1'),
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: excelUploading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {excelUploading ? (
+                    <>
+                      <div className="loading-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', borderColor: 'white transparent white transparent' }}></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet size={20} />
+                      {excelFileName && excelPreview ? '✓ Uploaded' : 'Select Excel File'}
+                    </>
+                  )}
+                </label>
+                <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+                  Required columns: 바코드 (Barcode), 상품명 (Product Name), 우수회원5 (VIP5 Price), 카테고리 (Category)
+                </p>
+              </div>
+
+              {/* 업로드된 파일명 표시 */}
+              {excelFileName && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem 1rem',
+                  background: excelUploading ? '#fef3c7' : (excelPreview ? '#f0fdf4' : '#f0f9ff'),
+                  border: excelUploading ? '1px solid #fbbf24' : (excelPreview ? '1px solid #86efac' : '1px solid #bae6fd'),
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                }}>
+                  {excelUploading ? (
+                    <div className="loading-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', borderColor: '#f59e0b #f59e0b transparent #f59e0b' }}></div>
+                  ) : (
+                    <FileSpreadsheet size={20} color={excelPreview ? "#059669" : "#0369a1"} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 500, color: excelUploading ? '#92400e' : (excelPreview ? '#059669' : '#0369a1') }}>
+                      {excelUploading ? '⏳ 파일 업로드 중...' : (excelPreview ? '✓ 파일 업로드 완료' : '📤 파일 선택됨')}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: excelUploading ? '#78350f' : (excelPreview ? '#047857' : '#075985'), marginTop: '0.25rem' }}>
+                      {excelFileName}
+                    </div>
+                  </div>
+                  {excelPreview && (
+                    <div style={{
+                      padding: '0.25rem 0.75rem',
+                      background: '#10b981',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                    }}>
+                      ✓ 준비 완료
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 미리보기 테이블 */}
+              {excelPreview && excelPreview.preview && excelPreview.preview.length > 0 && (
+                <div style={{ marginTop: '2rem' }}>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600 }}>
+                    Preview ({excelPreview.validRows - duplicateSkus.size} available, {duplicateSkus.size} duplicates, {excelPreview.invalidRows} invalid)
+                  </h3>
+                  <div style={{
+                    overflowX: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    maxHeight: '500px',
+                    overflowY: 'auto',
+                  }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead style={{ background: '#f9fafb', position: 'sticky', top: 0, zIndex: 10 }}>
+                        <tr>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #e5e7eb', fontWeight: 600, width: '50px' }}>
+                            <input
+                              type="checkbox"
+                              checked={excelPreview.preview.filter((item) => {
+                                const sku = item.mapped?.sku;
+                                const isDuplicate = sku && duplicateSkus.has(sku);
+                                return item.validation.ok && !isDuplicate;
+                              }).length > 0 && 
+                               excelPreview.preview.filter((item) => {
+                                 const sku = item.mapped?.sku;
+                                 const isDuplicate = sku && duplicateSkus.has(sku);
+                                 return item.validation.ok && !isDuplicate;
+                               })
+                                 .every((item) => selectedRows.has(item.rowIndex))}
+                              onChange={(e) => handleSelectAll(e.target.checked)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Row</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Status</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>SKU</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Name</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Price</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Original Price</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Discount Rate</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Category</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Errors</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {excelPreview.preview.map((item, index) => {
+                          const isValidRow = item.validation.ok;
+                          const sku = item.mapped?.sku;
+                          const isDuplicate = sku && duplicateSkus.has(sku);
+                          const isSelectable = isValidRow && !isDuplicate;
+                          const isSelected = selectedRows.has(item.rowIndex);
+                          
+                          return (
+                            <tr
+                              key={index}
+                              style={{
+                                background: isSelected ? '#dbeafe' : (isDuplicate ? '#fef3c7' : (isValidRow ? '#f0fdf4' : '#fef2f2')),
+                                borderBottom: '1px solid #e5e7eb',
+                                opacity: isSelectable ? 1 : 0.6,
+                              }}
+                            >
+                              <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleRowToggle(item.rowIndex)}
+                                  disabled={!isSelectable}
+                                  style={{ cursor: isSelectable ? 'pointer' : 'not-allowed' }}
+                                />
+                              </td>
+                              <td style={{ padding: '0.75rem' }}>{item.rowIndex}</td>
+                            <td style={{ padding: '0.75rem' }}>
+                              {isDuplicate ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#f59e0b' }}>
+                                  <XCircle size={16} />
+                                  중복
+                                </span>
+                              ) : isValidRow ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#059669' }}>
+                                  <CheckCircle size={16} />
+                                  판매중
+                                </span>
+                              ) : (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#dc2626' }}>
+                                  <XCircle size={16} />
+                                  오류
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem', fontFamily: 'monospace', position: 'relative' }}>
+                              {item.mapped.sku || '-'}
+                              {isDuplicate && (
+                                <span style={{
+                                  position: 'absolute',
+                                  right: '0.25rem',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: '#f59e0b',
+                                  color: 'white',
+                                  fontSize: '0.7rem',
+                                  padding: '0.15rem 0.4rem',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  중복
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>{item.mapped.name || '-'}</td>
+                            <td style={{ padding: '0.75rem' }}>
+                              {item.mapped.price !== null ? `₩${item.mapped.price.toLocaleString()}` : '-'}
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>
+                              {item.mapped.originalPrice !== null && item.mapped.originalPrice !== undefined 
+                                ? `₩${item.mapped.originalPrice.toLocaleString()}` 
+                                : '-'}
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>
+                              {item.mapped.discountRate !== null && item.mapped.discountRate !== undefined 
+                                ? `${item.mapped.discountRate}%` 
+                                : '-'}
+                            </td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.75rem' }}>
+                              {item.mapped.category.l1 && (
+                                <div>
+                                  {item.mapped.category.l1}
+                                  {item.mapped.category.l2 && ` > ${item.mapped.category.l2}`}
+                                  {item.mapped.category.l3 && ` > ${item.mapped.category.l3}`}
+                                </div>
+                              )}
+                              {!item.mapped.category.l1 && '-'}
+                            </td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.75rem', color: isDuplicate ? '#f59e0b' : '#dc2626' }}>
+                              {isDuplicate ? (
+                                <span style={{ color: '#f59e0b', fontWeight: 600 }}>중복된 SKU: {item.mapped.sku}</span>
+                              ) : item.validation.errors && item.validation.errors.length > 0 ? (
+                                <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                                  {item.validation.errors.map((err, errIdx) => (
+                                    <li key={errIdx}>{err}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              )}
+
+              {/* 결과 리포트 */}
+              {excelResult && (
+                <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600 }}>
+                    Import Result
+                  </h3>
+                  <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.875rem', color: '#666' }}>Processed: </span>
+                      <span style={{ fontWeight: 600 }}>{excelResult.processedCount}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.875rem', color: '#666' }}>Success: </span>
+                      <span style={{ fontWeight: 600, color: '#059669' }}>{excelResult.successCount}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.875rem', color: '#666' }}>Failed: </span>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>{excelResult.failCount}</span>
+                    </div>
+                  </div>
+                  {excelResult.message && (
+                    <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+                      {excelResult.message}
+                    </p>
+                  )}
+                  {excelResult.duplicateItems && excelResult.duplicateItems.length > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: '#f59e0b' }}>
+                        중복된 상품 ({excelResult.duplicateItems.length}개):
+                      </h4>
+                      <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.875rem', maxHeight: '200px', overflowY: 'auto' }}>
+                        {excelResult.duplicateItems.map((item, idx) => (
+                          <li key={idx} style={{ marginBottom: '0.25rem', color: '#f59e0b' }}>
+                            Row {item.rowIndex}: {item.name} (SKU: {item.sku}) - {item.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {excelResult.failItems && excelResult.failItems.length > excelResult.duplicateItems?.length && (
+                    <div>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>실패한 항목:</h4>
+                      <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.875rem', maxHeight: '200px', overflowY: 'auto' }}>
+                        {excelResult.failItems
+                          .filter(item => !excelResult.duplicateItems?.some(dup => dup.rowIndex === item.rowIndex && dup.sku === item.sku))
+                          .map((item, idx) => (
+                            <li key={idx} style={{ marginBottom: '0.25rem', color: '#dc2626' }}>
+                              Row {item.rowIndex}: {item.name} (SKU: {item.sku}) - {item.reason}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {error && <p className="status-message error">{error}</p>}
+              {success && !excelResult && (
+                <p className="status-message success">
+                  Excel file processed successfully.
+                </p>
+              )}
+            </section>
+          </div>
+
+          {/* 엑셀 업로드 모드용 사이드바 (미리보기 및 실행 버튼) */}
+          {excelPreview && excelPreview.preview && excelPreview.preview.length > 0 && (
+            <div className="product-register-sidebar">
+              <div className="sidebar-section">
+                <h3>추가될 상품 미리보기</h3>
+                <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#666' }}>
+                  {selectedRows.size > 0 ? (
+                    <span><strong>{selectedRows.size}개</strong> 상품이 선택되었습니다.</span>
+                  ) : (
+                    <span>
+                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 30)}개</strong> 상품이 추가됩니다.
+                      {duplicateSkus.size > 0 && (
+                        <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>
+                          (중복 {duplicateSkus.size}개 제외)
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {excelPreview.preview
+                    .filter((item) => {
+                      const sku = item.mapped?.sku;
+                      const isDuplicate = sku && duplicateSkus.has(sku);
+                      if (selectedRows.size > 0) {
+                        return selectedRows.has(item.rowIndex);
+                      }
+                      return item.validation.ok && !isDuplicate;
+                    })
+                    .slice(0, 30)
+                    .map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '0.75rem',
+                          marginBottom: '0.75rem',
+                          background: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem', color: '#111827' }}>
+                          {item.mapped.name || `Row ${item.rowIndex}`}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>
+                          <strong>SKU:</strong> {item.mapped.sku || '-'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>
+                          <strong>가격:</strong> {item.mapped.price !== null ? `₩${item.mapped.price.toLocaleString()}` : '-'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                          <strong>카테고리:</strong>{' '}
+                          {item.mapped.category.l1 && (
+                            <span>
+                              {item.mapped.category.l1}
+                              {item.mapped.category.l2 && ` > ${item.mapped.category.l2}`}
+                              {item.mapped.category.l3 && ` > ${item.mapped.category.l3}`}
+                            </span>
+                          )}
+                          {!item.mapped.category.l1 && '-'}
+                        </div>
+                        {item.validation.ok && (
+                          <div style={{
+                            marginTop: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            display: 'inline-block',
+                          }}>
+                            ✓ 검증 완료
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="sidebar-section">
+                <h3>실행</h3>
+                <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#666' }}>
+                  미리보기에 표시된 상품들을 등록하시겠습니까?
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExcelCommit}
+                  disabled={excelCommitting || (excelPreview.validRows - duplicateSkus.size) === 0}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1.5rem',
+                    background: excelCommitting || (excelPreview.validRows - duplicateSkus.size) === 0 ? '#ccc' : '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: excelCommitting || excelPreview.validRows === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: excelCommitting || excelPreview.validRows === 0 ? 'none' : '0 4px 6px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseOver={(e) => {
+                    if (!excelCommitting && (excelPreview.validRows - duplicateSkus.size) > 0) {
+                      e.currentTarget.style.boxShadow = '0 6px 8px rgba(16, 185, 129, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!excelCommitting && (excelPreview.validRows - duplicateSkus.size) > 0) {
+                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(16, 185, 129, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  {excelCommitting ? (
+                    <>
+                      <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px', borderColor: 'white transparent white transparent' }}></div>
+                      실행 중...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={18} />
+                      실행하기
+                    </>
+                  )}
+                </button>
+                {selectedRows.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRows(new Set())}
+                    disabled={excelCommitting}
+                    style={{
+                      width: '100%',
+                      marginTop: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: 'transparent',
+                      color: '#666',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: excelCommitting ? 'not-allowed' : 'pointer',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    선택 해제
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          </>
+        ) : (
+          <>
+          <div className="product-register-main">
           <form onSubmit={handleSubmit} className="product-register-form">
             <section className="product-register-section">
               <h2>{isEditMode ? '상품 수정' : '상품 기본 정보'}</h2>
@@ -716,6 +1677,44 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                   min="0"
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="discountRate">
+                  할인율 (%)
+                </label>
+                <input
+                  type="number"
+                  id="discountRate"
+                  name="discountRate"
+                  value={formData.discountRate}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="예: 20 (20% 할인)"
+                />
+                <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                  할인율을 입력하면 원래 가격이 자동으로 계산됩니다.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="originalPrice">
+                  원래 가격 (₩)
+                </label>
+                <input
+                  type="number"
+                  id="originalPrice"
+                  name="originalPrice"
+                  value={formData.originalPrice}
+                  onChange={handleInputChange}
+                  min="0"
+                  placeholder="할인율 입력 시 자동 계산되거나 직접 입력 가능"
+                />
+                <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                  할인 전 원래 가격입니다. 할인율 입력 시 자동 계산되며, 직접 수정할 수 있습니다.
+                </p>
               </div>
 
               <div className="form-group">
@@ -954,7 +1953,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
               <div className="form-group">
                 <label htmlFor="imageFile">
-                  상품 이미지 <span className="required">*</span> (최대 4개)
+                  상품 이미지 (최대 4개)
                 </label>
                 <input
                   type="file"
@@ -1102,7 +2101,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
               <div className="form-group">
                 <label htmlFor="description">
-                  상세 설명 <span className="required">*</span>
+                  상세 설명
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <input
@@ -1166,7 +2165,6 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                   onChange={handleInputChange}
                   placeholder="상품 특징, 소재, 배송 정보 등을 입력하세요. 이미지를 추가하려면 위의 '이미지 추가' 버튼을 클릭하세요."
                   rows="8"
-                  required
                   style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
                 />
                 <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
@@ -1480,6 +2478,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

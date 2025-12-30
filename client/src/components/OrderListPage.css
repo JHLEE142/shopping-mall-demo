@@ -1,0 +1,306 @@
+.order-list-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  padding-bottom: 4rem;
+}
+
+.order-list-page__container {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+/* 헤더 */
+.order-list-page__header {
+  margin-bottom: 2rem;
+}
+
+.order-list-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem;
+  color: #000000;
+}
+
+/* 검색바 */
+.order-list-page__search {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.order-list-page__search-input {
+  width: 100%;
+  padding: 1rem 3rem 1rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #000000;
+  background: #ffffff;
+}
+
+.order-list-page__search-input::placeholder {
+  color: #9ca3af;
+}
+
+.order-list-page__search-input:focus {
+  outline: none;
+  border-color: #374151;
+}
+
+.order-list-page__search-icon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* 연도 필터 */
+.order-list-page__year-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.order-list-page__year-filter {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.order-list-page__year-filter:hover {
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.order-list-page__year-filter.is-active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* 로딩/에러/빈 상태 */
+.order-list-page__loading,
+.order-list-page__error,
+.order-list-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+.order-list-page__error {
+  color: #dc2626;
+}
+
+.order-list-page__empty svg {
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+/* 날짜 그룹 */
+.order-list-page__date-group {
+  margin-bottom: 2rem;
+}
+
+.order-list-page__date-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* 주문 카드 */
+.order-list-page__order-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.order-list-page__order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.order-list-page__order-status {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+}
+
+.order-list-page__order-detail-link {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.order-list-page__order-detail-link:hover {
+  color: #000000;
+}
+
+.order-list-page__order-detail-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 주문 아이템 */
+.order-list-page__order-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.order-list-page__order-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.order-list-page__order-item:first-child {
+  padding-top: 0;
+}
+
+.order-list-page__order-item-left {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.order-list-page__order-item-image {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.order-list-page__order-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.order-list-page__order-item-quantity-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.order-list-page__order-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-list-page__order-item-delivery-type {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.order-list-page__order-item-delivery-type svg {
+  width: 16px;
+  height: 16px;
+}
+
+.order-list-page__order-item-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+  line-height: 1.4;
+}
+
+.order-list-page__order-item-price {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 액션 버튼들 */
+.order-list-page__order-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 140px;
+}
+
+.order-list-page__action-button {
+  padding: 0.625rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.order-list-page__action-button:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.order-list-page__action-button--primary {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.order-list-page__action-button--primary:hover {
+  background: #374151;
+  border-color: #374151;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .order-list-page__order-item {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .order-list-page__order-item-actions {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .order-list-page__action-button {
+    flex: 1;
+    min-width: calc(50% - 0.25rem);
+  }
+}

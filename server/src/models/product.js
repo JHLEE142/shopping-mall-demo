@@ -39,6 +39,19 @@ const productSchema = new Schema(
       required: true,
       min: [0, 'Price must be a positive number'],
     },
+    // 원래 가격 (할인 전 가격)
+    originalPrice: {
+      type: Number,
+      default: null,
+      min: [0, 'Original price must be a positive number'],
+    },
+    // 할인율 (0~100, 퍼센트 단위)
+    discountRate: {
+      type: Number,
+      default: 0,
+      min: [0, 'Discount rate must be between 0 and 100'],
+      max: [100, 'Discount rate must be between 0 and 100'],
+    },
     // 카테고리 ID (소분류를 가리키는 ObjectId)
     categoryId: {
       type: Schema.Types.ObjectId,
@@ -82,7 +95,7 @@ const productSchema = new Schema(
     },
     image: {
       type: String,
-      required: true,
+      default: '',
       trim: true,
     },
     images: {

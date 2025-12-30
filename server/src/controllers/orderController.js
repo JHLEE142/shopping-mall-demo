@@ -1,6 +1,8 @@
 const Order = require('../models/order');
 const Cart = require('../models/cart');
 const { Coupon, UserCoupon } = require('../models/coupon');
+const User = require('../models/user');
+const PointHistory = require('../models/point');
 
 const PORTONE_API_BASE_URL = 'https://api.iamport.kr';
 
@@ -86,6 +88,67 @@ async function verifyPortOnePayment(impUid, expectedAmount) {
   }
 
   return paymentInfo;
+}
+
+// 적립금 계산 함수: 결제 금액의 1%를 원 단위로 절삭
+function calculateRewardPoints(paymentAmount) {
+  const rewardAmount = paymentAmount * 0.01; // 1%
+  return Math.floor(rewardAmount); // 원 단위 절삭
+}
+
+// 적립금 적립 함수
+async function earnOrderRewardPoints(order) {
+  try {
+    // 게스트 주문이거나 결제가 완료되지 않은 경우 적립하지 않음
+    if (!order.user || order.payment?.status !== 'paid') {
+      return;
+    }
+
+    // 이미 적립금이 적립되었는지 확인 (중복 적립 방지)
+    const existingPoint = await PointHistory.findOne({
+      user: order.user,
+      relatedOrder: order._id,
+      type: 'earn',
+    });
+
+    if (existingPoint) {
+      return; // 이미 적립됨
+    }
+
+    const paymentAmount = order.payment?.amount || order.summary?.grandTotal || 0;
+    if (paymentAmount <= 0) {
+      return;
+    }
+
+    const rewardAmount = calculateRewardPoints(paymentAmount);
+    if (rewardAmount <= 0) {
+      return;
+    }
+
+    const user = await User.findById(order.user);
+    if (!user) {
+      return;
+    }
+
+    const newBalance = (user.points || 0) + rewardAmount;
+
+    // 사용자 적립금 업데이트
+    user.points = newBalance;
+    await user.save();
+
+    // 적립금 내역 저장
+    await PointHistory.create({
+      user: order.user,
+      type: 'earn',
+      amount: rewardAmount,
+      balance: newBalance,
+      description: `주문 완료 적립 (주문번호: ${order.orderNumber})`,
+      relatedOrder: order._id,
+    });
+  } catch (error) {
+    console.error('적립금 적립 중 오류:', error);
+    // 적립금 적립 실패가 주문 처리에 영향을 주지 않도록 에러를 무시
+  }
 }
 
 function normalizeSubdocument(subdoc) {
@@ -391,6 +454,11 @@ async function createOrder(req, res, next) {
     //   });
     // }
 
+    // 결제 완료된 경우 적립금 적립
+    if (order.payment?.status === 'paid' && order.user) {
+      await earnOrderRewardPoints(order);
+    }
+
     const populatedOrder = await order.populate('user', 'name email user_type');
     return res.status(201).json(populatedOrder);
   } catch (error) {
@@ -502,11 +570,17 @@ async function updateOrder(req, res, next) {
     }
 
     if (payment) {
+      const previousPaymentStatus = order.payment?.status;
       order.set('payment', {
         ...normalizeSubdocument(order.payment),
         ...payment,
         currency: (payment.currency || order.payment?.currency || 'KRW').toUpperCase(),
       });
+
+      // 결제 상태가 'paid'로 변경된 경우 적립금 적립
+      if (previousPaymentStatus !== 'paid' && payment.status === 'paid' && order.user) {
+        await earnOrderRewardPoints(order);
+      }
     }
 
     if (shipping) {

@@ -61,7 +61,7 @@ function createApp() {
 
   const corsOptions = createCorsOptions();
   app.use(cors(corsOptions));
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' })); // 1000개 상품 데이터 처리용 제한 증가
 
   app.use('/api', apiRouter);
   app.get('/api/health', (req, res) => {

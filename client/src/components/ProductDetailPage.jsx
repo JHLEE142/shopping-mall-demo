@@ -188,11 +188,15 @@ function buildProductData(source) {
   const base = { ...FALLBACK_PRODUCT };
   const mergedPrice = Number(source.price ?? base.price);
 
-  // 데이터베이스에서 가져온 이미지를 갤러리로 사용
-  // images 배열이 있으면 우선 사용, 없으면 image 필드 사용
-  const dbImages = Array.isArray(source.images) && source.images.length > 0
-    ? source.images
-    : (source.image ? [source.image] : []);
+  // 상품 갤러리 이미지 구성
+  // 대표 이미지(image 필드)를 첫 번째로, 그 다음에 images 배열의 나머지 이미지들 추가
+  const mainImage = source.image || '';
+  const additionalImages = Array.isArray(source.images) ? source.images.filter(img => img && img !== mainImage) : [];
+  
+  // 갤러리: 대표 이미지(image)를 첫 번째로, 나머지 images 배열 추가
+  const productGalleryImages = mainImage 
+    ? [mainImage, ...additionalImages]
+    : (additionalImages.length > 0 ? additionalImages : base.gallery);
 
   // description을 파싱하여 story와 materials, care 추출 시도
   const description = source.description || '';
@@ -204,9 +208,6 @@ function buildProductData(source) {
     return urlMatch ? urlMatch[1] : null;
   }).filter(Boolean);
 
-  // 상품 갤러리 이미지: DB images 배열만 사용 (description 이미지 제외)
-  const productGalleryImages = dbImages.length > 0 ? dbImages : (source.image ? [source.image] : base.gallery);
-
   // description에서 텍스트만 추출 (마크다운 제거하지 않고 그대로 사용)
   const descriptionText = description;
 
@@ -217,6 +218,8 @@ function buildProductData(source) {
     activity: `활동용도: ${source.category || base.category}`,
     price: mergedPrice || base.price,
     priceSale: Number(source.priceSale ?? source.price ?? base.priceSale ?? mergedPrice),
+    originalPrice: source.originalPrice || null,
+    discountRate: source.discountRate || 0,
     rating: source.rating || base.rating,
     reviewCount: source.reviewCount || base.reviewCount,
     description: descriptionText || base.description,
@@ -252,6 +255,7 @@ function ProductDetailPage({
   onAddToCartSuccess = () => {},
   onViewCart = () => {},
   onDirectOrder = () => {},
+  onViewShippingPolicy = null,
 }) {
   const [product, setProduct] = useState(buildProductData(initialProduct));
   const [status, setStatus] = useState(initialProduct ? 'success' : 'loading');
@@ -566,24 +570,38 @@ function ProductDetailPage({
   }, [product.priceSale, product.price]);
 
   const formattedComparePrice = useMemo(() => {
+    // originalPrice가 있으면 그것을 사용, 없으면 기존 로직 사용
+    const currentPrice = product.priceSale || product.price;
+    if (product.originalPrice && product.originalPrice > currentPrice) {
+      const formatter = new Intl.NumberFormat('ko-KR');
+      return `${formatter.format(product.originalPrice)}원`;
+    }
     if (!product.price || product.price === product.priceSale) {
       return null;
     }
     const formatter = new Intl.NumberFormat('ko-KR');
     return `${formatter.format(product.price)}원`;
-  }, [product.price, product.priceSale]);
+  }, [product.price, product.priceSale, product.originalPrice]);
 
   // 수량별 가격 계산
   const quantityPrices = useMemo(() => {
     const basePrice = product.priceSale || product.price;
-    const originalPrice = product.price || basePrice;
+    const originalPrice = product.originalPrice || null;
     
     return quantityOptions.map((qty) => {
       const totalPrice = basePrice * qty;
-      const originalTotalPrice = originalPrice * qty;
-      const discount = originalTotalPrice - totalPrice;
-      const discountPerUnit = qty > 1 ? Math.floor(discount / qty) : 0;
-      const savings = qty > 1 ? discount : 0;
+      const originalTotalPrice = originalPrice ? originalPrice * qty : null;
+      
+      // 절약 금액 계산: (원래 가격 - 할인된 가격) * 수량
+      // originalPrice가 있으면 정확한 절약 금액 계산
+      let savings = 0;
+      if (originalPrice && originalPrice > basePrice) {
+        const perUnitSavings = originalPrice - basePrice;
+        savings = Math.round(perUnitSavings * qty);
+      }
+      
+      const discount = originalTotalPrice ? originalTotalPrice - totalPrice : 0;
+      const discountPerUnit = qty > 1 && originalTotalPrice ? Math.floor(discount / qty) : 0;
       
       return {
         quantity: qty,
@@ -595,18 +613,21 @@ function ProductDetailPage({
         pricePerUnit: Math.floor(totalPrice / qty),
       };
     });
-  }, [product.priceSale, product.price, quantityOptions]);
+  }, [product.priceSale, product.price, product.originalPrice, quantityOptions]);
 
   // 선택된 수량의 가격 정보
   const selectedQuantityPrice = useMemo(() => {
     return quantityPrices.find(qp => qp.quantity === selectedQuantity) || quantityPrices[0];
   }, [quantityPrices, selectedQuantity]);
 
-  // 총 할인율 계산
+  // 총 할인율 계산 (discountRate가 있으면 우선 사용, 없으면 기존 로직)
   const discountPercentage = useMemo(() => {
+    if (product.discountRate && product.discountRate > 0) {
+      return product.discountRate;
+    }
     if (!product.price || product.price === product.priceSale) return 0;
     return Math.round(((product.price - product.priceSale) / product.price) * 100);
-  }, [product.price, product.priceSale]);
+  }, [product.price, product.priceSale, product.discountRate]);
 
   const reviewSummary = reviewStats
     ? [
@@ -971,6 +992,11 @@ function ProductDetailPage({
                     예상 배송일: {product.shipping.estimatedDays}일 이내
                   </p>
                 )}
+                {!product.shipping?.isFree && (
+                  <p style={{ margin: '0.5rem 0 0 1.5rem', fontSize: '0.85rem', color: '#6366f1', fontWeight: 500 }}>
+                    20,000원 이상 구매 시 배송비 무료
+                  </p>
+                )}
               </div>
 
               {/* 판매자 정보 */}
@@ -1128,7 +1154,13 @@ function ProductDetailPage({
               </button>
               <button
                 type="button"
-                onClick={() => setActiveDetailTab('shipping')}
+                onClick={() => {
+                  if (onViewShippingPolicy) {
+                    onViewShippingPolicy();
+                  } else {
+                    setActiveDetailTab('shipping');
+                  }
+                }}
                 style={{
                   padding: '1rem 2rem',
                   border: 'none',

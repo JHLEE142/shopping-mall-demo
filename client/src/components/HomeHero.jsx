@@ -224,22 +224,51 @@ function mapProductsToCatalog(products = []) {
   const formatter = new Intl.NumberFormat('ko-KR');
 
   return products.map((product, index) => {
-    const palette = pickColorPalette(index);
     const basePrice = Number(product.price || 0);
-    const formattedPrice = basePrice ? `${formatter.format(basePrice)}원` : '가격 문의';
+    const originalPrice = product.originalPrice ? Number(product.originalPrice) : null;
+    const discountRate = product.discountRate ? Number(product.discountRate) : 0;
+    
+    // 할인율이 있고 원래 가격이 있으면 할인 표시
+    let formattedPrice = basePrice ? `${formatter.format(basePrice)}원` : '가격 문의';
+    let priceSecondary = null;
+    let badge = null;
+    
+    // 할인율이 있거나 원래 가격이 현재 가격보다 크면 할인 표시
+    if (discountRate > 0 && originalPrice && originalPrice > basePrice) {
+      formattedPrice = `${formatter.format(basePrice)}원`;
+      priceSecondary = `${formatter.format(originalPrice)}원`;
+      badge = `${Math.round(discountRate)}%`;
+    } else if (originalPrice && originalPrice > basePrice) {
+      // 할인율이 없어도 원래 가격이 더 크면 할인율 계산
+      const calculatedDiscountRate = Math.round(((originalPrice - basePrice) / originalPrice) * 100);
+      if (calculatedDiscountRate > 0) {
+        formattedPrice = `${formatter.format(basePrice)}원`;
+        priceSecondary = `${formatter.format(originalPrice)}원`;
+        badge = `${calculatedDiscountRate}%`;
+      }
+    }
+
+    // 실제 colors 사용 (없으면 빈 배열)
+    const colors = (product.colors && Array.isArray(product.colors) && product.colors.length > 0)
+      ? product.colors.map((color) => ({
+          name: color.name || '색상',
+          value: color.value || '#000000',
+        }))
+      : [];
+
+    // 실제 rating/reviewCount 사용 (없으면 0.0(0))
+    const rating = product.rating !== undefined ? product.rating : 0;
+    const reviewCount = product.reviewCount !== undefined ? product.reviewCount : 0;
 
     return {
       id: product._id,
       name: product.name,
-      rating: 4.8,
-      reviews: 24 + index * 3,
+      rating,
+      reviews: reviewCount,
       pricePrimary: formattedPrice,
-      priceSecondary: null,
-      badge: null,
-      colors: palette.map((value, colorIndex) => ({
-        name: `컬러 ${colorIndex + 1}`,
-        value,
-      })),
+      priceSecondary: priceSecondary,
+      badge: badge,
+      colors, // 실제 colors 사용 (없으면 빈 배열)
       image:
         product.image ||
         'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=900&q=80',
@@ -247,6 +276,8 @@ function mapProductsToCatalog(products = []) {
         id: product._id,
         category: product.category || '상의',
         price: basePrice,
+        originalPrice: originalPrice,
+        discountRate: discountRate,
         description: product.description,
         image: product.image,
       },
@@ -470,9 +501,9 @@ function HomeHero({
     // 일반 목록일 때만 카테고리 필터 적용
     let filteredProducts = products;
     
-    // 카테고리 필터 적용
+    // 카테고리 필터 적용 (대분류 기준)
     if (categoryFilter) {
-      filteredProducts = products.filter((product) => product.category === categoryFilter);
+      filteredProducts = products.filter((product) => product.categoryMain === categoryFilter);
     }
     
     // 일반 목록에서도 products가 비어있으면 빈 배열 반환 (FALLBACK_CATALOG 제거)
@@ -801,7 +832,6 @@ function HomeHero({
                 onViewProduct(product.detail);
               }
             }}>
-              {product.badge && <span className="catalog-card__badge">{product.badge}</span>}
               <img src={product.image} alt={product.name} />
               <button
                 type="button"
@@ -822,16 +852,18 @@ function HomeHero({
               </button>
             </div>
             <div className="catalog-card__body">
-              <div className="catalog-card__colors">
-                {product.colors.map((color) => (
-                  <span
-                    key={`${product.name}-${color.value}`}
-                    className="catalog-card__color-dot"
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
+              {product.colors && product.colors.length > 0 && (
+                <div className="catalog-card__colors">
+                  {product.colors.map((color) => (
+                    <span
+                      key={`${product.name}-${color.value}`}
+                      className="catalog-card__color-dot"
+                      style={{ backgroundColor: color.value }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              )}
               <h3 className="catalog-card__title">{product.name}</h3>
               <div className="catalog-card__rating">
                 <Star size={16} fill="#111" strokeWidth={0} />
@@ -840,12 +872,15 @@ function HomeHero({
                 </span>
               </div>
               <div className="catalog-card__prices">
-                <span className="catalog-card__price">{product.pricePrimary}</span>
+                {product.badge && (
+                  <span className="catalog-card__discount-badge">{product.badge}</span>
+                )}
                 {product.priceSecondary && (
                   <span className="catalog-card__price catalog-card__price--compare">
                     {product.priceSecondary}
                   </span>
                 )}
+                <span className="catalog-card__price">{product.pricePrimary}</span>
               </div>
               <button
                 type="button"

@@ -19,6 +19,11 @@ import OrderPage from './components/OrderPage';
 import WishlistPage from './components/WishlistPage';
 import SettingsPage from './components/SettingsPage';
 import PointsPage from './components/PointsPage';
+import MyPage from './components/MyPage';
+import OrderListPage from './components/OrderListPage';
+import ExchangeReturnPage from './components/ExchangeReturnPage';
+import ShippingReturnPolicyPage from './components/ShippingReturnPolicyPage';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
   // URL에서 초기 view 읽기
@@ -26,7 +31,7 @@ function App() {
     const path = window.location.pathname;
     if (path === '/' || path === '') return 'home';
     const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
-    const validViews = ['home', 'login', 'signup', 'admin', 'product-create', 'product-edit', 'product-detail', 'lookbook', 'style-note', 'cart', 'order', 'wishlist', 'settings', 'points'];
+    const validViews = ['home', 'login', 'signup', 'admin', 'product-create', 'product-edit', 'product-detail', 'lookbook', 'style-note', 'cart', 'order', 'order-list', 'wishlist', 'settings', 'points', 'mypage', 'shipping-return-policy'];
     return validViews.includes(view) ? view : 'home';
   };
 
@@ -43,6 +48,8 @@ function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [selectedProductData, setSelectedProductData] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrderItem, setSelectedOrderItem] = useState(null);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [pointsBalance, setPointsBalance] = useState(0);
@@ -391,6 +398,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -435,6 +443,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -481,6 +490,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -495,6 +505,11 @@ function App() {
             onDirectOrder={(orderItem) => {
               setDirectOrderItem(orderItem);
               setView('order');
+            }}
+            onViewShippingPolicy={() => {
+              const url = `/shipping-return-policy?from=product-detail&productId=${selectedProductId}`;
+              window.history.pushState({ view: 'shipping-return-policy' }, '', url);
+              setView('shipping-return-policy');
             }}
           />
         </main>
@@ -525,6 +540,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -565,6 +581,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -603,6 +620,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -661,6 +679,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -701,6 +720,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -740,6 +760,7 @@ function App() {
           onMoveToWishlist={() => setView('wishlist')}
           onMoveToSettings={() => setView('settings')}
           onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
           cartCount={cartCount}
           wishlistCount={wishlistCount}
           onLogout={handleLogout}
@@ -762,6 +783,192 @@ function App() {
         user={session?.user || null}
         onBack={() => setView('home')}
       />
+    );
+  }
+
+  if (view === 'mypage') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => setView('home')}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <MyPage
+            user={session?.user || null}
+            onBack={() => setView('home')}
+            onMoveToSettings={() => setView('settings')}
+            onMoveToPoints={() => setView('points')}
+            onMoveToOrder={() => setView('order-list')}
+            onMoveToWishlist={() => setView('wishlist')}
+            onLogout={handleLogout}
+            pointsBalance={pointsBalance}
+          />
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (view === 'order-list') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => setView('home')}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <OrderListPage
+            user={session?.user || null}
+            onBack={() => setView('mypage')}
+            onViewOrderDetail={(order) => {
+              // 주문 상세 페이지로 이동 (추후 구현 가능)
+              console.log('주문 상세:', order);
+            }}
+            onViewProduct={(product) => {
+              if (product._id || product.id) {
+                setSelectedProductId(product._id || product.id);
+                setView('product-detail');
+              }
+            }}
+            onExchangeReturn={(order, orderItem) => {
+              setSelectedOrder(order);
+              setSelectedOrderItem(orderItem);
+              setView('exchange-return');
+            }}
+          />
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (view === 'exchange-return') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => setView('home')}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <ExchangeReturnPage
+            order={selectedOrder}
+            orderItem={selectedOrderItem}
+            user={session?.user || null}
+            onBack={() => setView('order-list')}
+            onSubmit={(data) => {
+              console.log('교환/반품 신청 데이터:', data);
+              alert('교환/반품 신청이 완료되었습니다.');
+              setView('order-list');
+            }}
+          />
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (view === 'shipping-return-policy') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => setView('home')}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <ShippingReturnPolicyPage
+            onBack={() => {
+              // 이전 페이지로 돌아가기 (히스토리 사용)
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                setView('home');
+              }
+            }}
+          />
+        </main>
+        <SiteFooter />
+      </div>
     );
   }
 
@@ -832,6 +1039,7 @@ function App() {
         onMoveToWishlist={() => setView('wishlist')}
         onMoveToSettings={() => setView('settings')}
         onMoveToPoints={() => setView('points')}
+        onMoveToMyPage={() => setView('mypage')}
         pointsBalance={pointsBalance}
         cartCount={cartCount}
         wishlistCount={wishlistCount}
@@ -841,6 +1049,11 @@ function App() {
         {content}
       </main>
       <SiteFooter />
+      <ChatWidget 
+        user={session?.user || null}
+        onMoveToLogin={() => setView('login')}
+        onMoveToSignUp={() => setView('signup')}
+      />
     </div>
   );
 }
