@@ -37,8 +37,11 @@ function createCorsOptions() {
 
       const normalized = normalizeOrigin(origin);
       const isAllowed = allowList.includes(normalized);
+      
+      // Vercel 도메인 허용 (모든 *.vercel.app 도메인)
+      const isVercelDomain = normalized.includes('.vercel.app');
 
-      if (isAllowed) {
+      if (isAllowed || isVercelDomain) {
         callback(null, true);
         return;
       }
