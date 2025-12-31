@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "build": "echo 'No build step required for Node.js server'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed:coupons": "node scripts/init-coupons.js"
   },
