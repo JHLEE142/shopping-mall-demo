@@ -2,6 +2,84 @@ const axios = require('axios');
 const { getSystemPrompt } = require('../prompts/assistantPrompt');
 
 /**
+ * AI 응답에서 역할/함수 설명 제거
+ */
+function cleanAIResponse(response) {
+  if (!response || typeof response !== 'string') {
+    return response;
+  }
+
+  let cleaned = response;
+
+  // 역할/함수 설명 패턴 제거
+  const unwantedPatterns = [
+    // 역할 관련
+    /역할\s*[:：]\s*[^\n]+/gi,
+    /핵심\s*역할\s*[:：]\s*[^\n]+/gi,
+    /##\s*역할[^\n]*/gi,
+    /###\s*역할[^\n]*/gi,
+    /대행자\s*\([^)]*\)/gi,
+    /안내자\s*아님[^\n]*/gi,
+    /역할\s*[^\n]*대행자[^\n]*/gi,
+    
+    // 함수 관련 (실제 TOOL_CALL은 유지)
+    /함수\s*[:：]\s*[^\n]+/gi,
+    /##\s*함수[^\n]*/gi,
+    /###\s*함수[^\n]*/gi,
+    
+    // 프롬프트/지침 관련
+    /프롬프트[^\n]*/gi,
+    /지침[^\n]*/gi,
+    /규칙[^\n]*/gi,
+    /##\s*[^\n]*역할[^\n]*/gi,
+    /###\s*[^\n]*역할[^\n]*/gi,
+    
+    // 시스템 메시지 스타일 제거
+    /당신은\s*[^\n]*비서입니다[^\n]*/gi,
+    /이\s*전자상거래[^\n]*/gi,
+    /사용자\s*대신\s*직접[^\n]*/gi,
+    /설명하지\s*말고\s*실행하라[^\n]*/gi,
+    
+    // 마크다운 헤더 제거 (역할 관련)
+    /^#{1,3}\s*역할[^\n]*$/gim,
+    /^#{1,3}\s*함수[^\n]*$/gim,
+  ];
+
+  unwantedPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+
+  // "잠시만 기다려주세요" 이후의 역할 설명 제거
+  // "잠시만 기다려주세요" 또는 "기다려 주세요" 이후에 나오는 역할/함수 설명 제거
+  const waitPattern = /(잠시만\s*기다려\s*주세요|기다려\s*주세요|잠시만\s*기다려주세요)[^\n]*\n/gi;
+  const waitMatch = cleaned.match(waitPattern);
+  if (waitMatch) {
+    // "잠시만 기다려주세요" 이후의 내용에서 역할/함수 설명 제거
+    const parts = cleaned.split(waitPattern);
+    if (parts.length > 1) {
+      // 첫 번째 부분(잠시만 기다려주세요 포함)은 유지
+      let afterWait = parts.slice(1).join('');
+      
+      // 역할/함수 설명 제거
+      afterWait = afterWait.replace(/역할[^\n]*/gi, '');
+      afterWait = afterWait.replace(/함수[^\n]*/gi, '');
+      afterWait = afterWait.replace(/대행자[^\n]*/gi, '');
+      afterWait = afterWait.replace(/안내자[^\n]*/gi, '');
+      
+      cleaned = parts[0] + waitMatch[0] + afterWait;
+    }
+  }
+
+  // 연속된 빈 줄 정리
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // 앞뒤 공백 제거
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
+/**
  * OpenAI API를 통해 채팅 메시지 처리
  */
 async function sendChatMessage(req, res) {
@@ -45,13 +123,16 @@ async function sendChatMessage(req, res) {
       }
     );
 
-    const aiMessage = response.data.choices[0]?.message?.content;
+    let aiMessage = response.data.choices[0]?.message?.content;
 
     if (!aiMessage) {
       return res.status(500).json({
         message: 'AI 응답을 받을 수 없습니다.',
       });
     }
+
+    // 응답에서 역할/함수 설명 제거
+    aiMessage = cleanAIResponse(aiMessage);
 
     res.json({
       message: aiMessage,
