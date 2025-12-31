@@ -835,7 +835,7 @@ function ProductDetailPage({
 
               <div className="product-info__prices">
                 {discountPercentage > 0 && (
-                  <span style={{ color: '#dc3545', fontSize: '1.2rem', fontWeight: 600, marginRight: '0.5rem' }}>
+                  <span style={{ color: '#ef4444', fontSize: '1.3rem', fontWeight: 700, marginRight: '0.5rem' }}>
                     {discountPercentage}%
                   </span>
                 )}

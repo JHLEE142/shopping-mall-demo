@@ -53,12 +53,13 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: #ff4444;
-  color: white;
+  background: #ffffff;
+  color: #ef4444;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border: 1px solid #ef4444;
 }
 
 .product-grid-info {

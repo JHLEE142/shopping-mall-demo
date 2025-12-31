@@ -1918,12 +1918,13 @@ body {
 .catalog-card__discount-badge {
   display: inline-block;
   padding: clamp(0.125rem, 0.375vw, 0.25rem) clamp(0.375rem, 1vw, 0.5rem);
-  background: #dc3545;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: clamp(0.5rem, 1.25vw, 0.625rem);
+  background: #ffffff;
+  color: #ef4444;
+  font-weight: 800;
+  font-size: clamp(0.5625rem, 1.375vw, 0.6875rem);
   border-radius: clamp(0.1875rem, 0.5vw, 0.25rem);
   line-height: 1.2;
+  border: 1px solid #ef4444;
 }
 
 .catalog-card__price {

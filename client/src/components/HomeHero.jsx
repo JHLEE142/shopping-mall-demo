@@ -873,7 +873,7 @@ function HomeHero({
               </div>
               <div className="catalog-card__prices">
                 {product.badge && (
-                  <span className="catalog-card'/;__discount-badge">{product.badge}</span>
+                  <span className="catalog-card__discount-badge">{product.badge}</span>
                 )}
                 {product.priceSecondary && (
                   <span className="catalog-card__price catalog-card__price--compare">

@@ -137,11 +137,156 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     setInputMessage('');
     setIsLoading(true);
 
+    // 사용자 메시지에서 정보 추출
+    if (currentInput) {
+      try {
+        // 로그인 페이지일 때: 이메일, 비밀번호 추출
+        if (currentView === 'login') {
+          const loginInfo = {};
+          
+          // 이메일 패턴
+          const emailMatch = currentInput.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i);
+          if (emailMatch && emailMatch[1]) {
+            loginInfo.email = emailMatch[1].trim();
+          }
+          
+          // 비밀번호 패턴
+          // 이메일이 포함되어 있지 않고, 특수문자나 숫자가 포함된 경우 비밀번호로 간주
+          // 또는 명시적으로 "비밀번호"라는 단어가 포함된 경우
+          if (!emailMatch && currentInput.trim().length > 0) {
+            const passwordPattern = /(?:비밀번호|password)[은는]?\s*[:：]?\s*(.+)/i;
+            const passwordMatch = currentInput.match(passwordPattern);
+            if (passwordMatch && passwordMatch[1]) {
+              loginInfo.password = passwordMatch[1].trim();
+            } else if (currentInput.trim().length >= 4) {
+              // 이메일이 아니고 길이가 4자 이상이면 비밀번호로 간주
+              loginInfo.password = currentInput.trim();
+            }
+          }
+          
+          // 추출한 정보가 있으면 localStorage에 저장
+          if (Object.keys(loginInfo).length > 0) {
+            const existingInfo = JSON.parse(localStorage.getItem('loginFormData') || '{}');
+            const updatedInfo = { ...existingInfo, ...loginInfo };
+            localStorage.setItem('loginFormData', JSON.stringify(updatedInfo));
+            
+            // 이메일과 비밀번호가 모두 있으면 자동 로그인 트리거
+            if (updatedInfo.email && updatedInfo.password) {
+              localStorage.setItem('autoLoginTrigger', 'true');
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('autoLoginTrigger'));
+              }, 300);
+            }
+          }
+        }
+        
+        // 회원가입 페이지일 때: 이름, 이메일, 주소 추출
+        if (currentView === 'signup') {
+          const extractedInfo = {};
+          
+          // 주소 패턴 (한국 주소 형식)
+          const addressPatterns = [
+            /([가-힣]+(?:시|도)\s+[가-힣]+(?:시|구|군)\s+[가-힣\s\d\-]+(?:동|로|길|번지)[가-힣\s\d\-]*(?:\s*,\s*\d+층)?)/,
+            /(경기|서울|부산|인천|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)[가-힣\s\d\-]+(?:시|구|동|로|길|번지)[가-힣\s\d\-]*(?:\s*,\s*\d+층)?/,
+          ];
+          for (const pattern of addressPatterns) {
+            const match = currentInput.match(pattern);
+            if (match && match[0] && match[0].trim().length > 5) {
+              extractedInfo.address = match[0].trim();
+              break;
+            }
+          }
+          
+          // 이메일 패턴
+          const emailMatch = currentInput.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i);
+          if (emailMatch && emailMatch[1]) {
+            extractedInfo.email = emailMatch[1].trim();
+          }
+          
+          // 이름 패턴 (한글 이름만, 2-4자)
+          const namePatterns = [
+            /^([가-힣]{2,4})$/,
+            /(?:이름|성함)[은는]?\s*[:：]?\s*([가-힣]{2,4})/i,
+          ];
+          for (const pattern of namePatterns) {
+            const match = currentInput.match(pattern);
+            if (match && match[1] && match[1].length >= 2 && match[1].length <= 4) {
+              extractedInfo.name = match[1].trim();
+              break;
+            }
+          }
+          
+          // 추출한 정보가 있으면 localStorage에 저장
+          if (Object.keys(extractedInfo).length > 0) {
+            const existingInfo = JSON.parse(localStorage.getItem('signupFormData') || '{}');
+            const updatedInfo = { ...existingInfo, ...extractedInfo };
+            localStorage.setItem('signupFormData', JSON.stringify(updatedInfo));
+          }
+        }
+      } catch (error) {
+        console.error('사용자 메시지에서 정보 추출 실패:', error);
+      }
+    }
+
     try {
       // OpenAI API 호출
       const botResponse = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView);
       
       setMessages((prev) => {
+        // TOOL_CALL 파싱 및 실행
+        const toolCallPatterns = [
+          /\*\*TOOL_CALL\*\*:\s*(\w+)\s*\(([^)]*)\)/i,
+          /TOOL_CALL:\s*(\w+)\s*\(([^)]*)\)/i,
+          /\[TOOL_CALL\]\s*(\w+)\s*\(([^)]*)\)/i,
+        ];
+        
+        let toolCallMatch = null;
+        for (const pattern of toolCallPatterns) {
+          toolCallMatch = botResponse.match(pattern);
+          if (toolCallMatch) break;
+        }
+        
+        if (toolCallMatch) {
+          const toolName = toolCallMatch[1].toLowerCase();
+          const toolParams = toolCallMatch[2];
+          
+          if (toolName === '로그인' || toolName === 'login') {
+            // 로그인 TOOL_CALL 파싱: 로그인 (email, password)
+            // 파라미터 추출 (쉼표로 구분, 따옴표 제거)
+            const params = toolParams
+              .split(',')
+              .map(p => p.trim().replace(/^["'`]|["'`]$/g, ''))
+              .filter(p => p.length > 0);
+            
+            if (params.length >= 2) {
+              const loginData = {
+                email: params[0].trim(),
+                password: params[1].trim(),
+              };
+              
+              // 이메일 형식 검증
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (emailRegex.test(loginData.email) && loginData.password.length > 0) {
+                localStorage.setItem('loginFormData', JSON.stringify(loginData));
+                localStorage.setItem('autoLoginTrigger', 'true');
+                
+                // 로그인 페이지로 이동하거나 자동 로그인 실행
+                if (currentView === 'login') {
+                  // 이미 로그인 페이지에 있으므로 자동 로그인 트리거만 설정
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('autoLoginTrigger'));
+                  }, 100);
+                } else if (onMoveToLogin) {
+                  onMoveToLogin();
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('autoLoginTrigger'));
+                  }, 500);
+                }
+              }
+            }
+          }
+        }
+        
         const botMessage = {
           id: prev.length + 1,
           text: botResponse,
@@ -150,34 +295,128 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
         };
         const newMessages = [...prev, botMessage];
         
-        // 로그인/회원가입 관련 키워드가 있고 해당 함수가 있으면 제안
+        // AI 응답 및 사용자 메시지에서 회원가입 정보 추출 (이름, 이메일, 주소 등)
+        if (currentView === 'signup' && (botResponse || currentInput)) {
+          try {
+            const extractedInfo = {};
+            const textToParse = (botResponse || '') + ' ' + (currentInput || '');
+            
+            // 이름 추출 (한글 이름 패턴)
+            const namePatterns = [
+              /(?:이름|성함)[은는]?\s*[:：]?\s*([가-힣]{2,4})/i,
+              /([가-힣]{2,4})(?:님|씨|입니다|이에요|예요|입니다)/,
+              /(?:제\s*이름은|내\s*이름은|이름은)\s*([가-힣]{2,4})/i,
+            ];
+            for (const pattern of namePatterns) {
+              const match = textToParse.match(pattern);
+              if (match && match[1] && match[1].length >= 2 && match[1].length <= 4) {
+                extractedInfo.name = match[1].trim();
+                break;
+              }
+            }
+            
+            // 이메일 추출
+            const emailMatch = textToParse.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i);
+            if (emailMatch && emailMatch[1]) {
+              extractedInfo.email = emailMatch[1].trim();
+            }
+            
+            // 주소 추출 (한국 주소 패턴)
+            const addressPatterns = [
+              /(?:주소|배송지)[은는]?\s*[:：]?\s*([가-힣\s\d\-]+(?:시|구|동|로|길|번지)[가-힣\s\d\-]*)/i,
+              /(경기|서울|부산|인천|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)[가-힣\s\d\-]+(?:시|구|동|로|길|번지)[가-힣\s\d\-]*/,
+              /([가-힣]+(?:시|도)\s+[가-힣]+(?:시|구|군)\s+[가-힣\s\d\-]+(?:동|로|길|번지)[가-힣\s\d\-]*)/,
+            ];
+            for (const pattern of addressPatterns) {
+              const match = textToParse.match(pattern);
+              if (match && match[1] && match[1].trim().length > 5) {
+                extractedInfo.address = match[1].trim();
+                break;
+              }
+            }
+            
+            // 추출한 정보가 있으면 localStorage에 저장
+            if (Object.keys(extractedInfo).length > 0) {
+              const existingInfo = JSON.parse(localStorage.getItem('signupFormData') || '{}');
+              const updatedInfo = { ...existingInfo, ...extractedInfo };
+              localStorage.setItem('signupFormData', JSON.stringify(updatedInfo));
+            }
+          } catch (error) {
+            console.error('회원가입 정보 추출 실패:', error);
+          }
+        }
+        
+        // AI 응답에서 로그인 정보 추출
+        if (currentView === 'login' && botResponse) {
+          try {
+            const loginInfo = {};
+            const textToParse = botResponse;
+            
+            // 이메일 추출
+            const emailMatch = textToParse.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i);
+            if (emailMatch && emailMatch[1]) {
+              loginInfo.email = emailMatch[1].trim();
+            }
+            
+            // 추출한 정보가 있으면 localStorage에 저장
+            if (Object.keys(loginInfo).length > 0) {
+              const existingInfo = JSON.parse(localStorage.getItem('loginFormData') || '{}');
+              const updatedInfo = { ...existingInfo, ...loginInfo };
+              localStorage.setItem('loginFormData', JSON.stringify(updatedInfo));
+            }
+          } catch (error) {
+            console.error('로그인 정보 추출 실패:', error);
+          }
+        }
+        
+        // 로그인/회원가입 관련 키워드가 있고 해당 함수가 있으면 제안 (중복 방지)
         if (!isLoggedIn) {
-          if ((messageText.includes('로그인') || messageText.includes('로그') || messageText.includes('login')) && onMoveToLogin) {
-            setTimeout(() => {
-              setMessages((current) => {
-                const suggestionMessage = {
-                  id: current.length + 1,
-                  text: '로그인 페이지로 이동하시겠어요?',
-                  sender: 'bot',
-                  timestamp: new Date(),
-                  action: 'login',
-                };
-                return [...current, suggestionMessage];
-              });
-            }, 500);
-          } else if ((messageText.includes('회원가입') || messageText.includes('가입') || messageText.includes('signup') || messageText.includes('회원')) && onMoveToSignUp) {
-            setTimeout(() => {
-              setMessages((current) => {
-                const suggestionMessage = {
-                  id: current.length + 1,
-                  text: '회원가입 페이지로 이동하시겠어요?',
-                  sender: 'bot',
-                  timestamp: new Date(),
-                  action: 'signup',
-                };
-                return [...current, suggestionMessage];
-              });
-            }, 500);
+          // 최근 메시지 중에 이미 같은 action의 제안이 있는지 확인
+          const hasRecentSuggestion = newMessages.some(msg => 
+            msg.action === 'login' || msg.action === 'signup'
+          );
+          
+          // AI 응답 자체에 이미 회원가입/로그인 제안이 포함되어 있는지 확인
+          const botResponseHasSuggestion = botResponse.includes('회원가입') || 
+                                           botResponse.includes('로그인') ||
+                                           botResponse.includes('이동하시겠어요');
+          
+          if (!hasRecentSuggestion && !botResponseHasSuggestion) {
+            if ((messageText.includes('로그인') || messageText.includes('로그') || messageText.includes('login')) && onMoveToLogin) {
+              setTimeout(() => {
+                setMessages((current) => {
+                  // 다시 한 번 중복 체크
+                  const hasDuplicate = current.some(msg => msg.action === 'login');
+                  if (hasDuplicate) return current;
+                  
+                  const suggestionMessage = {
+                    id: current.length + 1,
+                    text: '로그인 페이지로 이동하시겠어요?',
+                    sender: 'bot',
+                    timestamp: new Date(),
+                    action: 'login',
+                  };
+                  return [...current, suggestionMessage];
+                });
+              }, 500);
+            } else if ((messageText.includes('회원가입') || messageText.includes('가입') || messageText.includes('signup') || messageText.includes('회원')) && onMoveToSignUp) {
+              setTimeout(() => {
+                setMessages((current) => {
+                  // 다시 한 번 중복 체크
+                  const hasDuplicate = current.some(msg => msg.action === 'signup');
+                  if (hasDuplicate) return current;
+                  
+                  const suggestionMessage = {
+                    id: current.length + 1,
+                    text: '회원가입 페이지로 이동하시겠어요?',
+                    sender: 'bot',
+                    timestamp: new Date(),
+                    action: 'signup',
+                  };
+                  return [...current, suggestionMessage];
+                });
+              }, 500);
+            }
           }
         }
         

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createUser } from '../services/userService';
 
 const INITIAL_FORM_DATA = {
@@ -19,11 +19,97 @@ const INITIAL_AGREEMENTS = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
-  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  // localStorage에서 저장된 회원가입 정보 불러오기
+  const loadStoredFormData = () => {
+    try {
+      const stored = localStorage.getItem('signupFormData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          ...INITIAL_FORM_DATA,
+          ...parsed,
+          // password는 저장하지 않음 (보안)
+          password: '',
+          confirmPassword: '',
+        };
+      }
+    } catch (error) {
+      console.error('저장된 회원가입 정보 불러오기 실패:', error);
+    }
+    return INITIAL_FORM_DATA;
+  };
+
+  const [formData, setFormData] = useState(loadStoredFormData);
   const [agreements, setAgreements] = useState(INITIAL_AGREEMENTS);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // 컴포넌트 마운트 시 localStorage에서 정보 불러오기
+  useEffect(() => {
+    const storedData = loadStoredFormData();
+    if (storedData.name || storedData.email || storedData.address) {
+      setFormData(storedData);
+    }
+  }, []);
+
+  // localStorage 변경 감지 (다른 탭이나 채팅 위젯에서 업데이트된 경우)
+  useEffect(() => {
+    let lastStorageValue = localStorage.getItem('signupFormData');
+    
+    const handleStorageChange = (e) => {
+      if (e.key === 'signupFormData' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setFormData((prev) => ({
+            ...prev,
+            ...parsed,
+            // password는 업데이트하지 않음
+            password: prev.password,
+            confirmPassword: prev.confirmPassword,
+          }));
+          lastStorageValue = e.newValue;
+        } catch (error) {
+          console.error('저장된 회원가입 정보 업데이트 실패:', error);
+        }
+      }
+    };
+
+    // 다른 탭에서의 변경 감지
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 같은 창에서의 localStorage 변경 감지 (storage 이벤트는 다른 탭에서만 발생)
+    const checkStorage = setInterval(() => {
+      const currentValue = localStorage.getItem('signupFormData');
+      if (currentValue !== lastStorageValue) {
+        lastStorageValue = currentValue;
+        if (currentValue) {
+          try {
+            const parsed = JSON.parse(currentValue);
+            setFormData((prev) => {
+              // 이미 같은 값이면 업데이트하지 않음
+              if (prev.name === parsed.name && prev.email === parsed.email && prev.address === parsed.address) {
+                return prev;
+              }
+              return {
+                ...prev,
+                ...parsed,
+                password: prev.password,
+                confirmPassword: prev.confirmPassword,
+              };
+            });
+          } catch (error) {
+            console.error('저장된 회원가입 정보 확인 실패:', error);
+          }
+        }
+      }
+    }, 500); // 0.5초마다 체크
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkStorage);
+    };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -88,6 +174,9 @@ function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
 
     try {
       await createUser(payload);
+
+      // 회원가입 성공 시 localStorage의 저장된 정보 삭제
+      localStorage.removeItem('signupFormData');
 
       setFormData(INITIAL_FORM_DATA);
       setAgreements(INITIAL_AGREEMENTS);
