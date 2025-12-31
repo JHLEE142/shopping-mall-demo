@@ -3,8 +3,10 @@ import { MessageCircle, X, Send, Minimize2, Maximize2, Settings } from 'lucide-r
 import { sendChatMessage, getOpenAIApiKey, setOpenAIApiKey } from '../services/chatService';
 import './ChatWidget.css';
 
-function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }) {
+function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home' }) {
   const isLoggedIn = !!user;
+  const isHomePage = currentView === 'home';
+  const isLoginPage = currentView === 'login';
   
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -25,7 +27,17 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
         sender: 'bot',
         timestamp: new Date(),
       };
+    } else if (isHomePage && !isLoggedIn) {
+      // 로그인 전 메인페이지: 로그인 유도 메시지
+      return {
+        id: 1,
+        text: `채팅 기능은 로그인 후 이용 가능합니다.\n\n로그인하시면 AI 쇼핑 비서를 통해 상품 추천, 검색, 주문 도움 등을 받으실 수 있습니다.\n\n지금 로그인하시겠어요?`,
+        sender: 'bot',
+        timestamp: new Date(),
+        action: 'login_prompt',
+      };
     } else {
+      // 로그인/회원가입 페이지 등: 로그인 도우미
       return {
         id: 1,
         text: `안녕하세요! 로그인/회원가입 도우미입니다. 로그인이나 회원가입에 대해 궁금한 점이 있으시면 언제든지 물어보세요!${apiKeyNotice}`,
@@ -33,7 +45,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
         timestamp: new Date(),
       };
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isHomePage]);
   
   const [messages, setMessages] = useState([initialMessage]);
   const [inputMessage, setInputMessage] = useState('');
@@ -57,7 +69,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
       // 초기 메시지만 있는 경우에만 업데이트
       setMessages([initialMessage]);
     }
-  }, [isLoggedIn, initialMessage]);
+  }, [isLoggedIn, initialMessage, isHomePage]);
 
   // 컴포넌트 마운트 시 저장된 API 키 확인
   useEffect(() => {
@@ -80,6 +92,14 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
           sender: 'bot',
           timestamp: new Date(),
         }]);
+      } else if (isHomePage && !isLoggedIn) {
+        setMessages([{
+          id: 1,
+          text: `채팅 기능은 로그인 후 이용 가능합니다.\n\n로그인하시면 AI 쇼핑 비서를 통해 상품 추천, 검색, 주문 도움 등을 받으실 수 있습니다.\n\n지금 로그인하시겠어요?`,
+          sender: 'bot',
+          timestamp: new Date(),
+          action: 'login_prompt',
+        }]);
       } else {
         setMessages([{
           id: 1,
@@ -89,11 +109,20 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
         }]);
       }
     }
-  }, [apiKeyInput, isLoggedIn]);
+  }, [apiKeyInput, isLoggedIn, isHomePage]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim() || isLoading) return;
+
+    // 로그인 전 메인페이지에서는 채팅 차단 및 로그인 유도
+    if (isHomePage && !isLoggedIn) {
+      if (onMoveToLogin) {
+        onMoveToLogin();
+        setIsOpen(false);
+      }
+      return;
+    }
 
     const userMessage = {
       id: messages.length + 1,
@@ -110,7 +139,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
 
     try {
       // OpenAI API 호출
-      const botResponse = await sendChatMessage([...messages, userMessage], isLoggedIn);
+      const botResponse = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView);
       
       setMessages((prev) => {
         const botMessage = {
@@ -339,7 +368,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
                       <p className="chat-widget__message-text">{message.text}</p>
                       {message.action && (
                         <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                          {message.action === 'login' && onMoveToLogin && (
+                          {(message.action === 'login' || message.action === 'login_prompt') && onMoveToLogin && (
                             <button
                               type="button"
                               onClick={() => {
@@ -397,15 +426,30 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null }
                   ref={inputRef}
                   type="text"
                   className="chat-widget__input"
-                  placeholder={isLoggedIn ? "원하시는 상품이나 질문을 입력하세요..." : "로그인이나 회원가입에 대해 물어보세요..."}
+                  placeholder={
+                    isHomePage && !isLoggedIn 
+                      ? "로그인 후 채팅 기능을 이용하세요..." 
+                      : isLoggedIn 
+                        ? "원하시는 상품이나 질문을 입력하세요..." 
+                        : "로그인이나 회원가입에 대해 물어보세요..."
+                  }
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
+                  disabled={isHomePage && !isLoggedIn}
+                  style={isHomePage && !isLoggedIn ? { cursor: 'not-allowed', opacity: 0.6 } : {}}
+                  onClick={() => {
+                    if (isHomePage && !isLoggedIn && onMoveToLogin) {
+                      onMoveToLogin();
+                      setIsOpen(false);
+                    }
+                  }}
                 />
                 <button
                   type="submit"
                   className="chat-widget__send-button"
-                  disabled={!inputMessage.trim() || isLoading}
+                  disabled={!inputMessage.trim() || isLoading || (isHomePage && !isLoggedIn)}
                   aria-label="전송"
+                  style={(isHomePage && !isLoggedIn) ? { cursor: 'not-allowed', opacity: 0.6 } : {}}
                 >
                   {isLoading ? (
                     <span style={{ fontSize: '0.75rem' }}>전송 중...</span>

@@ -21,3 +21,8 @@ agents/datasets/**
 **/*.pt
 **/*.pth
 **/*.ckpt
+
+# Environment variables
+.env
+.env.local
+.env.*.local

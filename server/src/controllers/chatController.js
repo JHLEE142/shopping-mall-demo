@@ -1,12 +1,14 @@
 const axios = require('axios');
+const { getSystemPrompt } = require('../prompts/assistantPrompt');
 
 /**
  * OpenAI API를 통해 채팅 메시지 처리
  */
 async function sendChatMessage(req, res) {
   try {
-    const { messages, isLoggedIn } = req.body;
-    const apiKey = req.headers['x-openai-api-key'] || req.body.apiKey;
+    const { messages, isLoggedIn, currentView } = req.body;
+    // 환경 변수에서 기본 API 키 가져오기, 없으면 요청에서 가져오기
+    const apiKey = req.headers['x-openai-api-key'] || req.body.apiKey || process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       return res.status(400).json({
@@ -20,16 +22,8 @@ async function sendChatMessage(req, res) {
       });
     }
 
-    // 로그인 상태에 따라 시스템 프롬프트 설정
-    const systemPrompt = isLoggedIn
-      ? `당신은 한국 온라인 쇼핑몰 "Caurora"의 AI 쇼핑 비서입니다. 
-사용자가 상품을 찾거나 쇼핑에 대한 질문을 할 때 친절하고 도움이 되는 답변을 제공하세요.
-상품 추천, 가격 정보, 배송 정보, 할인 정보 등에 대해 도움을 줄 수 있습니다.
-답변은 한국어로 작성하고, 친근하고 전문적인 톤을 유지하세요.`
-      : `당신은 한국 온라인 쇼핑몰 "Caurora"의 로그인/회원가입 도우미입니다.
-사용자가 로그인이나 회원가입에 대해 질문할 때 친절하고 도움이 되는 답변을 제공하세요.
-로그인 방법, 회원가입 절차, 비밀번호 찾기, 이메일 인증 등에 대해 안내할 수 있습니다.
-답변은 한국어로 작성하고, 친근하고 전문적인 톤을 유지하세요.`;
+    // 상황별 시스템 프롬프트 생성
+    const systemPrompt = getSystemPrompt(isLoggedIn, currentView);
 
     // OpenAI API 호출
     const response = await axios.post(

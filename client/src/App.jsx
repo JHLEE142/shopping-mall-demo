@@ -464,6 +464,12 @@ function App() {
           />
         </main>
         <SiteFooter />
+        <ChatWidget 
+          user={session?.user || null}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          currentView={view}
+        />
       </div>
     );
   }
@@ -514,6 +520,12 @@ function App() {
           />
         </main>
         <SiteFooter />
+        <ChatWidget 
+          user={session?.user || null}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          currentView={view}
+        />
       </div>
     );
   }
@@ -555,6 +567,12 @@ function App() {
           />
         </main>
         <SiteFooter />
+        <ChatWidget 
+          user={session?.user || null}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          currentView={view}
+        />
       </div>
     );
   }
@@ -594,6 +612,12 @@ function App() {
           />
         </main>
         <SiteFooter />
+        <ChatWidget 
+          user={session?.user || null}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          currentView={view}
+        />
       </div>
     );
   }
@@ -653,6 +677,12 @@ function App() {
           />
         </main>
         <SiteFooter />
+        <ChatWidget 
+          user={session?.user || null}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          currentView={view}
+        />
       </div>
     );
   }
@@ -1053,6 +1083,7 @@ function App() {
         user={session?.user || null}
         onMoveToLogin={() => setView('login')}
         onMoveToSignUp={() => setView('signup')}
+        currentView={view}
       />
     </div>
   );

@@ -47,7 +47,7 @@ function createCorsOptions() {
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-OpenAI-API-Key', 'x-openai-api-key'],
     optionsSuccessStatus: 204,
     preflightContinue: false,
   };

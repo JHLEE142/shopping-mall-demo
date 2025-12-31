@@ -6,7 +6,39 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const AGENTS_DIR = path.join(__dirname, '../../../agents/specs');
+/**
+ * Resolve agents/specs directory path safely
+ * Returns null if directory doesn't exist
+ */
+function resolveAgentsSpecsDir(): string | null {
+  // Try multiple strategies to find repo root
+  let repoRoot = process.cwd();
+  
+  // If running from server/src/ai_runtime, go up 3 levels to repo root
+  if (__dirname.includes('server/src/ai_runtime')) {
+    repoRoot = path.resolve(__dirname, '../../..');
+  }
+  // If running from server/src/, go up 2 levels
+  else if (__dirname.includes('server/src')) {
+    repoRoot = path.resolve(__dirname, '../..');
+  }
+  // If running from server/, go up 1 level
+  else if (__dirname.includes('server')) {
+    repoRoot = path.resolve(__dirname, '..');
+  }
+  
+  const agentsSpecsPath = path.join(repoRoot, 'agents', 'specs');
+  
+  // Return path if it exists, otherwise return null
+  if (!fs.existsSync(agentsSpecsPath)) {
+    return null;
+  }
+  
+  return agentsSpecsPath;
+}
+
+// Lazy initialization - will be resolved when first used
+let AGENTS_DIR: string | null = null;
 
 export interface AgentSpec {
   role: string;
@@ -20,6 +52,16 @@ export interface AgentSpec {
 }
 
 export function loadAgentSpec(agentName: string): AgentSpec | null {
+  // Lazy initialize AGENTS_DIR
+  if (AGENTS_DIR === null) {
+    AGENTS_DIR = resolveAgentsSpecsDir();
+  }
+  
+  // If agents directory doesn't exist, return null
+  if (!AGENTS_DIR) {
+    return null;
+  }
+  
   try {
     const filePath = path.join(AGENTS_DIR, `${agentName}.md`);
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -137,6 +179,16 @@ function parseExamples(content: string): any[] {
 }
 
 export function getAllAgentNames(): string[] {
+  // Lazy initialize AGENTS_DIR
+  if (AGENTS_DIR === null) {
+    AGENTS_DIR = resolveAgentsSpecsDir();
+  }
+  
+  // If agents directory doesn't exist, return empty array
+  if (!AGENTS_DIR) {
+    return [];
+  }
+  
   try {
     const files = fs.readdirSync(AGENTS_DIR);
     return files

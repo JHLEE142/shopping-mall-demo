@@ -9,6 +9,7 @@ const path = require('path');
 /**
  * Resolve agents/specs directory path safely
  * Works from any location (process.cwd() or __dirname)
+ * Returns null if directory doesn't exist
  */
 function resolveAgentsSpecsDir() {
   // Try multiple strategies to find repo root
@@ -29,15 +30,16 @@ function resolveAgentsSpecsDir() {
   
   const agentsSpecsPath = path.join(repoRoot, 'agents', 'specs');
   
-  // Verify path exists
+  // Return path if it exists, otherwise return null
   if (!fs.existsSync(agentsSpecsPath)) {
-    throw new Error(`Agents specs directory not found: ${agentsSpecsPath}. Current working directory: ${process.cwd()}, __dirname: ${__dirname}`);
+    return null;
   }
   
   return agentsSpecsPath;
 }
 
-const AGENTS_DIR = resolveAgentsSpecsDir();
+// Lazy initialization - will be resolved when first used
+let AGENTS_DIR = null;
 
 /**
  * @typedef {Object} AgentSpec
@@ -57,6 +59,16 @@ const AGENTS_DIR = resolveAgentsSpecsDir();
  * @returns {AgentSpec|null}
  */
 function loadAgentSpec(agentName) {
+  // Lazy initialize AGENTS_DIR
+  if (AGENTS_DIR === null) {
+    AGENTS_DIR = resolveAgentsSpecsDir();
+  }
+  
+  // If agents directory doesn't exist, return null
+  if (!AGENTS_DIR) {
+    return null;
+  }
+  
   try {
     const filePath = path.join(AGENTS_DIR, `${agentName}.md`);
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -190,6 +202,16 @@ function parseExamples(content) {
  * @returns {string[]}
  */
 function getAllAgentNames() {
+  // Lazy initialize AGENTS_DIR
+  if (AGENTS_DIR === null) {
+    AGENTS_DIR = resolveAgentsSpecsDir();
+  }
+  
+  // If agents directory doesn't exist, return empty array
+  if (!AGENTS_DIR) {
+    return [];
+  }
+  
   try {
     const files = fs.readdirSync(AGENTS_DIR);
     return files

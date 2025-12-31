@@ -4,10 +4,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500
  * OpenAI API를 통해 채팅 메시지 전송
  * @param {Array} messages - 대화 메시지 배열
  * @param {boolean} isLoggedIn - 로그인 여부
+ * @param {string} currentView - 현재 페이지 (login, signup, home 등)
  * @param {string} apiKey - OpenAI API 키
  * @returns {Promise<string>} AI 응답 텍스트
  */
-export async function sendChatMessage(messages, isLoggedIn = false, apiKey = null) {
+export async function sendChatMessage(messages, isLoggedIn = false, currentView = 'home', apiKey = null) {
   try {
     const storedApiKey = apiKey || getOpenAIApiKey();
     
@@ -27,6 +28,7 @@ export async function sendChatMessage(messages, isLoggedIn = false, apiKey = nul
           content: msg.text,
         })),
         isLoggedIn,
+        currentView, // 현재 페이지 정보 추가
         apiKey: storedApiKey, // body에도 포함 (호환성)
       }),
     });
