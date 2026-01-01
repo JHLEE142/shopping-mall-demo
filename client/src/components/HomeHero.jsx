@@ -340,7 +340,7 @@ function HomeHero({
       try {
         setCategoriesLoading(true);
         const data = await fetchCategories({ includeProductCount: true });
-        console.log('카테고리 로드 성공:', data?.length || 0, '개');
+        // console.log('카테고리 로드 성공:', data?.length || 0, '개');
         setCategories(data || []);
       } catch (error) {
         console.error('카테고리 로드 실패:', error.message);

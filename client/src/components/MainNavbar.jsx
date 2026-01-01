@@ -45,7 +45,7 @@ function MainNavbar({
         const hierarchy = await fetchCategoryHierarchy(false);
         // 계층 구조에서 대분류(level 1)만 추출
         const mainCategories = hierarchy.filter(cat => cat.level === 1);
-        console.log('대분류 카테고리 로드 성공:', mainCategories?.length || 0, '개');
+        // console.log('대분류 카테고리 로드 성공:', mainCategories?.length || 0, '개');
         setCategories(mainCategories || []);
       } catch (error) {
         console.error('카테고리 로드 실패:', error.message);
