@@ -13,7 +13,7 @@ import {
   Star,
   Truck,
 } from 'lucide-react';
-import { fetchProductById } from '../services/productService';
+import { fetchProductById, fetchSimilarProducts } from '../services/productService';
 import { addItemToCart } from '../services/cartService';
 import { getReviewsByProduct, getReviewStats, createReview } from '../services/reviewService';
 import { 
@@ -256,6 +256,7 @@ function ProductDetailPage({
   onViewCart = () => {},
   onDirectOrder = () => {},
   onViewShippingPolicy = null,
+  onViewProduct = null,
 }) {
   const [product, setProduct] = useState(buildProductData(initialProduct));
   const [status, setStatus] = useState(initialProduct ? 'success' : 'loading');
@@ -301,6 +302,10 @@ function ProductDetailPage({
     purpose: '',
   });
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  
+  // 추천 상품 관련 상태
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
 
   useEffect(() => {
     const normalized = buildProductData(initialProduct);
@@ -309,8 +314,10 @@ function ProductDetailPage({
     setSelectedSize(null);
     setActiveImage(normalized.gallery.length > 0 ? 0 : 0);
     
-    if (initialProduct?._id || productId) {
-      loadReviews(initialProduct?._id || productId);
+    const targetId = initialProduct?._id || productId;
+    if (targetId) {
+      loadReviews(targetId);
+      loadRecommendedProducts(targetId);
     }
   }, [initialProduct, productId]);
 
@@ -338,6 +345,21 @@ function ProductDetailPage({
       });
     } finally {
       setReviewsLoading(false);
+    }
+  };
+
+  const loadRecommendedProducts = async (id) => {
+    if (!id) return;
+    
+    try {
+      setRecommendationsLoading(true);
+      const products = await fetchSimilarProducts(id, 4);
+      setRecommendedProducts(products || []);
+    } catch (err) {
+      console.error('Failed to load recommended products:', err);
+      setRecommendedProducts([]);
+    } finally {
+      setRecommendationsLoading(false);
     }
   };
 
@@ -541,6 +563,9 @@ function ProductDetailPage({
         
         // 리뷰 데이터 로드
         loadReviews(data._id || targetProductId);
+        
+        // 추천 상품 로드
+        loadRecommendedProducts(data._id || targetProductId);
       } catch (err) {
         if (!isMounted) return;
         setStatus('error');
@@ -1831,18 +1856,65 @@ function ProductDetailPage({
 
           <section className="product-recommendations">
             <h2>나를 위한 추천 제품</h2>
-            <div className="product-recommendations__grid">
-              {FALLBACK_RECOMMENDATIONS.map((item) => (
-                <article key={item.id} className="product-recommendations__card">
-                  <img src={item.image} alt={item.name} />
-                  <div>
-                    <h3>{item.name}</h3>
-                    <p>{item.priceRange}</p>
-                    <button type="button">구매 신청하기</button>
-                  </div>
-                </article>
-              ))}
-            </div>
+            {recommendationsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <p>추천 상품을 불러오는 중...</p>
+              </div>
+            ) : recommendedProducts.length > 0 ? (
+              <div className="product-recommendations__grid">
+                {recommendedProducts.map((item) => {
+                  const productData = buildProductData(item);
+                  const productId = item._id || item.id;
+                  const price = productData.priceSale || productData.price;
+                  const originalPrice = productData.price || productData.originalPrice;
+                  const priceRange = originalPrice && originalPrice > price
+                    ? `${new Intl.NumberFormat('ko-KR').format(price)}원 - ${new Intl.NumberFormat('ko-KR').format(originalPrice)}원`
+                    : `${new Intl.NumberFormat('ko-KR').format(price)}원`;
+                  
+                  return (
+                    <article 
+                      key={productId} 
+                      className="product-recommendations__card"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        if (onViewProduct) {
+                          onViewProduct(item);
+                        } else {
+                          // onViewProduct가 없으면 URL로 이동
+                          const url = `/product-detail?productId=${productId}`;
+                          window.location.href = url;
+                        }
+                      }}
+                    >
+                      <img 
+                        src={productData.gallery?.[0] || productData.image || 'https://via.placeholder.com/300'} 
+                        alt={productData.name} 
+                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                      />
+                      <div>
+                        <h3>{productData.name}</h3>
+                        <p>{priceRange}</p>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onViewProduct) {
+                              onViewProduct(item);
+                            }
+                          }}
+                        >
+                          상품 보기
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                <p>추천 상품이 없습니다.</p>
+              </div>
+            )}
           </section>
 
           <section className="product-newsletter">

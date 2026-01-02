@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const { createTrustedDevice } = require('./trustedDeviceController');
+const { mergeGuestCartToUser } = require('./cartController');
 
 function sanitizeUser(user) {
   if (!user) {
@@ -214,6 +215,42 @@ async function loginUser(req, res, next) {
     console.log('Remote Address:', req.connection.remoteAddress || '없음');
     console.log('Socket Remote Address:', req.socket?.remoteAddress || '없음');
     console.log('========================\n');
+    
+    // 비회원 장바구니를 회원 장바구니로 병합
+    try {
+      const guestSessionId = req.headers['x-guest-session-id'] || req.body.guestSessionId;
+      const deviceId = req.headers['x-device-id'] || req.body.deviceId;
+      const normalizedIp = ip ? ip.split(',')[0].trim() : '';
+      
+      if (guestSessionId || deviceId) {
+        console.log('[로그인] 비회원 장바구니 병합 시도:', { 
+          guestSessionId: guestSessionId ? '있음' : '없음',
+          deviceId: deviceId ? '있음' : '없음',
+          ip: normalizedIp || '없음'
+        });
+        
+        const mergedCart = await mergeGuestCartToUser(
+          user._id,
+          guestSessionId,
+          deviceId,
+          normalizedIp
+        );
+        
+        if (mergedCart) {
+          console.log('[로그인] 비회원 장바구니 병합 완료:', {
+            itemCount: mergedCart.items?.length || 0
+          });
+          responseData.cartMerged = true;
+          responseData.cartItemCount = mergedCart.items?.length || 0;
+        } else {
+          console.log('[로그인] 병합할 비회원 장바구니가 없습니다.');
+        }
+      }
+    } catch (cartMergeError) {
+      // 장바구니 병합 실패해도 로그인은 성공하도록 함
+      console.error('[로그인] 비회원 장바구니 병합 실패:', cartMergeError.message);
+      // 에러는 무시하고 로그인은 계속 진행
+    }
     
     // 자동 로그인 설정
     if (rememberMe) {

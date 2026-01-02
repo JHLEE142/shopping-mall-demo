@@ -3,6 +3,7 @@ const Cart = require('../models/cart');
 const { Coupon, UserCoupon } = require('../models/coupon');
 const User = require('../models/user');
 const PointHistory = require('../models/point');
+const crypto = require('crypto');
 
 const PORTONE_API_BASE_URL = 'https://api.iamport.kr';
 
@@ -208,15 +209,54 @@ function computeOrderTotals(items = [], summaryOverrides = {}, couponDiscount = 
 }
 
 function canAccessOrder(user, order) {
-  if (!user || !order) {
+  if (!order) {
     return false;
   }
 
-  if (user.user_type === 'admin') {
+  // 관리자는 모든 주문 접근 가능
+  if (user && user.user_type === 'admin') {
     return true;
   }
 
-  return order.user && order.user.toString() === user.id;
+  // 회원 주문인 경우
+  if (order.user) {
+    return user && order.user.toString() === user.id;
+  }
+
+  // 비회원 주문은 항상 false (별도 인증 필요)
+  return false;
+}
+
+// 비회원 주문 접근 권한 확인
+function canAccessGuestOrder(order, guestSessionId, accessToken, email, phone) {
+  if (!order || !order.isGuest) {
+    return false;
+  }
+
+  // accessToken으로 확인
+  if (accessToken && order.guestAuth?.accessToken) {
+    if (order.guestAuth.accessToken === accessToken) {
+      // 토큰 만료 확인
+      if (order.guestAuth.tokenExpiresAt && new Date() > order.guestAuth.tokenExpiresAt) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  // 주문번호 + 이메일/전화번호로 확인
+  const normalizedEmail = email ? email.toLowerCase().trim() : '';
+  const normalizedPhone = phone ? phone.trim() : '';
+  
+  if (normalizedEmail && order.contact?.email && order.contact.email === normalizedEmail) {
+    return true;
+  }
+  
+  if (normalizedPhone && order.contact?.phone && order.contact.phone === normalizedPhone) {
+    return true;
+  }
+
+  return false;
 }
 
 async function createOrder(req, res, next) {
@@ -242,6 +282,15 @@ async function createOrder(req, res, next) {
 
     if (!shipping || !shipping.address) {
       return res.status(400).json({ message: '배송 정보는 필수입니다.' });
+    }
+
+    // 비회원 주문인 경우 필수 정보 확인
+    if (!req.user) {
+      if (!guestName && !contact.email && !contact.phone) {
+        return res.status(400).json({ 
+          message: '비회원 주문은 이름, 이메일, 또는 전화번호 중 하나는 필수입니다.' 
+        });
+      }
     }
 
     const normalizedItems = items.map((item) => {
@@ -372,11 +421,27 @@ async function createOrder(req, res, next) {
 
     const orderNumber = providedOrderNumber || (await generateUniqueOrderNumber());
 
+    // 비회원 주문인 경우 accessToken 생성
+    let guestAuth = undefined;
+    if (!req.user) {
+      const accessToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30일 유효
+      
+      guestAuth = {
+        accessToken,
+        tokenExpiresAt,
+        passwordHash: '', // 필요시 추가
+      };
+    }
+
     const orderPayload = {
       orderNumber,
       user: req.user ? req.user._id : undefined,
+      isGuest: !req.user,
       guestName: normalizeString(guestName),
       guestEmail: normalizeString(guestEmail).toLowerCase(),
+      guestAuth: guestAuth,
       contact: {
         phone: normalizeString(contact.phone),
         email: normalizeString(contact.email).toLowerCase(),
@@ -528,8 +593,51 @@ async function getOrderById(req, res, next) {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
 
-    if (!canAccessOrder(req.user, order)) {
-      return res.status(403).json({ message: '이 주문을 조회할 권한이 없습니다.' });
+    // 회원 주문인 경우
+    if (order.user) {
+      if (!canAccessOrder(req.user, order)) {
+        return res.status(403).json({ message: '이 주문을 조회할 권한이 없습니다.' });
+      }
+    } else {
+      // 비회원 주문인 경우
+      const accessToken = req.headers['x-guest-access-token'] || req.query.accessToken;
+      const email = req.query.email;
+      const phone = req.query.phone;
+      const guestSessionId = req.headers['x-guest-session-id'] || req.query.guestSessionId;
+      
+      if (!canAccessGuestOrder(order, guestSessionId, accessToken, email, phone)) {
+        return res.status(403).json({ message: '이 주문을 조회할 권한이 없습니다.' });
+      }
+    }
+
+    return res.json(order);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// 비회원 주문 조회 API (별도 엔드포인트)
+async function lookupGuestOrder(req, res, next) {
+  try {
+    const { orderNumber, email, phone, accessToken } = req.body;
+
+    if (!orderNumber) {
+      return res.status(400).json({ message: '주문번호는 필수입니다.' });
+    }
+
+    const order = await Order.findOne({ orderNumber }).populate('user', 'name email user_type');
+
+    if (!order) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+
+    if (!order.isGuest) {
+      return res.status(400).json({ message: '회원 주문은 로그인 후 조회해주세요.' });
+    }
+
+    // 비회원 주문 접근 권한 확인
+    if (!canAccessGuestOrder(order, null, accessToken, email, phone)) {
+      return res.status(403).json({ message: '주문 정보가 일치하지 않습니다.' });
     }
 
     return res.json(order);
@@ -677,6 +785,7 @@ module.exports = {
   getOrderById,
   updateOrder,
   cancelOrder,
+  lookupGuestOrder,
 };
 
 

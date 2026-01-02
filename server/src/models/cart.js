@@ -37,8 +37,52 @@ const cartSchema = new Schema(
     user: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+      default: null,
       index: true,
+    },
+    isGuest: {
+      type: Boolean,
+      default: function() {
+        return !this.user;
+      },
+      index: true,
+    },
+    guestSessionId: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+      sparse: true,
+    },
+    guestInfo: {
+      deviceId: {
+        type: String,
+        default: '',
+        trim: true,
+        index: true,
+        sparse: true,
+      },
+      ipAddress: {
+        type: String,
+        default: '',
+        trim: true,
+        index: true,
+        sparse: true,
+      },
+      userAgent: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      sessionCreatedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      lastAccessedAt: {
+        type: Date,
+        default: Date.now,
+      },
     },
     status: {
       type: String,
@@ -91,7 +135,22 @@ const cartSchema = new Schema(
   }
 );
 
+// 기존 인덱스 (회원 장바구니용)
 cartSchema.index({ user: 1, status: 1 });
+
+// 비회원 장바구니 조회용 인덱스
+cartSchema.index({ isGuest: 1, guestSessionId: 1 });
+cartSchema.index({ isGuest: 1, 'guestInfo.deviceId': 1 });
+cartSchema.index({ isGuest: 1, 'guestInfo.ipAddress': 1, status: 1 });
+cartSchema.index({ isGuest: 1, status: 1, 'guestInfo.lastAccessedAt': -1 });
+
+// 복합 인덱스 (비회원 장바구니 조회 최적화)
+cartSchema.index({ 
+  isGuest: 1, 
+  'guestInfo.deviceId': 1, 
+  'guestInfo.ipAddress': 1, 
+  status: 1 
+});
 
 module.exports = model('Cart', cartSchema);
 

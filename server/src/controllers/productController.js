@@ -4,6 +4,7 @@ const Review = require('../models/review');
 const XLSX = require('xlsx');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { calculateStringSimilarity } = require('../utils/phonemeConverter');
 
 // 재고 상태 계산 헬퍼 함수
 function calculateInventoryStatus(inventory) {
@@ -1270,6 +1271,119 @@ async function commitImport(req, res, next) {
   }
 }
 
+// 유사한 상품 추천 (카테고리 + 상품 이름 유사도 고려)
+async function getSimilarProducts(req, res, next) {
+  try {
+    const { id } = req.params;
+    const limit = Math.max(parseInt(req.query.limit, 10) || 4, 1);
+    
+    // 현재 상품 조회
+    const currentProduct = await Product.findById(id).lean();
+    if (!currentProduct) {
+      return res.status(404).json({ message: '상품을 찾을 수 없습니다.' });
+    }
+
+    // 같은 카테고리의 상품들을 가져오기
+    let categoryFilter = null;
+    
+    // 우선순위: categoryMain > categoryMid > categorySub > category
+    if (currentProduct.categoryMain) {
+      categoryFilter = currentProduct.categoryMain;
+    } else if (currentProduct.categoryMid) {
+      categoryFilter = currentProduct.categoryMid;
+    } else if (currentProduct.categorySub) {
+      categoryFilter = currentProduct.categorySub;
+    } else if (currentProduct.category) {
+      categoryFilter = currentProduct.category;
+    }
+
+    if (!categoryFilter) {
+      return res.json({ items: [] });
+    }
+
+    // 같은 카테고리의 모든 상품 조회 (현재 상품 제외)
+    const products = await Product.find({
+      $or: [
+        { categoryMain: categoryFilter },
+        { categoryMid: categoryFilter },
+        { categorySub: categoryFilter },
+        { category: categoryFilter },
+      ],
+      _id: { $ne: currentProduct._id },
+    }).lean();
+
+    if (products.length === 0) {
+      return res.json({ items: [] });
+    }
+
+    // 상품 이름 유사도 계산 및 정렬
+    const currentProductName = currentProduct.name || '';
+    const productsWithSimilarity = products.map(product => {
+      const productName = product.name || '';
+      const nameSimilarity = calculateStringSimilarity(currentProductName, productName);
+      
+      // 카테고리 일치도 점수 추가
+      let categoryScore = 0;
+      if (product.categoryMain === currentProduct.categoryMain) categoryScore += 0.3;
+      if (product.categoryMid === currentProduct.categoryMid) categoryScore += 0.3;
+      if (product.categorySub === currentProduct.categorySub) categoryScore += 0.4;
+      
+      // 최종 점수: 이름 유사도 60% + 카테고리 일치도 40%
+      const finalScore = (nameSimilarity * 0.6) + (categoryScore * 0.4);
+      
+      return {
+        product,
+        similarity: finalScore,
+        nameSimilarity,
+        categoryScore,
+      };
+    });
+
+    // 유사도 순으로 정렬
+    productsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
+
+    // 상위 limit개만 반환
+    const topProducts = productsWithSimilarity
+      .slice(0, limit)
+      .map(item => item.product);
+
+    // 리뷰 집계 추가
+    const productsWithReviews = await Promise.all(
+      topProducts.map(async (product) => {
+        try {
+          const reviewStats = await Review.aggregate([
+            { $match: { productId: product._id } },
+            {
+              $group: {
+                _id: null,
+                averageRating: { $avg: '$rating' },
+                reviewCount: { $sum: 1 }
+              }
+            }
+          ]);
+
+          if (reviewStats.length > 0) {
+            product.rating = Math.round(reviewStats[0].averageRating * 10) / 10;
+            product.reviewCount = reviewStats[0].reviewCount;
+          } else {
+            product.rating = 0;
+            product.reviewCount = 0;
+          }
+        } catch (error) {
+          console.error(`Failed to aggregate reviews for product ${product._id}:`, error);
+          product.rating = 0;
+          product.reviewCount = 0;
+        }
+        return product;
+      })
+    );
+
+    return res.json({ items: productsWithReviews });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createProduct,
   getProducts,
@@ -1278,6 +1392,7 @@ module.exports = {
   deleteProduct,
   importExcel,
   commitImport,
+  getSimilarProducts,
 };
 
 

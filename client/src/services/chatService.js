@@ -10,17 +10,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500
  */
 export async function sendChatMessage(messages, isLoggedIn = false, currentView = 'home', apiKey = null) {
   try {
-    const storedApiKey = apiKey || getOpenAIApiKey();
-    
-    if (!storedApiKey) {
-      throw new Error('OpenAI API 키가 설정되지 않았습니다. 설정에서 API 키를 입력해주세요.');
-    }
-
+    // API key는 서버의 .env에서 사용하므로 클라이언트에서는 전달하지 않음
+    // 서버가 자동으로 process.env.OPENAI_API_KEY를 사용함
     const response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-OpenAI-API-Key': storedApiKey,
       },
       body: JSON.stringify({
         messages: messages.map(msg => ({
@@ -29,7 +24,6 @@ export async function sendChatMessage(messages, isLoggedIn = false, currentView 
         })),
         isLoggedIn,
         currentView, // 현재 페이지 정보 추가
-        apiKey: storedApiKey, // body에도 포함 (호환성)
       }),
     });
 
@@ -39,7 +33,12 @@ export async function sendChatMessage(messages, isLoggedIn = false, currentView 
     }
 
     const data = await response.json();
-    return data.message || data.response || '응답을 받을 수 없습니다.';
+    // productCards도 함께 반환
+    return {
+      message: data.message || data.response || '응답을 받을 수 없습니다.',
+      response: data.message || data.response || '응답을 받을 수 없습니다.',
+      productCards: data.productCards || null,
+    };
   } catch (error) {
     console.error('Chat API error:', error);
     throw error;

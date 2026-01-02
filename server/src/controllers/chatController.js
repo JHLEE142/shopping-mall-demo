@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getSystemPrompt } = require('../prompts/assistantPrompt');
+const { hybridSearch } = require('./searchController');
 
 /**
  * AI 응답에서 역할/함수 설명 제거
@@ -85,12 +86,12 @@ function cleanAIResponse(response) {
 async function sendChatMessage(req, res) {
   try {
     const { messages, isLoggedIn, currentView } = req.body;
-    // 환경 변수에서 기본 API 키 가져오기, 없으면 요청에서 가져오기
-    const apiKey = req.headers['x-openai-api-key'] || req.body.apiKey || process.env.OPENAI_API_KEY;
+    // 환경 변수에서 API 키 가져오기 (우선순위: .env 파일)
+    const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       return res.status(400).json({
-        message: 'OpenAI API 키가 필요합니다. API 키를 설정해주세요.',
+        message: 'OpenAI API 키가 서버에 설정되지 않았습니다. 서버 관리자에게 문의하세요.',
       });
     }
 
@@ -103,17 +104,51 @@ async function sendChatMessage(req, res) {
     // 상황별 시스템 프롬프트 생성
     const systemPrompt = getSystemPrompt(isLoggedIn, currentView);
 
+    // 사용자 메시지에서 검색 의도 파악
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    const searchKeywords = extractSearchKeywords(lastUserMessage);
+    
+    // 검색 의도가 있으면 내부 검색 API 호출
+    let searchResults = [];
+    if (searchKeywords && searchKeywords.length > 0) {
+      try {
+        const searchQuery = searchKeywords.join(' ');
+        console.log('[Chat] 내부 검색 실행:', searchQuery);
+        const searchResultsData = await hybridSearch(searchQuery, 10);
+        searchResults = searchResultsData.map(result => ({
+          id: result.product._id.toString(),
+          name: result.product.name,
+          price: result.product.priceSale || result.product.price,
+          image: result.product.image || result.product.gallery?.[0] || '',
+          description: result.product.description || '',
+          score: result.score,
+        }));
+        console.log('[Chat] 검색 결과:', searchResults.length, '개');
+      } catch (searchError) {
+        console.error('[Chat] 검색 오류:', searchError);
+      }
+    }
+
+    // 검색 결과를 시스템 프롬프트에 추가
+    let enhancedSystemPrompt = systemPrompt;
+    if (searchResults.length > 0) {
+      enhancedSystemPrompt += `\n\n## 현재 검색 결과 (내부 검색 API에서 가져온 상품들):\n${JSON.stringify(searchResults, null, 2)}\n\n**중요**: 검색 결과가 이미 제공되었으므로 "잠시만 기다려 주세요", "검색 중입니다", "찾는 중입니다" 같은 대기 메시지를 절대 사용하지 마세요. 바로 검색 결과를 바탕으로 추천 설명과 함께 **PRODUCT_CARDS** 형식으로 응답하세요.`;
+    } else if (searchKeywords && searchKeywords.length > 0) {
+      // 검색 의도가 있지만 결과가 없는 경우
+      enhancedSystemPrompt += `\n\n**중요**: 검색을 수행했지만 결과가 없습니다. "잠시만 기다려 주세요" 같은 메시지 없이 바로 결과가 없다는 것을 알려주고, 다른 검색어를 제안하세요.`;
+    }
+
     // OpenAI API 호출
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: enhancedSystemPrompt },
           ...messages,
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 2000, // 상품 카드 정보를 포함하기 위해 증가
       },
       {
         headers: {
@@ -131,12 +166,29 @@ async function sendChatMessage(req, res) {
       });
     }
 
+    // PRODUCT_CARDS 파싱
+    let productCards = null;
+    const productCardsMatch = aiMessage.match(/\*\*PRODUCT_CARDS\*\*:\s*(\[.*?\])/s);
+    if (productCardsMatch) {
+      try {
+        productCards = JSON.parse(productCardsMatch[1]);
+        // PRODUCT_CARDS 부분을 응답에서 제거 (텍스트만 남김)
+        aiMessage = aiMessage.replace(/\*\*PRODUCT_CARDS\*\*:\s*\[.*?\]/s, '').trim();
+      } catch (parseError) {
+        console.error('[Chat] PRODUCT_CARDS 파싱 오류:', parseError);
+      }
+    } else if (searchResults.length > 0) {
+      // AI가 PRODUCT_CARDS 형식으로 응답하지 않았지만 검색 결과가 있으면 직접 사용
+      productCards = searchResults;
+    }
+
     // 응답에서 역할/함수 설명 제거
     aiMessage = cleanAIResponse(aiMessage);
 
     res.json({
       message: aiMessage,
       response: aiMessage, // 호환성을 위해 두 필드 모두 제공
+      productCards: productCards, // 상품 카드 데이터
     });
   } catch (error) {
     console.error('OpenAI API error:', error.response?.data || error.message);
@@ -160,6 +212,48 @@ async function sendChatMessage(req, res) {
       message: error.response?.data?.error?.message || '채팅 메시지 처리 중 오류가 발생했습니다.',
     });
   }
+}
+
+/**
+ * 사용자 메시지에서 검색 키워드 추출
+ */
+function extractSearchKeywords(message) {
+  if (!message || typeof message !== 'string') {
+    return [];
+  }
+
+  const lowerMessage = message.toLowerCase();
+  
+  // 검색 의도 키워드
+  const searchKeywords = [
+    '검색', '찾아', '추천', '보여줘', '보여', '알려줘', '알려',
+    'search', 'find', 'recommend', 'show', 'tell',
+  ];
+
+  // 검색 의도가 있는지 확인
+  const hasSearchIntent = searchKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  if (!hasSearchIntent) {
+    return [];
+  }
+
+  // 상품명 추출 (한글, 영문, 숫자 조합)
+  const productNamePatterns = [
+    /(?:검색|찾아|추천|보여줘|보여|알려줘|알려|search|find|recommend|show|tell)[\s:]*([가-힣a-zA-Z0-9\s]+)/i,
+    /([가-힣a-zA-Z0-9\s]{2,})/,
+  ];
+
+  for (const pattern of productNamePatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const keywords = match[1].trim().split(/\s+/).filter(k => k.length > 0);
+      if (keywords.length > 0) {
+        return keywords;
+      }
+    }
+  }
+
+  return [];
 }
 
 module.exports = {

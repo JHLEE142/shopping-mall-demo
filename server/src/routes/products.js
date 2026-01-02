@@ -8,6 +8,7 @@ const {
   deleteProduct,
   importExcel,
   commitImport,
+  getSimilarProducts,
 } = require('../controllers/productController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 
@@ -85,6 +86,9 @@ router.post(
   authorize('admin'),
   commitImport
 );
+
+// 유사한 상품 추천 (인증 불필요)
+router.get('/:id/similar', getSimilarProducts);
 
 router
   .route('/:id')

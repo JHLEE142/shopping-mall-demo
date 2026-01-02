@@ -1,6 +1,7 @@
 const TrustedDevice = require('../models/trustedDevice');
 const User = require('../models/user');
 const jwt = require('jsonwebtoken');
+const { mergeGuestCartToUser } = require('./cartController');
 const bcrypt = require('bcryptjs');
 
 function createAuthToken(userId) {
@@ -142,11 +143,50 @@ exports.autoLogin = async (req, res, next) => {
     // 새 JWT 토큰 발급
     const token = createAuthToken(user.id);
 
-    res.json({
+    const responseData = {
       message: '자동 로그인 성공',
       token,
       user: sanitizeUser(user),
-    });
+    };
+
+    // 비회원 장바구니를 회원 장바구니로 병합
+    try {
+      const guestSessionId = req.headers['x-guest-session-id'] || req.body.guestSessionId;
+      const requestDeviceId = req.headers['x-device-id'] || req.body.deviceId;
+      const normalizedIp = ip ? ip.split(',')[0].trim() : '';
+      
+      // autoLogin에서는 deviceId가 이미 있지만, 비회원 장바구니 병합을 위해 요청의 deviceId도 사용
+      if (guestSessionId || requestDeviceId) {
+        console.log('[자동 로그인] 비회원 장바구니 병합 시도:', { 
+          guestSessionId: guestSessionId ? '있음' : '없음',
+          deviceId: requestDeviceId ? '있음' : '없음',
+          ip: normalizedIp || '없음'
+        });
+        
+        const mergedCart = await mergeGuestCartToUser(
+          user._id,
+          guestSessionId,
+          requestDeviceId,
+          normalizedIp
+        );
+        
+        if (mergedCart) {
+          console.log('[자동 로그인] 비회원 장바구니 병합 완료:', {
+            itemCount: mergedCart.items?.length || 0
+          });
+          responseData.cartMerged = true;
+          responseData.cartItemCount = mergedCart.items?.length || 0;
+        } else {
+          console.log('[자동 로그인] 병합할 비회원 장바구니가 없습니다.');
+        }
+      }
+    } catch (cartMergeError) {
+      // 장바구니 병합 실패해도 자동 로그인은 성공하도록 함
+      console.error('[자동 로그인] 비회원 장바구니 병합 실패:', cartMergeError.message);
+      // 에러는 무시하고 자동 로그인은 계속 진행
+    }
+
+    res.json(responseData);
   } catch (error) {
     next(error);
   }

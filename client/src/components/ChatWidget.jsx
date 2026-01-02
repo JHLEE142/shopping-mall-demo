@@ -3,7 +3,7 @@ import { MessageCircle, X, Send, Minimize2, Maximize2, Settings } from 'lucide-r
 import { sendChatMessage, getOpenAIApiKey, setOpenAIApiKey } from '../services/chatService';
 import './ChatWidget.css';
 
-function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home' }) {
+function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home', onViewProduct = null, onAddToCart = null }) {
   const isLoggedIn = !!user;
   const isHomePage = currentView === 'home';
   const isLoginPage = currentView === 'login';
@@ -14,6 +14,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
   const [showApiKeySettings, setShowApiKeySettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyError, setApiKeyError] = useState('');
+  const [addingToCart, setAddingToCart] = useState(null);
   
   // 로그인 상태에 따라 초기 메시지 설정
   const initialMessage = useMemo(() => {
@@ -79,37 +80,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     }
   }, []);
 
-  // API 키가 변경되면 초기 메시지 업데이트
-  useEffect(() => {
-    if (messages.length === 1) {
-      const hasApiKey = !!getOpenAIApiKey();
-      const apiKeyNotice = !hasApiKey ? '\n\n💡 OpenAI API 키를 설정해야 AI 쇼핑 비서를 사용할 수 있습니다. 설정 버튼(⚙️)을 클릭하여 API 키를 입력해주세요.' : '';
-      
-      if (isLoggedIn) {
-        setMessages([{
-          id: 1,
-          text: `안녕하세요! AI 쇼핑 비서입니다. 어떤 상품을 찾고 계신가요?${apiKeyNotice}`,
-          sender: 'bot',
-          timestamp: new Date(),
-        }]);
-      } else if (isHomePage && !isLoggedIn) {
-        setMessages([{
-          id: 1,
-          text: `채팅 기능은 로그인 후 이용 가능합니다.\n\n로그인하시면 AI 쇼핑 비서를 통해 상품 추천, 검색, 주문 도움 등을 받으실 수 있습니다.\n\n지금 로그인하시겠어요?`,
-          sender: 'bot',
-          timestamp: new Date(),
-          action: 'login_prompt',
-        }]);
-      } else {
-        setMessages([{
-          id: 1,
-          text: `안녕하세요! 로그인/회원가입 도우미입니다. 로그인이나 회원가입에 대해 궁금한 점이 있으시면 언제든지 물어보세요!${apiKeyNotice}`,
-          sender: 'bot',
-          timestamp: new Date(),
-        }]);
-      }
-    }
-  }, [apiKeyInput, isLoggedIn, isHomePage]);
+  // API 키 관련 useEffect 제거 (서버 .env 사용)
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -136,6 +107,22 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     const currentInput = inputMessage.trim();
     setInputMessage('');
     setIsLoading(true);
+    
+    // 검색 의도가 있는지 확인하여 로딩 메시지 표시
+    const hasSearchIntent = /(검색|찾아|추천|보여줘|보여|알려줘|알려|search|find|recommend|show|tell)/i.test(currentInput);
+    if (hasSearchIntent) {
+      // 검색 중 메시지 표시
+      setMessages((prev) => {
+        const searchingMessage = {
+          id: prev.length + 1,
+          text: '🔍 검색 중...',
+          sender: 'bot',
+          timestamp: new Date(),
+          isSearching: true,
+        };
+        return [...prev, searchingMessage];
+      });
+    }
 
     // 사용자 메시지에서 정보 추출
     if (currentInput) {
@@ -230,7 +217,9 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
 
     try {
       // OpenAI API 호출
-      const botResponse = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView);
+      const response = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView);
+      const botResponse = typeof response === 'string' ? response : response.message || response.response || '';
+      const productCards = response.productCards || null;
       
       setMessages((prev) => {
         // TOOL_CALL 파싱 및 실행
@@ -292,8 +281,35 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
           text: botResponse,
           sender: 'bot',
           timestamp: new Date(),
+          productCards: productCards, // 상품 카드 데이터
         };
         const newMessages = [...prev, botMessage];
+        
+        // 사용자 메시지에서 장바구니 추가 의도 파악
+        if (isLoggedIn && currentInput && productCards && productCards.length > 0) {
+          const addToCartPatterns = [
+            /(.+?)\s*(?:장바구니|장바구니에|담아|담아줘|담기|추가|추가해줘)/i,
+            /(?:장바구니|장바구니에|담아|담아줘|담기|추가|추가해줘)\s*(.+?)/i,
+          ];
+          
+          for (const pattern of addToCartPatterns) {
+            const match = currentInput.match(pattern);
+            if (match && match[1]) {
+              const productName = match[1].trim();
+              // 상품 카드에서 해당 상품 찾기
+              const matchedProduct = productCards.find(p => 
+                p.name && p.name.toLowerCase().includes(productName.toLowerCase())
+              );
+              if (matchedProduct) {
+                // 장바구니에 추가
+                setTimeout(() => {
+                  handleAddToCart(matchedProduct.id || matchedProduct._id);
+                }, 500);
+                break;
+              }
+            }
+          }
+        }
         
         // AI 응답 및 사용자 메시지에서 회원가입 정보 추출 (이름, 이메일, 주소 등)
         if (currentView === 'signup' && (botResponse || currentInput)) {
@@ -491,6 +507,41 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     });
   };
 
+  const handleAddToCart = async (productId) => {
+    if (!isLoggedIn || !productId) return;
+    
+    setAddingToCart(productId);
+    try {
+      await addItemToCart(productId, 1);
+      setMessages((prev) => {
+        const successMessage = {
+          id: prev.length + 1,
+          text: '✅ 장바구니에 상품을 추가했습니다!',
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        return [...prev, successMessage];
+      });
+      if (onAddToCart) {
+        onAddToCart();
+      }
+    } catch (error) {
+      console.error('장바구니 추가 실패:', error);
+      setMessages((prev) => {
+        const errorMessage = {
+          id: prev.length + 1,
+          text: `❌ 장바구니 추가 실패: ${error.message || '알 수 없는 오류'}`,
+          sender: 'bot',
+          timestamp: new Date(),
+          isError: true,
+        };
+        return [...prev, errorMessage];
+      });
+    } finally {
+      setAddingToCart(null);
+    }
+  };
+
   return (
     <>
       {/* 채팅 버튼 */}
@@ -514,14 +565,15 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
               <span className="chat-widget__status">대기 중</span>
             </div>
             <div className="chat-widget__header-actions">
-              <button
+              {/* API 키 설정 버튼 비활성화 (서버 .env 사용) */}
+              {/* <button
                 className="chat-widget__action-button"
                 onClick={() => setShowApiKeySettings(!showApiKeySettings)}
                 aria-label="API 키 설정"
                 title="API 키 설정"
               >
                 <Settings size={18} strokeWidth={2} />
-              </button>
+              </button> */}
               <button
                 className="chat-widget__action-button"
                 onClick={() => setIsMinimized(!isMinimized)}
@@ -603,8 +655,115 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
                     key={message.id}
                     className={`chat-widget__message chat-widget__message--${message.sender}`}
                   >
-                    <div className={`chat-widget__message-content ${message.isError ? 'chat-widget__message-content--error' : ''}`}>
-                      <p className="chat-widget__message-text">{message.text}</p>
+                    <div className={`chat-widget__message-content ${message.isError ? 'chat-widget__message-content--error' : ''} ${message.isSearching ? 'chat-widget__message-content--searching' : ''}`}>
+                      <p className="chat-widget__message-text">
+                        {message.isSearching ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ 
+                              display: 'inline-block',
+                              width: '12px',
+                              height: '12px',
+                              border: '2px solid #111827',
+                              borderTopColor: 'transparent',
+                              borderRadius: '50%',
+                              animation: 'spin 0.8s linear infinite'
+                            }}></span>
+                            {message.text}
+                          </span>
+                        ) : (
+                          message.text
+                        )}
+                      </p>
+                      
+                      {/* 상품 카드 표시 */}
+                      {message.productCards && message.productCards.length > 0 && (
+                        <div className="chat-widget__product-cards" style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                          {message.productCards.map((product, idx) => (
+                            <div
+                              key={product.id || idx}
+                              className="chat-widget__product-card"
+                              style={{
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                background: 'white',
+                              }}
+                              onClick={() => {
+                                if (onViewProduct) {
+                                  onViewProduct({ _id: product.id, id: product.id, ...product });
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#111827';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                            >
+                              {product.image && (
+                                <img
+                                  src={product.image}
+                                  alt={product.name}
+                                  style={{
+                                    width: '100%',
+                                    height: '100px',
+                                    objectFit: 'cover',
+                                  }}
+                                  onError={(e) => {
+                                    e.target.src = 'https://via.placeholder.com/140x100?text=No+Image';
+                                  }}
+                                />
+                              )}
+                              <div style={{ padding: '0.5rem' }}>
+                                <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.75rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {product.name}
+                                </h4>
+                                <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#111827', fontWeight: 600 }}>
+                                  {new Intl.NumberFormat('ko-KR').format(product.price)}원
+                                </p>
+                                {isLoggedIn && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddToCart(product.id || product._id);
+                                    }}
+                                    disabled={addingToCart === (product.id || product._id)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.7rem',
+                                      background: addingToCart === (product.id || product._id) ? '#d1d5db' : '#111827',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: addingToCart === (product.id || product._id) ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '0.25rem',
+                                    }}
+                                  >
+                                    {addingToCart === (product.id || product._id) ? (
+                                      <>추가 중...</>
+                                    ) : (
+                                      <>
+                                        <ShoppingCart size={12} />
+                                        담기
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       {message.action && (
                         <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
                           {(message.action === 'login' || message.action === 'login_prompt') && onMoveToLogin && (

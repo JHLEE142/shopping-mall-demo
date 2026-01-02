@@ -285,6 +285,12 @@ function App() {
   }, [session?.user]);
 
   useEffect(() => {
+    // 세션이 없으면 장바구니를 가져오지 않음 (401 에러 방지)
+    if (!session?.user) {
+      handleCartUpdate(0);
+      return;
+    }
+    
     let isMounted = true;
     fetchCart()
       .then((data) => {
@@ -469,6 +475,8 @@ function App() {
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           currentView={view}
+          onViewProduct={handleViewProduct}
+          onAddToCart={handleCartUpdate}
         />
       </div>
     );
@@ -517,6 +525,7 @@ function App() {
               window.history.pushState({ view: 'shipping-return-policy' }, '', url);
               setView('shipping-return-policy');
             }}
+            onViewProduct={handleViewProduct}
           />
         </main>
         <SiteFooter />
@@ -525,6 +534,8 @@ function App() {
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           currentView={view}
+          onViewProduct={handleViewProduct}
+          onAddToCart={handleCartUpdate}
         />
       </div>
     );
@@ -572,6 +583,8 @@ function App() {
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           currentView={view}
+          onViewProduct={handleViewProduct}
+          onAddToCart={handleCartUpdate}
         />
       </div>
     );
@@ -617,6 +630,8 @@ function App() {
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           currentView={view}
+          onViewProduct={handleViewProduct}
+          onAddToCart={handleCartUpdate}
         />
       </div>
     );
@@ -682,6 +697,8 @@ function App() {
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           currentView={view}
+          onViewProduct={handleViewProduct}
+          onAddToCart={handleCartUpdate}
         />
       </div>
     );

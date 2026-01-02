@@ -673,25 +673,25 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     });
   };
 
-  // 전체 선택/해제 핸들러
-  const handleSelectAll = (checked) => {
-    if (!excelPreview || !excelPreview.preview) return;
-    
-    if (checked) {
-      // 유효한 행만 선택 (중복 제외, 최대 30개)
-      const validRows = excelPreview.preview
-        .filter((item) => {
-          const sku = item.mapped?.sku;
-          const isDuplicate = sku && duplicateSkus.has(sku);
-          return item.validation.ok && !isDuplicate;
-        })
-        .slice(0, 30)
-        .map((item) => item.rowIndex);
-      setSelectedRows(new Set(validRows));
-    } else {
-      setSelectedRows(new Set());
-    }
-  };
+      // 전체 선택/해제 핸들러
+      const handleSelectAll = (checked) => {
+        if (!excelPreview || !excelPreview.preview) return;
+        
+        if (checked) {
+          // 유효한 행만 선택 (중복 제외, 최대 100개)
+          const validRows = excelPreview.preview
+            .filter((item) => {
+              const sku = item.mapped?.sku;
+              const isDuplicate = sku && duplicateSkus.has(sku);
+              return item.validation.ok && !isDuplicate;
+            })
+            .slice(0, 100)
+            .map((item) => item.rowIndex);
+          setSelectedRows(new Set(validRows));
+        } else {
+          setSelectedRows(new Set());
+        }
+      };
 
   // 엑셀 파일 업로드 핸들러
   const handleExcelUpload = async (e) => {
@@ -746,13 +746,13 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       const headers = data[0] || [];
       const allRows = data.slice(1);
       
-      // 최대 30개 행만 처리 (먼저 slice하여 효율성 향상)
-      const maxRowsToProcess = 30;
+      // 최대 100개 행만 처리 (먼저 slice하여 효율성 향상)
+      const maxRowsToProcess = 100;
       const rows = allRows.slice(0, maxRowsToProcess);
       
       console.log(`[Excel Upload] Total rows in file: ${allRows.length}, Processing: ${rows.length} rows`);
       
-      // 컬럼명으로 매핑된 객체 배열로 변환 (30개만)
+      // 컬럼명으로 매핑된 객체 배열로 변환 (100개만)
       const mappedData = rows.map(row => {
         const obj = {};
         headers.forEach((header, index) => {
@@ -763,7 +763,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         return obj;
       });
       
-      const maxRows = mappedData.length; // 이미 30개로 제한됨
+      const maxRows = mappedData.length; // 이미 100개로 제한됨
       console.log(`[Excel Upload] File parsed: ${maxRows} rows found`);
       
       // 컬럼 찾기 헬퍼
@@ -992,12 +992,12 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       return;
     }
 
-    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 30개)
+    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 100개)
     let rowsToCommit = excelPreview.preview;
     if (selectedRows.size > 0) {
       rowsToCommit = excelPreview.preview.filter((item) => selectedRows.has(item.rowIndex));
     } else {
-      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 30개)
+      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 100개)
       const skuSet = new Set();
       rowsToCommit = excelPreview.preview
         .filter((item) => {
@@ -1008,7 +1008,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           if (sku) skuSet.add(sku);
           return true;
         })
-        .slice(0, 30);
+        .slice(0, 100);
     }
 
     if (rowsToCommit.length === 0) {
@@ -1153,7 +1153,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
               }}>
                 <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
                 <span style={{ fontWeight: 600, color: '#1e40af' }}>
-                  최대 30개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
+                  최대 100개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
                 </span>
               </div>
 
@@ -1475,7 +1475,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                     <span><strong>{selectedRows.size}개</strong> 상품이 선택되었습니다.</span>
                   ) : (
                     <span>
-                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 30)}개</strong> 상품이 추가됩니다.
+                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 100)}개</strong> 상품이 추가됩니다.
                       {duplicateSkus.size > 0 && (
                         <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>
                           (중복 {duplicateSkus.size}개 제외)
@@ -1494,7 +1494,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       }
                       return item.validation.ok && !isDuplicate;
                     })
-                    .slice(0, 30)
+                    .slice(0, 100)
                     .map((item, idx) => (
                       <div
                         key={idx}

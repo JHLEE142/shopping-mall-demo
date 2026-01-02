@@ -65,6 +65,14 @@ const orderSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'User',
       index: true,
+      default: null,
+    },
+    isGuest: {
+      type: Boolean,
+      default: function() {
+        return !this.user;
+      },
+      index: true,
     },
     guestName: {
       type: String,
@@ -76,6 +84,24 @@ const orderSchema = new Schema(
       default: '',
       lowercase: true,
       trim: true,
+    },
+    guestAuth: {
+      accessToken: {
+        type: String,
+        default: '',
+        trim: true,
+        index: true,
+        sparse: true,
+      },
+      tokenExpiresAt: {
+        type: Date,
+        default: null,
+      },
+      passwordHash: {
+        type: String,
+        default: '',
+        trim: true,
+      },
     },
     contact: {
       phone: {
@@ -293,7 +319,14 @@ const orderSchema = new Schema(
   }
 );
 
+// 기존 인덱스 (회원 주문용)
 orderSchema.index({ user: 1, placedAt: -1 });
+
+// 비회원 주문 조회용 인덱스
+orderSchema.index({ isGuest: 1, orderNumber: 1 });
+orderSchema.index({ isGuest: 1, 'contact.email': 1 });
+orderSchema.index({ isGuest: 1, 'contact.phone': 1 });
+orderSchema.index({ 'guestAuth.accessToken': 1 }, { sparse: true });
 
 module.exports = model('Order', orderSchema);
 

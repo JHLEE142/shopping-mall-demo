@@ -108,6 +108,37 @@ export async function fetchProductById(productId) {
 }
 
 /**
+ * 유사한 상품 추천 (같은 카테고리 + 상품 이름 유사도 고려)
+ * @param {string} productId - 현재 상품 ID
+ * @param {number} limit - 가져올 상품 개수 (기본값: 4)
+ * @returns {Promise<Array>} 추천 상품 목록
+ */
+export async function fetchSimilarProducts(productId, limit = 4) {
+  try {
+    const params = new URLSearchParams({
+      limit: String(limit),
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/products/${productId}/similar?${params.toString()}`, {
+      headers: {
+        ...buildAuthHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      console.error('추천 상품 조회 실패:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error('추천 상품 조회 중 오류:', error);
+    return [];
+  }
+}
+
+/**
  * 엑셀 파일 업로드 및 미리보기
  * @param {File} file - 업로드할 엑셀 파일
  * @returns {Promise<Object>} - 미리보기 데이터

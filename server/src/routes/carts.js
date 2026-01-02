@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const authenticate = require('../middleware/authMiddleware');
+const { optionalAuth } = require('../middleware/authMiddleware');
 const {
   getCart,
   addCartItem,
@@ -10,11 +10,12 @@ const {
 
 const router = Router();
 
-router.get('/', authenticate, getCart);
-router.post('/items', authenticate, addCartItem);
-router.put('/items/:productId', authenticate, updateCartItem);
-router.delete('/items/:productId', authenticate, removeCartItem);
-router.delete('/', authenticate, clearCart);
+// optionalAuth: 토큰이 있으면 사용자 정보 추가, 없어도 통과 (비회원 지원)
+router.get('/', optionalAuth, getCart);
+router.post('/items', optionalAuth, addCartItem);
+router.put('/items/:productId', optionalAuth, updateCartItem);
+router.delete('/items/:productId', optionalAuth, removeCartItem);
+router.delete('/', optionalAuth, clearCart);
 
 module.exports = router;
 

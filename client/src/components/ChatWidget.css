@@ -55,8 +55,8 @@
   position: fixed;
   bottom: 90px;
   right: 2rem;
-  width: 380px;
-  height: 600px;
+  width: 665px; /* 380px * 1.75 = 665px (75% 증가) */
+  height: 800px; /* 1050px * 0.9 = 945px (10% 감소) */
   background: white;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -364,6 +364,18 @@
   background: #fef2f2 !important;
   border-color: #fca5a5 !important;
   color: #991b1b !important;
+}
+
+/* 검색 중 메시지 스타일 */
+.chat-widget__message-content--searching {
+  background: #f0f9ff !important;
+  border-color: #93c5fd !important;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 반응형 */
