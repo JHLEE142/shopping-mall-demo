@@ -1027,7 +1027,7 @@ function ProductDetailPage({
               {/* 판매자 정보 */}
               <div style={{ marginTop: '1rem', padding: '1rem', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
-                  판매자: <span style={{ color: '#111', fontWeight: 600 }}>Caurora</span>
+                  판매자: <span style={{ color: '#111', fontWeight: 600 }}>LMN</span>
                 </p>
               </div>
 

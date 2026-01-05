@@ -3721,7 +3721,7 @@ function AdminDashboard({
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <div className="admin-sidebar__logo">Caurora Admin</div>
+        <div className="admin-sidebar__logo">LMN Admin</div>
         <nav className="admin-sidebar__nav">
           {NAV_ITEMS.map((item) => (
             <button

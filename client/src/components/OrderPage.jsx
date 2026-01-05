@@ -280,7 +280,7 @@ function OrderPage({
     const orderTitle =
       cart.items.length === 1
         ? cart.items[0].product.name
-        : `Caurora 주문 (${cart.items.length}건)`;
+        : `LMN 주문 (${cart.items.length}건)`;
 
     const amount = Number(total || 0);
     const amountToCharge = amount > 0 ? amount : 1;

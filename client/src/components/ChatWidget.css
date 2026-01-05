@@ -55,8 +55,8 @@
   position: fixed;
   bottom: 90px;
   right: 2rem;
-  width: 665px; /* 380px * 1.75 = 665px (75% 증가) */
-  height: 800px; /* 1050px * 0.9 = 945px (10% 감소) */
+  width: 665px; 
+  height: 800px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);

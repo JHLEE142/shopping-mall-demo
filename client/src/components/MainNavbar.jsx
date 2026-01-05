@@ -244,7 +244,7 @@ function MainNavbar({
       <nav className="home-nav">
         <div className="nav-left">
           <button type="button" className="nav-brand nav-brand--button" onClick={handleNavigateHome}>
-            Caurora
+            <span className="nav-brand__text">Caurora</span>
           </button>
         </div>
 

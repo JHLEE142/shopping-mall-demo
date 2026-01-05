@@ -537,6 +537,19 @@ body {
   color: #0f172a;
   text-decoration: none;
   font-family: sans-serif;
+  display: flex;
+  align-items: center;
+}
+
+.nav-brand__logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.nav-brand__text {
+  display: inline;
 }
 
 .nav-brand--button {
@@ -544,6 +557,8 @@ body {
   border: none;
   cursor: pointer;
   padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 .nav-menu {

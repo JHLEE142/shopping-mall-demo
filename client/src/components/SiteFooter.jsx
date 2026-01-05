@@ -14,7 +14,7 @@ const CUSTOMER_SUPPORT = {
 
 const BANK_INFOS = [
   { label: '예금주', value: '커멧랩스' },
-  { label: '하나', value: '455-910458-16907' },
+  { label: '하나', value: '000-000000-00000' },
 ];
 
 const FOOTER_LINKS = ['이용안내', '이용약관', '개인정보취급방침', 'instagram'];
