@@ -505,6 +505,7 @@ function AdminDashboard({
     totalPages: 1,
     totalItems: 0,
   });
+  const [productSearch, setProductSearch] = useState('');
   const [salesOrders, setSalesOrders] = useState([]);
   const [salesStatus, setSalesStatus] = useState('idle');
   const [salesError, setSalesError] = useState('');
@@ -745,17 +746,18 @@ function AdminDashboard({
   }, [orderStatusDistribution]);
 
   const loadProducts = useCallback(
-    async (page = 1) => {
+    async (page = 1, searchQuery = null) => {
       try {
         setProductsStatus('loading');
         setProductsError('');
-        const data = await fetchProducts(page, PRODUCTS_PAGE_SIZE);
+        const search = searchQuery !== null ? searchQuery : productSearch;
+        const data = await fetchProducts(page, PRODUCTS_PAGE_SIZE, null, search || null);
 
         const totalPages = Math.max(data?.totalPages ?? 1, 1);
         const totalItems = data?.totalItems ?? 0;
 
         if (page > totalPages && totalPages > 0) {
-          await loadProducts(totalPages);
+          await loadProducts(totalPages, search);
           return;
         }
 
@@ -770,7 +772,7 @@ function AdminDashboard({
         setDeletingProductId(null);
       }
     },
-    []
+    [productSearch]
   );
 
   useEffect(() => {
@@ -779,6 +781,18 @@ function AdminDashboard({
     }
     loadProducts(1);
   }, [activeNav, loadProducts]);
+
+  // 검색어 변경 시 상품 목록 다시 로드 (debounce 적용)
+  useEffect(() => {
+    if (activeNav !== 'Products') {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      loadProducts(1, productSearch);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [productSearch, activeNav, loadProducts]);
 
   const handleProductPageChange = useCallback(
     (direction) => {
@@ -1034,8 +1048,8 @@ function AdminDashboard({
   }, []);
 
   const reloadCurrentPage = useCallback(() => {
-    loadProducts(productPage);
-  }, [loadProducts, productPage]);
+    loadProducts(productPage, productSearch);
+  }, [loadProducts, productPage, productSearch]);
 
   const handleDeleteProduct = useCallback(
     async (product) => {
@@ -3156,6 +3170,35 @@ function AdminDashboard({
             새 상품 등록
           </button>
         </header>
+        <div className="admin-section" style={{ marginBottom: '1rem' }}>
+          <div className="admin-search">
+            <Search className="admin-search__icon" />
+            <input
+              className="admin-search__input"
+              type="text"
+              placeholder="상품명, SKU로 검색..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+            {productSearch && (
+              <button
+                type="button"
+                onClick={() => setProductSearch('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '0.25rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#6b7280',
+                }}
+              >
+                <X className="admin-icon" style={{ width: '16px', height: '16px' }} />
+              </button>
+            )}
+          </div>
+        </div>
         <div className="admin-card">
           {productsStatus === 'loading' && (
             <div className="admin-loading-state">

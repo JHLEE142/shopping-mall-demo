@@ -5074,7 +5074,7 @@ body {
 }
 
 .admin-table--products-list .admin-table__header {
-  grid-template-columns: 100px 120px minmax(200px, 300px) 120px 100px 120px 120px;
+  grid-template-columns: 60px 120px minmax(150px, 200px) minmax(200px, 1fr) 120px 120px 120px 150px;
 }
 
 .admin-table--compact .admin-table__header {
@@ -5107,7 +5107,7 @@ body {
 }
 
 .admin-table--products-list .admin-table__row {
-  grid-template-columns: 100px 120px minmax(200px, 300px) 120px 100px 120px 120px;
+  grid-template-columns: 60px 120px minmax(150px, 200px) minmax(200px, 1fr) 120px 120px 120px 150px;
 }
 
 /* 상품명 컬럼 최대 너비 제한 및 오버플로우 처리 */

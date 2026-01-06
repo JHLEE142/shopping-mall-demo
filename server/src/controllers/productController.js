@@ -6,6 +6,151 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { calculateStringSimilarity } = require('../utils/phonemeConverter');
 
+// 카테고리별 multiplier 매핑 (카테고리 문자열 포함 매칭)
+function getCategoryMultiplier(categoryPathText) {
+  if (!categoryPathText || typeof categoryPathText !== 'string') {
+    return 2.10; // 기본값
+  }
+
+  const categoryPath = categoryPathText.trim();
+
+  // 1.65 (유입형 A)
+  const multiplier165 = [
+    '주방용품 > 조리도구 > 건지기/망',
+    '생활잡화 > 일회용품 > 비닐봉투/비닐장갑/지퍼백',
+    '생활잡화 > 일회용품 > 물티슈/티슈',
+    '생활잡화 > 일회용품 > 일회용식기',
+    '생활잡화 > 일회용품 > 일회용디스펜서',
+    '생활잡화 > 일회용품 > 일회용컵',
+    '생활잡화 > 일회용품 > 랩/호일',
+    '생활잡화 > 일회용품 > 이쑤시게/면봉/꼬치',
+    '생활잡화 > 일회용품 > 기타용품',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 주방용세제',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 다용도세제',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 세탁용세제'
+  ];
+
+  // 1.75 (주력형 B + 욕실청소 균형형 E)
+  const multiplier175 = [
+    '주방용품 > 조리도구 > 도마',
+    '주방용품 > 조리도구 > 가위/칼/칼갈이',
+    '주방용품 > 조리도구 > 국자/주걱/뒤지게',
+    '주방용품 > 조리도구 > 채칼/강판',
+    '주방용품 > 조리도구 > 절구/다지기',
+    '주방용품 > 조리도구 > 거품기/집게',
+    '주방용품 > 조리도구 > 기타용품',
+    '주방용품 > 조리도구 > 채반/바구니',
+    '주방용품 > 조리기구 > 후라이팬/구이팬',
+    '주방용품 > 조리기구 > 냄비',
+    '주방용품 > 조리기구 > 내열냄비/뚝배기',
+    '주방용품 > 조리기구 > 찜기/곰솥/들통',
+    '주방용품 > 조리기구 > 주전자',
+    '주방용품 > 조리기구 > 기타용품',
+    '주방용품 > 식기/생활자기 > 공기/대접/접시',
+    '주방용품 > 식기/생활자기 > 컵/머그/잔',
+    '주방용품 > 식기/생활자기 > 스푼/티스푼',
+    '주방용품 > 식기/생활자기 > 수저통/케이스/받침',
+    '주방용품 > 식기/생활자기 > 유아식기',
+    '주방용품 > 식기/생활자기 > 보온/보냉제품',
+    '욕실/세탁/청소 > 청소용품 > 행주/걸레',
+    '욕실/세탁/청소 > 청소용품 > 먼지떨이/먼지제거기',
+    '욕실/세탁/청소 > 청소용품 > 마대/밀대/유리닦이',
+    '욕실/세탁/청소 > 청소용품 > 수세미/솔',
+    '욕실/세탁/청소 > 청소용품 > 휴지통/분리수거',
+    '욕실/세탁/청소 > 청소용품 > 빗자루/쓰레받이',
+    '욕실/세탁/청소 > 청소용품 > 기타용품',
+    '욕실/세탁/청소 > 세탁용품 > 빨래집게/빨랫줄',
+    '욕실/세탁/청소 > 세탁용품 > 건조대/바구니/다림판',
+    '욕실/세탁/청소 > 세탁용품 > 기타세탁용품',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 제습제',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 탈취제',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 방향제',
+    '욕실/세탁/청소 > 욕실용품 > 대야/바가지',
+    '욕실/세탁/청소 > 욕실용품 > 수건/타올',
+    '욕실/세탁/청소 > 욕실용품 > 욕실의자/바구니',
+    '욕실/세탁/청소 > 욕실용품 > 욕실정리소품',
+    '욕실/세탁/청소 > 욕실용품 > 변기커버',
+    '욕실/세탁/청소 > 욕실용품 > 욕실화',
+    '욕실/세탁/청소 > 욕실용품 > 때밀이/샤워타올'
+  ];
+
+  // 1.85 (객단가/구성형 C)
+  const multiplier185 = [
+    '주방용품 > 보관/밀폐용기 > 플라스틱용기',
+    '주방용품 > 보관/밀폐용기 > 물통/물병',
+    '주방용품 > 보관/밀폐용기 > 도자기/유리용기',
+    '주방용품 > 보관/밀폐용기 > 양념통/소스통',
+    '주방용품 > 보관/밀폐용기 > 도시락/찬합',
+    '주방용품 > 보관/밀폐용기 > 스텐용기',
+    '주방용품 > 보관/밀폐용기 > 김치통',
+    '주방용품 > 보관/밀폐용기 > 아이스트레이',
+    '주방용품 > 보관/밀폐용기 > 기타보관/밀폐용기',
+    '주방용품 > 주방잡화/소품 > 쟁반/트레이',
+    '주방용품 > 주방잡화/소품 > 냄비받침',
+    '주방용품 > 주방잡화/소품 > 기타주방잡화',
+    '주방용품 > 주방잡화/소품 > 망/커버/뚜껑',
+    '주방용품 > 주방잡화/소품 > 고무장갑/주방장갑',
+    '주방용품 > 주방잡화/소품 > 커피/티',
+    '수납/정리 > 리빙박스/바구니 > 리빙박스',
+    '수납/정리 > 리빙박스/바구니 > 바구니',
+    '수납/정리 > 리빙박스/바구니 > 패브릭정리함',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 커버',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 소품걸이/후크',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 옷걸이/바지걸이',
+    '수납/정리 > 서랍장/수납함 > 기타정리소품',
+    '수납/정리 > 서랍장/수납함 > 데스크정리소품',
+    '수납/정리 > 서랍장/수납함 > 데스크서랍장',
+    '수납/정리 > 서랍장/수납함 > 대형서랍장',
+    '수납/정리 > 선반/진열대 > 다용도선반',
+    '수납/정리 > 선반/진열대 > 주방선반',
+    '수납/정리 > 선반/진열대 > 욕실선반',
+    '수납/정리 > 선반/진열대 > 메탈랙',
+    '인테리어 > 거울/시계/액자 > 액자',
+    '인테리어 > 거울/시계/액자 > 시계',
+    '인테리어 > 거울/시계/액자 > 탁상용거울',
+    '인테리어 > 거울/시계/액자 > 벽걸이/전신거울',
+    '인테리어 > 인테리어소품 > 베개/방석/담요',
+    '인테리어 > 인테리어소품 > 기타소품',
+    '인테리어 > 인테리어소품 > 마블',
+    '인테리어 > 매트/카페트 > 매트/발판',
+    '인테리어 > 매트/카페트 > 카페트',
+    '인테리어 > 커튼/블라인드 > 커튼',
+    '인테리어 > 커튼/블라인드 > 커튼봉/레일/기타부품',
+    '인테리어 > 커튼/블라인드 > 블라인드/롤스크린',
+    '인테리어 > 스티커/시트지/벽지',
+    '인테리어 > 스티커/시트지/벽지 > 데코스티커',
+    '인테리어 > 스티커/시트지/벽지 > 벽지/시트지',
+    '인테리어 > 스티커/시트지/벽지 > 다용도시트지',
+    '여가/건강 > 차량용품 > 세차/관리',
+    '여가/건강 > 차량용품 > 차량용액세서리',
+    '여가/건강 > 차량용품 > 차량용방향제/탈취제',
+    '디지털/가전 > PC/스마트폰 > 스마트폰용품',
+    '디지털/가전 > PC/스마트폰 > PC용품',
+    '디지털/가전 > PC/스마트폰 > 음향기기',
+    '디지털/가전 > PC/스마트폰 > 다용도/기타거치대',
+    '디지털/가전 > 기타용품 > 케이블/랜선',
+    '디지털/가전 > 기타용품 > 공유기/허브/USB',
+    '디지털/가전 > 주방가전 > 홈메이드',
+    '디지털/가전 > 주방가전 > 쿠커/그릴/팬',
+    '디지털/가전 > 생활미용가전 > 이미용',
+    '디지털/가전 > 생활미용가전 > 생활가전'
+  ];
+
+  // 카테고리 경로 문자열 포함 매칭
+  if (multiplier165.some(cat => categoryPath.includes(cat))) {
+    return 1.65;
+  }
+  if (multiplier175.some(cat => categoryPath.includes(cat))) {
+    return 1.75;
+  }
+  if (multiplier185.some(cat => categoryPath.includes(cat))) {
+    return 1.85;
+  }
+
+  // 기본값 2.10 (고마진 D)
+  return 2.10;
+}
+
 // 재고 상태 계산 헬퍼 함수
 function calculateInventoryStatus(inventory) {
   if (!inventory) {
@@ -371,6 +516,10 @@ async function updateProduct(req, res, next) {
     // 다른 필드들도 업데이트 (inventory, discountRate, originalPrice 제외)
     Object.keys(payload).forEach((key) => {
       if (key !== 'inventory' && key !== 'discountRate' && key !== 'originalPrice' && key !== '_id' && key !== '__v') {
+        // image 필드는 빈 문자열이 아닐 때만 업데이트
+        if (key === 'image' && (!payload[key] || payload[key].trim() === '')) {
+          return; // 빈 이미지는 업데이트하지 않음
+        }
         updateQuery[key] = payload[key];
       }
     });
@@ -904,12 +1053,21 @@ async function importExcel(req, res, next) {
         return discountOptions[Math.floor(Math.random() * discountOptions.length)];
       }
 
-      // 가격: 우수회원5 컬럼 값에 * 1.91 적용 후 10원 단위로 절삭
+      // 카테고리 경로 추출 (가격 계산을 위해 먼저 처리)
+      let categoryPathText = null;
+      if (categoryPath && String(categoryPath).trim()) {
+        categoryPathText = String(categoryPath).trim();
+      }
+
+      // 가격: 우수회원5 컬럼 값에 카테고리별 multiplier 적용 후 10원 단위로 절삭
       if (vip5 !== null && vip5 !== undefined && vip5 !== '') {
         const vip5Num = Number(vip5);
         if (!isNaN(vip5Num) && vip5Num >= 0) {
-          // 우수회원5 값에 1.91을 곱한 후 10원 단위로 절삭
-          const calculatedPrice = vip5Num * 1.91;
+          // 카테고리별 multiplier 계산
+          const multiplier = categoryPathText ? getCategoryMultiplier(categoryPathText) : 2.10;
+          
+          // 우수회원5 값에 multiplier를 곱한 후 10원 단위로 절삭
+          const calculatedPrice = vip5Num * multiplier;
           mapped.price = Math.floor(calculatedPrice / 10) * 10;
           
           // 할인율 랜덤 배정
@@ -1062,8 +1220,8 @@ async function commitImport(req, res, next) {
       return res.status(400).json({ message: 'Preview data is required' });
     }
 
-    // 유효한 행만 필터링 (최대 30개)
-    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 30);
+    // 유효한 행만 필터링 (최대 1만개)
+    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 10000);
 
     if (validRows.length === 0) {
       return res.status(400).json({ message: 'No valid rows to import' });
@@ -1089,10 +1247,14 @@ async function commitImport(req, res, next) {
       }
     });
 
-    // DB에 존재하는 SKU 일괄 조회
+    // DB에 존재하는 SKU 일괄 조회 (가격 업데이트를 위해 전체 정보 조회)
     const skusToCheck = Array.from(skuMap.keys());
-    const existingProducts = await Product.find({ sku: { $in: skusToCheck } }).select('sku').lean();
-    const existingSkus = new Set(existingProducts.map(p => p.sku));
+    const existingProductsMap = new Map();
+    const existingProducts = await Product.find({ sku: { $in: skusToCheck } }).lean();
+    existingProducts.forEach(p => {
+      existingProductsMap.set(p.sku.toUpperCase(), p);
+    });
+    const existingSkus = new Set(existingProducts.map(p => p.sku.toUpperCase()));
 
     const results = {
       successCount: 0,
@@ -1131,23 +1293,9 @@ async function commitImport(req, res, next) {
           continue;
         }
 
-        // DB 중복 체크
-        if (existingSkus.has(sku)) {
-          results.failCount++;
-          results.duplicateItems.push({
-            rowIndex: item.rowIndex,
-            sku: sku,
-            name: mapped.name,
-            reason: `SKU already exists in database: ${sku}`,
-          });
-          results.failItems.push({
-            rowIndex: item.rowIndex,
-            sku: sku,
-            name: mapped.name,
-            reason: `SKU already exists in database: ${sku}`,
-          });
-          continue;
-        }
+        // DB에 존재하는 상품인지 체크 (가격 업데이트 처리)
+        const existingProduct = existingProductsMap.get(sku.toUpperCase());
+        const isExistingProduct = !!existingProduct;
 
         // 카테고리 재확인 및 upsert
         let categoryId = mapped.categoryId;
@@ -1205,42 +1353,62 @@ async function commitImport(req, res, next) {
           console.log(`⚠️ [EXCEL COMMIT] Row ${item.rowIndex}: No product URL provided`);
         }
 
-        // 상품 생성
-        const productPayload = {
-          sku: mapped.sku,
-          name: mapped.name,
-          price: mapped.price,
-          originalPrice: mapped.originalPrice || null,
-          discountRate: mapped.discountRate || 0,
-          categoryId: categoryId,
-          categoryPathText: categoryPathText,
-          categoryMain: mapped.category.l1 || null,
-          categoryMid: mapped.category.l2 || null,
-          categorySub: mapped.category.l3 || null,
-          category: mapped.category.l3 || mapped.category.l2 || mapped.category.l1 || '',
-          image: mainImage, // 대표 이미지
-          images: detailImages.slice(0, 4), // 상세 이미지 (최대 4개)
-          description: descriptionHtml, // 상세 설명에 이미지 포함
-          stockManagement: 'track',
-          totalStock: 0,
-          status: 'active', // 판매중으로 설정
-          shipping: {
-            isFree: false,
-            fee: 3000,
-            estimatedDays: 3,
-          },
-          returnPolicy: {
-            isReturnable: true,
-            returnDays: 15,
-            returnFee: 0,
-          },
-        };
-        
-        // 최종 저장 전 로그
-        console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Saving product - SKU: ${mapped.sku}, Description length: ${descriptionHtml.length}, Detail images in description: ${(descriptionHtml.match(/<img/g) || []).length}`);
+        // 기존 상품인 경우 가격 업데이트, 신규 상품인 경우 생성
+        if (isExistingProduct) {
+          // 기존 상품 가격 업데이트
+          const updatePayload = {
+            price: mapped.price,
+            originalPrice: mapped.originalPrice || null,
+            discountRate: mapped.discountRate || 0,
+          };
+          
+          console.log(`💰 [EXCEL COMMIT] Row ${item.rowIndex}: Updating product price - SKU: ${mapped.sku}, Price: ${mapped.price}, OriginalPrice: ${mapped.originalPrice}, DiscountRate: ${mapped.discountRate}`);
+          
+          await Product.findByIdAndUpdate(
+            existingProduct._id,
+            { $set: updatePayload },
+            { new: true, runValidators: true }
+          );
+          
+          results.successCount++;
+        } else {
+          // 신규 상품 생성
+          const productPayload = {
+            sku: mapped.sku,
+            name: mapped.name,
+            price: mapped.price,
+            originalPrice: mapped.originalPrice || null,
+            discountRate: mapped.discountRate || 0,
+            categoryId: categoryId,
+            categoryPathText: categoryPathText,
+            categoryMain: mapped.category.l1 || null,
+            categoryMid: mapped.category.l2 || null,
+            categorySub: mapped.category.l3 || null,
+            category: mapped.category.l3 || mapped.category.l2 || mapped.category.l1 || '',
+            image: mainImage, // 대표 이미지
+            images: detailImages.slice(0, 4), // 상세 이미지 (최대 4개)
+            description: descriptionHtml, // 상세 설명에 이미지 포함
+            stockManagement: 'track',
+            totalStock: 0,
+            status: 'active', // 판매중으로 설정
+            shipping: {
+              isFree: false,
+              fee: 3000,
+              estimatedDays: 3,
+            },
+            returnPolicy: {
+              isReturnable: true,
+              returnDays: 15,
+              returnFee: 0,
+            },
+          };
+          
+          // 최종 저장 전 로그
+          console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Creating product - SKU: ${mapped.sku}, Description length: ${descriptionHtml.length}, Detail images in description: ${(descriptionHtml.match(/<img/g) || []).length}`);
 
-        await Product.create(productPayload);
-        results.successCount++;
+          await Product.create(productPayload);
+          results.successCount++;
+        }
       } catch (error) {
         results.failCount++;
         results.failItems.push({

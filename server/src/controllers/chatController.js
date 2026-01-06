@@ -1,6 +1,8 @@
 const axios = require('axios');
 const { getSystemPrompt } = require('../prompts/assistantPrompt');
 const { hybridSearch } = require('./searchController');
+const { atlasMultiFieldSearch } = require('../utils/atlasSearch');
+const Product = require('../models/product');
 
 /**
  * AI 응답에서 역할/함수 설명 제거
@@ -104,38 +106,107 @@ async function sendChatMessage(req, res) {
     // 상황별 시스템 프롬프트 생성
     const systemPrompt = getSystemPrompt(isLoggedIn, currentView);
 
-    // 사용자 메시지에서 검색 의도 파악
+    // 사용자 메시지에서 검색 키워드 추출 (검색 의도가 있거나 상품명이 추출되면 검색 실행)
     const lastUserMessage = messages[messages.length - 1]?.content || '';
     const searchKeywords = extractSearchKeywords(lastUserMessage);
     
-    // 검색 의도가 있으면 내부 검색 API 호출
+    // 검색 키워드가 있으면 직접 데이터베이스 검색 + hybridSearch 병행
     let searchResults = [];
     if (searchKeywords && searchKeywords.length > 0) {
       try {
         const searchQuery = searchKeywords.join(' ');
-        console.log('[Chat] 내부 검색 실행:', searchQuery);
-        const searchResultsData = await hybridSearch(searchQuery, 10);
-        searchResults = searchResultsData.map(result => ({
-          id: result.product._id.toString(),
-          name: result.product.name,
-          price: result.product.priceSale || result.product.price,
-          image: result.product.image || result.product.gallery?.[0] || '',
-          description: result.product.description || '',
-          score: result.score,
-        }));
-        console.log('[Chat] 검색 결과:', searchResults.length, '개');
+        console.log('[Chat] 내부 검색 실행:', searchQuery, '(키워드:', searchKeywords, ')');
+        
+        // 방법 1: MongoDB Atlas Search (최우선, 가장 빠르고 정확)
+        let atlasSearchResults = [];
+        try {
+          const atlasResultsData = await atlasMultiFieldSearch(searchQuery, 10);
+          atlasSearchResults = atlasResultsData.map(result => ({
+            id: result.product._id.toString(),
+            name: result.product.name,
+            price: result.product.priceSale || result.product.price,
+            image: result.product.image || result.product.gallery?.[0] || '',
+            description: result.product.description || '',
+            score: result.score || 0,
+          }));
+          console.log('[Chat] Atlas Search 결과:', atlasSearchResults.length, '개');
+        } catch (atlasError) {
+          console.warn('[Chat] Atlas Search 실패, 기존 검색 사용:', atlasError.message);
+        }
+        
+        // 방법 2: 직접 MongoDB 검색 (간단하고 확실한 방법)
+        const directSearchResults = await directProductSearch(searchQuery, 10);
+        console.log('[Chat] 직접 DB 검색 결과:', directSearchResults.length, '개');
+        
+        // 방법 3: Hybrid 검색 (더 정교한 검색)
+        let hybridSearchResults = [];
+        try {
+          const searchResultsData = await hybridSearch(searchQuery, 10);
+          hybridSearchResults = searchResultsData.map(result => ({
+            id: result.product._id.toString(),
+            name: result.product.name,
+            price: result.product.priceSale || result.product.price,
+            image: result.product.image || result.product.gallery?.[0] || '',
+            description: result.product.description || '',
+            score: result.score || result.finalScore || 0,
+          }));
+          console.log('[Chat] Hybrid 검색 결과:', hybridSearchResults.length, '개');
+        } catch (hybridError) {
+          console.error('[Chat] Hybrid 검색 오류:', hybridError);
+        }
+        
+        // 세 검색 결과를 합치고 중복 제거 (Atlas Search 우선)
+        const allResults = [...atlasSearchResults, ...directSearchResults, ...hybridSearchResults];
+        const uniqueResults = new Map();
+        
+        allResults.forEach(result => {
+          const id = result.id;
+          if (!uniqueResults.has(id)) {
+            uniqueResults.set(id, result);
+          } else {
+            // 이미 있는 경우 더 높은 점수로 업데이트
+            const existing = uniqueResults.get(id);
+            if (result.score > existing.score) {
+              uniqueResults.set(id, result);
+            }
+          }
+        });
+        
+        searchResults = Array.from(uniqueResults.values())
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 10);
+        
+        console.log('[Chat] 최종 검색 결과:', searchResults.length, '개', searchResults.length > 0 ? `(예: ${searchResults[0].name})` : '');
       } catch (searchError) {
         console.error('[Chat] 검색 오류:', searchError);
       }
     }
 
+    // 검색 결과가 있으면 바로 상품 카드로 반환 (AI 응답 없이)
+    // "찾아보겠습니다" 같은 메시지 없이 바로 결과 표시
+    if (searchResults.length > 0) {
+      const searchQuery = searchKeywords.join(' ');
+      const responseMessage = `검색 결과 ${searchResults.length}개를 찾았습니다. 어떤 제품이 마음에 드세요?`;
+      
+      console.log('[Chat] 검색 결과 즉시 반환:', searchResults.length, '개 상품');
+      
+      return res.json({
+        message: responseMessage,
+        response: responseMessage,
+        productCards: searchResults,
+      });
+    }
+
     // 검색 결과를 시스템 프롬프트에 추가
     let enhancedSystemPrompt = systemPrompt;
-    if (searchResults.length > 0) {
-      enhancedSystemPrompt += `\n\n## 현재 검색 결과 (내부 검색 API에서 가져온 상품들):\n${JSON.stringify(searchResults, null, 2)}\n\n**중요**: 검색 결과가 이미 제공되었으므로 "잠시만 기다려 주세요", "검색 중입니다", "찾는 중입니다" 같은 대기 메시지를 절대 사용하지 마세요. 바로 검색 결과를 바탕으로 추천 설명과 함께 **PRODUCT_CARDS** 형식으로 응답하세요.`;
-    } else if (searchKeywords && searchKeywords.length > 0) {
-      // 검색 의도가 있지만 결과가 없는 경우
-      enhancedSystemPrompt += `\n\n**중요**: 검색을 수행했지만 결과가 없습니다. "잠시만 기다려 주세요" 같은 메시지 없이 바로 결과가 없다는 것을 알려주고, 다른 검색어를 제안하세요.`;
+    if (searchKeywords && searchKeywords.length > 0) {
+      if (searchResults.length === 0) {
+        // 검색 의도가 있지만 결과가 없는 경우
+        enhancedSystemPrompt += `\n\n**중요**: 검색을 수행했지만 결과가 없습니다. "잠시만 기다려 주세요" 같은 메시지 없이 바로 결과가 없다는 것을 알려주고, 다른 검색어를 제안하세요.`;
+      } else {
+        // 검색 결과가 있는 경우 (이미 위에서 반환됨, 여기 도달하지 않음)
+        enhancedSystemPrompt += `\n\n**중요**: 검색 결과가 있습니다. 사용자에게 검색 결과를 보여주고 어떤 제품이 마음에 드는지 물어보세요.`;
+      }
     }
 
     // OpenAI API 호출
@@ -215,45 +286,366 @@ async function sendChatMessage(req, res) {
 }
 
 /**
+ * 직접 MongoDB에서 상품 검색 (간단하고 확실한 방법)
+ */
+async function directProductSearch(query, limit = 10) {
+  try {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length === 0) {
+      return [];
+    }
+
+    const allResults = new Map();
+    const searchRegex = new RegExp(trimmedQuery, 'i');
+
+    // 방법 1: 전체 검색어로 검색 (가장 우선, 높은 점수)
+    try {
+      const products1 = await Product.find({
+        $or: [
+          { name: searchRegex },
+          { description: searchRegex },
+        ]
+      })
+      .limit(limit * 2)
+      .lean();
+
+      products1.forEach(product => {
+        const id = product._id.toString();
+        if (!allResults.has(id)) {
+          allResults.set(id, {
+            id: id,
+            name: product.name,
+            price: product.priceSale || product.price,
+            image: product.image || product.gallery?.[0] || '',
+            description: product.description || '',
+            score: 1.0, // 전체 매칭은 최고 점수
+          });
+        }
+      });
+      console.log('[Chat] 전체 검색어 매칭:', products1.length, '개');
+    } catch (error1) {
+      console.error('[Chat] 전체 검색어 검색 오류:', error1);
+    }
+
+    // 방법 2: 단어별 검색 (검색어를 공백으로 분리하여 각 단어로 검색)
+    const words = trimmedQuery.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 1) {
+      try {
+        // 각 단어가 포함된 상품 찾기
+        const wordQueries = words.map(word => ({
+          $or: [
+            { name: { $regex: word, $options: 'i' } },
+            { description: { $regex: word, $options: 'i' } },
+          ]
+        }));
+
+        const products2 = await Product.find({
+          $and: wordQueries // 모든 단어가 포함된 상품
+        })
+        .limit(limit * 2)
+        .lean();
+
+        products2.forEach(product => {
+          const id = product._id.toString();
+          if (!allResults.has(id)) {
+            allResults.set(id, {
+              id: id,
+              name: product.name,
+              price: product.priceSale || product.price,
+              image: product.image || product.gallery?.[0] || '',
+              description: product.description || '',
+              score: 0.9, // 단어별 매칭은 높은 점수
+            });
+          } else {
+            // 이미 있는 경우 점수 업데이트 (더 높은 점수로)
+            const existing = allResults.get(id);
+            if (0.9 > existing.score) {
+              existing.score = 0.9;
+            }
+          }
+        });
+        console.log('[Chat] 단어별 검색 매칭:', products2.length, '개');
+      } catch (error2) {
+        console.error('[Chat] 단어별 검색 오류:', error2);
+      }
+    }
+
+    // 방법 3: 부분 매칭 (검색어의 일부만 포함되어도 찾기)
+    if (allResults.size < limit && trimmedQuery.length >= 2) {
+      try {
+        // 검색어의 첫 2글자 이상으로 검색
+        const partialQuery = trimmedQuery.substring(0, Math.max(2, trimmedQuery.length - 1));
+        const partialRegex = new RegExp(partialQuery, 'i');
+        
+        const mongoose = require('mongoose');
+        const excludeIds = Array.from(allResults.keys()).map(id => {
+          try {
+            return new mongoose.Types.ObjectId(id);
+          } catch (e) {
+            return null;
+          }
+        }).filter(id => id !== null);
+        
+        const products3 = await Product.find({
+          $or: [
+            { name: partialRegex },
+            { description: partialRegex },
+          ],
+          ...(excludeIds.length > 0 ? { _id: { $nin: excludeIds } } : {})
+        })
+        .limit(limit - allResults.size)
+        .lean();
+
+        products3.forEach(product => {
+          const id = product._id.toString();
+          if (!allResults.has(id)) {
+            allResults.set(id, {
+              id: id,
+              name: product.name,
+              price: product.priceSale || product.price,
+              image: product.image || product.gallery?.[0] || '',
+              description: product.description || '',
+              score: 0.7, // 부분 매칭은 중간 점수
+            });
+          }
+        });
+        console.log('[Chat] 부분 매칭 검색:', products3.length, '개');
+      } catch (error3) {
+        console.error('[Chat] 부분 매칭 검색 오류:', error3);
+      }
+    }
+
+    // 점수 순으로 정렬하고 limit만큼 반환
+    const results = Array.from(allResults.values())
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, limit);
+
+    console.log('[Chat] 직접 DB 검색 최종 결과:', results.length, '개');
+    return results;
+  } catch (error) {
+    console.error('[Chat] 직접 DB 검색 오류:', error);
+    return [];
+  }
+}
+
+/**
+ * 한국어 조사 및 동사 어미 제거 (명사만 추출)
+ * @param {string} text - 처리할 텍스트
+ * @returns {string} - 조사와 어미가 제거된 텍스트
+ */
+function removeKoreanParticlesAndEndings(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+
+  let cleaned = text.trim();
+
+  // 동사 어미 패턴 제거 (찾고, 찾아, 찾아줘 등)
+  const verbEndingPatterns = [
+    /\s*(?:찾고|찾아|찾아줘|찾아봐|찾아주세요|찾아봐줘|찾아서)\s*/g,
+    /\s*(?:보고|보아|보아줘|보아봐|보아주세요)\s*/g,
+    /\s*(?:알고|알아|알아줘|알아봐|알아주세요)\s*/g,
+    /\s*(?:하고|하여|해줘|해봐|해주세요|해서)\s*/g,
+  ];
+
+  verbEndingPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, ' ');
+  });
+
+  // 단어별로 처리 (조사는 단어 끝에만 붙음)
+  const words = cleaned.split(/\s+/);
+  const cleanedWords = words.map(word => {
+    if (!word || word.length < 2) {
+      return word;
+    }
+
+    // 한국어 조사 (단어 끝에 붙는 조사만 제거)
+    // 받침이 있는 경우: 은, 을, 의, 에서, 와, 과, 로
+    // 받침이 없는 경우: 는, 를, 에, 에서, 와, 과, 도, 로
+    const koreanParticles = [
+      /은$/, /는$/, /이$/, /가$/, /을$/, /를$/, /의$/, 
+      /에$/, /에서$/, /와$/, /과$/, /도$/, /로$/, /으로$/,
+    ];
+
+    let cleanedWord = word;
+    koreanParticles.forEach(particle => {
+      cleanedWord = cleanedWord.replace(particle, '');
+    });
+
+    return cleanedWord;
+  }).filter(word => word && word.length > 0);
+
+  // 공백 정리
+  cleaned = cleanedWords.join(' ').replace(/\s+/g, ' ').trim();
+
+  return cleaned;
+}
+
+/**
  * 사용자 메시지에서 검색 키워드 추출
+ * 검색 의도가 있거나 상품명이 추출되면 검색 실행
+ * 조사와 동사 어미를 제거하고 명사만 추출
  */
 function extractSearchKeywords(message) {
   if (!message || typeof message !== 'string') {
     return [];
   }
 
-  const lowerMessage = message.toLowerCase();
-  
-  // 검색 의도 키워드
-  const searchKeywords = [
-    '검색', '찾아', '추천', '보여줘', '보여', '알려줘', '알려',
-    'search', 'find', 'recommend', 'show', 'tell',
-  ];
-
-  // 검색 의도가 있는지 확인
-  const hasSearchIntent = searchKeywords.some(keyword => lowerMessage.includes(keyword));
-  
-  if (!hasSearchIntent) {
+  const trimmedMessage = message.trim();
+  if (trimmedMessage.length === 0) {
     return [];
   }
 
-  // 상품명 추출 (한글, 영문, 숫자 조합)
-  const productNamePatterns = [
-    /(?:검색|찾아|추천|보여줘|보여|알려줘|알려|search|find|recommend|show|tell)[\s:]*([가-힣a-zA-Z0-9\s]+)/i,
-    /([가-힣a-zA-Z0-9\s]{2,})/,
+  const lowerMessage = trimmedMessage.toLowerCase();
+  
+  // 검색 의도 키워드 (제거할 키워드)
+  const searchIntentKeywords = [
+    '검색', '찾아', '찾아줘', '찾아주세요', '찾아봐', '찾아봐줘',
+    '추천', '추천해줘', '추천해주세요',
+    '보여줘', '보여주세요', '보여', '보여봐', '보여봐줘',
+    '알려줘', '알려주세요', '알려', '알려봐', '알려봐줘',
+    '있어', '있나', '있을까', '있을까요', '있어요', '있나요',
+    'search', 'find', 'recommend', 'show', 'tell', 'have', 'got',
   ];
 
-  for (const pattern of productNamePatterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) {
-      const keywords = match[1].trim().split(/\s+/).filter(k => k.length > 0);
-      if (keywords.length > 0) {
-        return keywords;
+  // 제거할 불필요한 단어들
+  const stopWords = [
+    '해줘', '해주세요', '해봐', '해봐줘', '주세요', '줘', '봐', '봐줘',
+    '있어', '있나', '있을까', '있을까요', '있어요', '있나요',
+    '어떤', '어떤거', '어떤것', '어떤게', '어떤게', '어떤거야',
+    '찾고', '찾아', '찾아줘', '찾아봐', '찾아주세요',
+    '보고', '보아', '보아줘', '보아봐',
+    '알고', '알아', '알아줘', '알아봐',
+    'please', 'please', 'can you', 'could you',
+  ];
+
+  // 1. 검색 의도가 있는지 확인
+  const hasSearchIntent = searchIntentKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  // 2. 상품명 추출 시도
+  let extractedKeywords = [];
+
+  // 방법 1: 검색 의도 키워드 앞/뒤의 텍스트 추출
+  if (hasSearchIntent) {
+    // 패턴 1: [상품명] + [검색의도키워드] (예: "프라이팬 찾아줘")
+    const beforePattern = /([가-힣a-zA-Z0-9\s]{2,})\s*(?:검색|찾아|찾아줘|찾아주세요|찾아봐|찾아봐줘|추천|추천해줘|추천해주세요|보여줘|보여주세요|보여|보여봐|보여봐줘|알려줘|알려주세요|알려|알려봐|알려봐줘)/i;
+    const beforeMatch = trimmedMessage.match(beforePattern);
+    if (beforeMatch && beforeMatch[1]) {
+      let productName = beforeMatch[1].trim();
+      // 조사와 동사 어미 제거
+      productName = removeKoreanParticlesAndEndings(productName);
+      // 불필요한 단어 제거
+      stopWords.forEach(stopWord => {
+        const regex = new RegExp(`\\b${stopWord}\\b`, 'gi');
+        productName = productName.replace(regex, '').trim();
+      });
+      if (productName.length >= 2) {
+        extractedKeywords = productName.split(/\s+/).filter(k => k.length >= 2);
+        if (extractedKeywords.length > 0) {
+          console.log('[Chat] 방법1-앞 패턴 매칭:', extractedKeywords);
+        }
+      }
+    }
+
+    // 패턴 2: [검색의도키워드] + [상품명] (예: "찾아줘 프라이팬")
+    if (extractedKeywords.length === 0) {
+      const afterPattern = /(?:검색|찾아|찾아줘|찾아주세요|찾아봐|찾아봐줘|추천|추천해줘|추천해주세요|보여줘|보여주세요|보여|보여봐|보여봐줘|알려줘|알려주세요|알려|알려봐|알려봐줘|있어|있나|있을까|있을까요|있어요|있나요)[\s:]*([가-힣a-zA-Z0-9\s]{2,})/i;
+      const afterMatch = trimmedMessage.match(afterPattern);
+      if (afterMatch && afterMatch[1]) {
+        let productName = afterMatch[1].trim();
+        // 조사와 동사 어미 제거
+        productName = removeKoreanParticlesAndEndings(productName);
+        // 불필요한 단어 제거
+        stopWords.forEach(stopWord => {
+          const regex = new RegExp(`\\b${stopWord}\\b`, 'gi');
+          productName = productName.replace(regex, '').trim();
+        });
+        if (productName.length >= 2) {
+          extractedKeywords = productName.split(/\s+/).filter(k => k.length >= 2);
+          if (extractedKeywords.length > 0) {
+            console.log('[Chat] 방법1-뒤 패턴 매칭:', extractedKeywords);
+          }
+        }
+      }
+    }
+
+    // 패턴 3: 영어 검색 의도 키워드
+    if (extractedKeywords.length === 0) {
+      const englishPattern = /(?:search|find|recommend|show|tell|have|got)[\s:]*([가-힣a-zA-Z0-9\s]{2,})/i;
+      const englishMatch = trimmedMessage.match(englishPattern);
+      if (englishMatch && englishMatch[1]) {
+        let productName = englishMatch[1].trim();
+        productName = removeKoreanParticlesAndEndings(productName);
+        stopWords.forEach(stopWord => {
+          const regex = new RegExp(`\\b${stopWord}\\b`, 'gi');
+          productName = productName.replace(regex, '').trim();
+        });
+        if (productName.length >= 2) {
+          extractedKeywords = productName.split(/\s+/).filter(k => k.length >= 2);
+          if (extractedKeywords.length > 0) {
+            console.log('[Chat] 방법1-영어 패턴 매칭:', extractedKeywords);
+          }
+        }
       }
     }
   }
 
-  return [];
+  // 방법 2: 검색 의도가 없어도 상품명으로 보이는 텍스트 추출 (2글자 이상)
+  if (extractedKeywords.length === 0) {
+    // 한글, 영문, 숫자 조합으로 2글자 이상인 단어 추출
+    const productNamePattern = /([가-힣a-zA-Z0-9]{2,})/g;
+    const matches = trimmedMessage.match(productNamePattern);
+    if (matches && matches.length > 0) {
+      // 불필요한 단어 필터링 및 조사 제거
+      extractedKeywords = matches
+        .map(word => removeKoreanParticlesAndEndings(word))
+        .filter(word => {
+          const lowerWord = word.toLowerCase();
+          return word.length >= 2 && 
+                 !stopWords.some(stopWord => lowerWord.includes(stopWord)) &&
+                 !searchIntentKeywords.some(intent => lowerWord.includes(intent));
+        })
+        .slice(0, 5); // 최대 5개 단어만
+    }
+  }
+
+  // 방법 3: 질문 형태에서 상품명 추출 ("프라이팬 있을까?" -> "프라이팬", "냄비는?" -> "냄비")
+  if (extractedKeywords.length === 0) {
+    const questionPattern = /([가-힣a-zA-Z0-9]{2,})\s*(?:있어|있나|있을까|있을까요|있어요|있나요|\?|있니|있어요|은|는|이|가|을|를)/i;
+    const match = trimmedMessage.match(questionPattern);
+    if (match && match[1]) {
+      let keyword = match[1].trim();
+      // 조사와 동사 어미 제거
+      keyword = removeKoreanParticlesAndEndings(keyword);
+      if (keyword.length >= 2) {
+        extractedKeywords = [keyword];
+      }
+    }
+  }
+
+  // 최종 키워드 정리 (조사와 어미 제거, 불필요한 단어 필터링)
+  if (extractedKeywords.length > 0) {
+    extractedKeywords = extractedKeywords
+      .map(k => {
+        // 조사와 동사 어미 제거
+        let cleaned = removeKoreanParticlesAndEndings(k.trim());
+        // 불필요한 단어 제거
+        stopWords.forEach(stopWord => {
+          const regex = new RegExp(`\\b${stopWord}\\b`, 'gi');
+          cleaned = cleaned.replace(regex, '').trim();
+        });
+        return cleaned;
+      })
+      .filter(k => {
+        const lowerK = k.toLowerCase();
+        return k.length >= 2 && 
+               !stopWords.some(sw => lowerK.includes(sw)) &&
+               !searchIntentKeywords.some(si => lowerK === si || lowerK.includes(si));
+      });
+  }
+
+  console.log('[Chat] 추출된 키워드:', extractedKeywords);
+  return extractedKeywords;
 }
 
 module.exports = {

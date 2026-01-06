@@ -45,26 +45,5 @@ export async function sendChatMessage(messages, isLoggedIn = false, currentView 
   }
 }
 
-/**
- * OpenAI API 키 설정
- * @param {string} apiKey - OpenAI API 키
- */
-export function setOpenAIApiKey(apiKey) {
-  localStorage.setItem('openai_api_key', apiKey);
-}
-
-/**
- * 저장된 OpenAI API 키 가져오기
- * @returns {string|null} API 키 또는 null
- */
-export function getOpenAIApiKey() {
-  return localStorage.getItem('openai_api_key');
-}
-
-/**
- * 저장된 OpenAI API 키 삭제
- */
-export function clearOpenAIApiKey() {
-  localStorage.removeItem('openai_api_key');
-}
+// API 키는 서버에서 관리하므로 클라이언트 함수는 제거됨
 

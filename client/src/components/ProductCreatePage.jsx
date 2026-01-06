@@ -8,6 +8,151 @@ import './ProductCreatePage.css';
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
+// 카테고리별 multiplier 매핑 (카테고리 문자열 포함 매칭)
+function getCategoryMultiplier(categoryPathText) {
+  if (!categoryPathText || typeof categoryPathText !== 'string') {
+    return 2.10; // 기본값
+  }
+
+  const categoryPath = categoryPathText.trim();
+
+  // 1.65 (유입형 A)
+  const multiplier165 = [
+    '주방용품 > 조리도구 > 건지기/망',
+    '생활잡화 > 일회용품 > 비닐봉투/비닐장갑/지퍼백',
+    '생활잡화 > 일회용품 > 물티슈/티슈',
+    '생활잡화 > 일회용품 > 일회용식기',
+    '생활잡화 > 일회용품 > 일회용디스펜서',
+    '생활잡화 > 일회용품 > 일회용컵',
+    '생활잡화 > 일회용품 > 랩/호일',
+    '생활잡화 > 일회용품 > 이쑤시게/면봉/꼬치',
+    '생활잡화 > 일회용품 > 기타용품',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 주방용세제',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 다용도세제',
+    '욕실/세탁/청소 > 세제/섬유유연제 > 세탁용세제'
+  ];
+
+  // 1.75 (주력형 B + 욕실청소 균형형 E)
+  const multiplier175 = [
+    '주방용품 > 조리도구 > 도마',
+    '주방용품 > 조리도구 > 가위/칼/칼갈이',
+    '주방용품 > 조리도구 > 국자/주걱/뒤지게',
+    '주방용품 > 조리도구 > 채칼/강판',
+    '주방용품 > 조리도구 > 절구/다지기',
+    '주방용품 > 조리도구 > 거품기/집게',
+    '주방용품 > 조리도구 > 기타용품',
+    '주방용품 > 조리도구 > 채반/바구니',
+    '주방용품 > 조리기구 > 후라이팬/구이팬',
+    '주방용품 > 조리기구 > 냄비',
+    '주방용품 > 조리기구 > 내열냄비/뚝배기',
+    '주방용품 > 조리기구 > 찜기/곰솥/들통',
+    '주방용품 > 조리기구 > 주전자',
+    '주방용품 > 조리기구 > 기타용품',
+    '주방용품 > 식기/생활자기 > 공기/대접/접시',
+    '주방용품 > 식기/생활자기 > 컵/머그/잔',
+    '주방용품 > 식기/생활자기 > 스푼/티스푼',
+    '주방용품 > 식기/생활자기 > 수저통/케이스/받침',
+    '주방용품 > 식기/생활자기 > 유아식기',
+    '주방용품 > 식기/생활자기 > 보온/보냉제품',
+    '욕실/세탁/청소 > 청소용품 > 행주/걸레',
+    '욕실/세탁/청소 > 청소용품 > 먼지떨이/먼지제거기',
+    '욕실/세탁/청소 > 청소용품 > 마대/밀대/유리닦이',
+    '욕실/세탁/청소 > 청소용품 > 수세미/솔',
+    '욕실/세탁/청소 > 청소용품 > 휴지통/분리수거',
+    '욕실/세탁/청소 > 청소용품 > 빗자루/쓰레받이',
+    '욕실/세탁/청소 > 청소용품 > 기타용품',
+    '욕실/세탁/청소 > 세탁용품 > 빨래집게/빨랫줄',
+    '욕실/세탁/청소 > 세탁용품 > 건조대/바구니/다림판',
+    '욕실/세탁/청소 > 세탁용품 > 기타세탁용품',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 제습제',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 탈취제',
+    '욕실/세탁/청소 > 제습/방향/탈취 > 방향제',
+    '욕실/세탁/청소 > 욕실용품 > 대야/바가지',
+    '욕실/세탁/청소 > 욕실용품 > 수건/타올',
+    '욕실/세탁/청소 > 욕실용품 > 욕실의자/바구니',
+    '욕실/세탁/청소 > 욕실용품 > 욕실정리소품',
+    '욕실/세탁/청소 > 욕실용품 > 변기커버',
+    '욕실/세탁/청소 > 욕실용품 > 욕실화',
+    '욕실/세탁/청소 > 욕실용품 > 때밀이/샤워타올'
+  ];
+
+  // 1.85 (객단가/구성형 C)
+  const multiplier185 = [
+    '주방용품 > 보관/밀폐용기 > 플라스틱용기',
+    '주방용품 > 보관/밀폐용기 > 물통/물병',
+    '주방용품 > 보관/밀폐용기 > 도자기/유리용기',
+    '주방용품 > 보관/밀폐용기 > 양념통/소스통',
+    '주방용품 > 보관/밀폐용기 > 도시락/찬합',
+    '주방용품 > 보관/밀폐용기 > 스텐용기',
+    '주방용품 > 보관/밀폐용기 > 김치통',
+    '주방용품 > 보관/밀폐용기 > 아이스트레이',
+    '주방용품 > 보관/밀폐용기 > 기타보관/밀폐용기',
+    '주방용품 > 주방잡화/소품 > 쟁반/트레이',
+    '주방용품 > 주방잡화/소품 > 냄비받침',
+    '주방용품 > 주방잡화/소품 > 기타주방잡화',
+    '주방용품 > 주방잡화/소품 > 망/커버/뚜껑',
+    '주방용품 > 주방잡화/소품 > 고무장갑/주방장갑',
+    '주방용품 > 주방잡화/소품 > 커피/티',
+    '수납/정리 > 리빙박스/바구니 > 리빙박스',
+    '수납/정리 > 리빙박스/바구니 > 바구니',
+    '수납/정리 > 리빙박스/바구니 > 패브릭정리함',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 커버',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 소품걸이/후크',
+    '수납/정리 > 소품걸이/옷걸이/커버 > 옷걸이/바지걸이',
+    '수납/정리 > 서랍장/수납함 > 기타정리소품',
+    '수납/정리 > 서랍장/수납함 > 데스크정리소품',
+    '수납/정리 > 서랍장/수납함 > 데스크서랍장',
+    '수납/정리 > 서랍장/수납함 > 대형서랍장',
+    '수납/정리 > 선반/진열대 > 다용도선반',
+    '수납/정리 > 선반/진열대 > 주방선반',
+    '수납/정리 > 선반/진열대 > 욕실선반',
+    '수납/정리 > 선반/진열대 > 메탈랙',
+    '인테리어 > 거울/시계/액자 > 액자',
+    '인테리어 > 거울/시계/액자 > 시계',
+    '인테리어 > 거울/시계/액자 > 탁상용거울',
+    '인테리어 > 거울/시계/액자 > 벽걸이/전신거울',
+    '인테리어 > 인테리어소품 > 베개/방석/담요',
+    '인테리어 > 인테리어소품 > 기타소품',
+    '인테리어 > 인테리어소품 > 마블',
+    '인테리어 > 매트/카페트 > 매트/발판',
+    '인테리어 > 매트/카페트 > 카페트',
+    '인테리어 > 커튼/블라인드 > 커튼',
+    '인테리어 > 커튼/블라인드 > 커튼봉/레일/기타부품',
+    '인테리어 > 커튼/블라인드 > 블라인드/롤스크린',
+    '인테리어 > 스티커/시트지/벽지',
+    '인테리어 > 스티커/시트지/벽지 > 데코스티커',
+    '인테리어 > 스티커/시트지/벽지 > 벽지/시트지',
+    '인테리어 > 스티커/시트지/벽지 > 다용도시트지',
+    '여가/건강 > 차량용품 > 세차/관리',
+    '여가/건강 > 차량용품 > 차량용액세서리',
+    '여가/건강 > 차량용품 > 차량용방향제/탈취제',
+    '디지털/가전 > PC/스마트폰 > 스마트폰용품',
+    '디지털/가전 > PC/스마트폰 > PC용품',
+    '디지털/가전 > PC/스마트폰 > 음향기기',
+    '디지털/가전 > PC/스마트폰 > 다용도/기타거치대',
+    '디지털/가전 > 기타용품 > 케이블/랜선',
+    '디지털/가전 > 기타용품 > 공유기/허브/USB',
+    '디지털/가전 > 주방가전 > 홈메이드',
+    '디지털/가전 > 주방가전 > 쿠커/그릴/팬',
+    '디지털/가전 > 생활미용가전 > 이미용',
+    '디지털/가전 > 생활미용가전 > 생활가전'
+  ];
+
+  // 카테고리 경로 문자열 포함 매칭
+  if (multiplier165.some(cat => categoryPath.includes(cat))) {
+    return 1.65;
+  }
+  if (multiplier175.some(cat => categoryPath.includes(cat))) {
+    return 1.75;
+  }
+  if (multiplier185.some(cat => categoryPath.includes(cat))) {
+    return 1.85;
+  }
+
+  // 기본값 2.10 (고마진 D)
+  return 2.10;
+}
+
 const EMPTY_FORM = {
   name: '',
   sku: '',
@@ -251,8 +396,39 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           [field]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) || 0 : value,
         },
       }));
+    } else if (name === 'price') {
+      // 판매가 변경 시 할인율과 원래 가격 계산
+      const price = value === '' ? '' : parseFloat(value);
+      setFormData((prev) => {
+        let discountRate = prev.discountRate;
+        let originalPrice = prev.originalPrice;
+        
+        if (price !== '' && !isNaN(price) && price > 0) {
+          const priceNum = price;
+          const originalPriceNum = prev.originalPrice ? parseFloat(prev.originalPrice) : null;
+          const discountRateNum = prev.discountRate ? parseFloat(prev.discountRate) : 0;
+          
+          // 원래 가격이 있고 할인율이 없으면 할인율 계산
+          if (originalPriceNum && originalPriceNum > priceNum && discountRateNum === 0) {
+            const calculatedDiscountRate = ((originalPriceNum - priceNum) / originalPriceNum) * 100;
+            discountRate = Math.max(0, Math.min(100, Math.round(calculatedDiscountRate * 10) / 10));
+          }
+          // 할인율이 있으면 원래 가격 계산
+          else if (discountRateNum > 0 && discountRateNum <= 100) {
+            const calculatedOriginalPrice = priceNum / (1 - discountRateNum / 100);
+            originalPrice = Math.floor(calculatedOriginalPrice / 100) * 100; // 100원 단위로 절삭
+          }
+        }
+        
+        return {
+          ...prev,
+          price: value,
+          discountRate: discountRate === '' ? '' : discountRate.toString(),
+          originalPrice: originalPrice === '' ? '' : originalPrice.toString(),
+        };
+      });
     } else if (name === 'discountRate') {
-      // 할인율 입력 시 원래 가격 역산
+      // 할인율 변경 시 원래 가격 계산
       const discountRate = value === '' ? '' : parseFloat(value);
       setFormData((prev) => {
         let originalPrice = prev.originalPrice;
@@ -268,6 +444,29 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           ...prev,
           discountRate: value,
           originalPrice: originalPrice === '' ? '' : originalPrice.toString(),
+        };
+      });
+    } else if (name === 'originalPrice') {
+      // 원래 가격 변경 시 할인율 계산
+      const originalPrice = value === '' ? '' : parseFloat(value);
+      setFormData((prev) => {
+        let discountRate = prev.discountRate;
+        if (prev.price && originalPrice !== '' && !isNaN(originalPrice) && originalPrice > 0) {
+          const price = parseFloat(prev.price);
+          const originalPriceNum = originalPrice;
+          if (!isNaN(price) && price > 0 && originalPriceNum > price) {
+            // 할인율 = (원래 가격 - 현재 가격) / 원래 가격 * 100
+            const calculatedDiscountRate = ((originalPriceNum - price) / originalPriceNum) * 100;
+            discountRate = Math.max(0, Math.min(100, Math.round(calculatedDiscountRate * 10) / 10));
+          } else if (originalPriceNum <= price) {
+            // 원래 가격이 현재 가격보다 작거나 같으면 할인율 0
+            discountRate = 0;
+          }
+        }
+        return {
+          ...prev,
+          originalPrice: value,
+          discountRate: discountRate === '' ? '' : discountRate.toString(),
         };
       });
     } else {
@@ -746,13 +945,13 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       const headers = data[0] || [];
       const allRows = data.slice(1);
       
-      // 최대 100개 행만 처리 (먼저 slice하여 효율성 향상)
-      const maxRowsToProcess = 100;
+      // 최대 1만개 행만 처리 (먼저 slice하여 효율성 향상)
+      const maxRowsToProcess = 10000;
       const rows = allRows.slice(0, maxRowsToProcess);
       
       console.log(`[Excel Upload] Total rows in file: ${allRows.length}, Processing: ${rows.length} rows`);
       
-      // 컬럼명으로 매핑된 객체 배열로 변환 (100개만)
+      // 컬럼명으로 매핑된 객체 배열로 변환 (1만개만)
       const mappedData = rows.map(row => {
         const obj = {};
         headers.forEach((header, index) => {
@@ -763,7 +962,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         return obj;
       });
       
-      const maxRows = mappedData.length; // 이미 100개로 제한됨
+      const maxRows = mappedData.length; // 이미 1만개로 제한됨
       console.log(`[Excel Upload] File parsed: ${maxRows} rows found`);
       
       // 컬럼 찾기 헬퍼
@@ -847,11 +1046,21 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           return discountOptions[Math.floor(Math.random() * discountOptions.length)];
         }
         
-        // 가격 계산: 1.91 곱한 후 10원 단위로 절삭
+        // 카테고리 경로 추출 (가격 계산을 위해 먼저 처리)
+        let categoryPathText = null;
+        if (categoryPath && String(categoryPath).trim()) {
+          categoryPathText = String(categoryPath).trim();
+        }
+        
+        // 가격 계산: 카테고리별 multiplier 적용 후 10원 단위로 절삭
         if (vip5 !== null && vip5 !== undefined && vip5 !== '') {
           const vip5Num = Number(vip5);
           if (!isNaN(vip5Num) && vip5Num >= 0) {
-            const calculatedPrice = vip5Num * 1.91;
+            // 카테고리별 multiplier 계산
+            const multiplier = categoryPathText ? getCategoryMultiplier(categoryPathText) : 2.10;
+            
+            // 우수회원5 값에 multiplier를 곱한 후 10원 단위로 절삭
+            const calculatedPrice = vip5Num * multiplier;
             mapped.price = Math.floor(calculatedPrice / 10) * 10;
             
             // 할인율 랜덤 배정
@@ -871,9 +1080,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         }
         
         // 카테고리 처리
-        if (categoryPath && String(categoryPath).trim()) {
-          const categoryPathStr = String(categoryPath).trim();
-          const parts = categoryPathStr.split('>').map(p => p.trim()).filter(p => p);
+        if (categoryPathText) {
+          const parts = categoryPathText.split('>').map(p => p.trim()).filter(p => p);
           mapped.category.l1 = parts[0] || null;
           mapped.category.l2 = parts[1] || null;
           mapped.category.l3 = parts[2] || null;

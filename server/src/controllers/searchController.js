@@ -3,6 +3,7 @@ const Category = require('../models/category');
 const { convertToPhoneme, convertEnglishToPhoneme, isKorean, calculateStringSimilarity } = require('../utils/phonemeConverter');
 const { getEmbedding, cosineSimilarity } = require('../utils/embeddingService');
 const { get: cacheGet, set: cacheSet, getSearchCacheKey, getEmbeddingCacheKey, getPhonemeCacheKey } = require('../utils/cacheService');
+const { atlasSearch, atlasMultiFieldSearch } = require('../utils/atlasSearch');
 
 /**
  * 카테고리 검색 (최우선)
@@ -90,7 +91,7 @@ async function exactTextSearch(query, limit = 20) {
 }
 
 /**
- * Hybrid 검색: Exact Text + Phoneme + Embedding
+ * Hybrid 검색: Atlas Search (최우선) + Exact Text + Phoneme + Embedding
  * @param {string} searchQuery - 검색 쿼리
  * @param {number} limit - 반환할 결과 수
  * @param {number} phonemeWeight - Phoneme 검색 가중치 (0-1)
@@ -104,21 +105,68 @@ async function hybridSearch(searchQuery, limit = 20, phonemeWeight = 0.3, embedd
 
   const query = searchQuery.trim();
   
-  // 1. 카테고리 검색 (최우선)
+  // 0. MongoDB Atlas Search (최우선, 가장 빠르고 정확)
+  let atlasResults = [];
+  try {
+    atlasResults = await atlasMultiFieldSearch(query, limit);
+    console.log('Atlas Search 결과:', { query, count: atlasResults.length });
+    
+    // Atlas Search 결과가 충분하면 그것만 반환
+    if (atlasResults.length >= limit) {
+      return atlasResults.slice(0, limit).map(r => ({ ...r, finalScore: r.score }));
+    }
+  } catch (atlasError) {
+    console.warn('Atlas Search 실패, 기존 검색 방법 사용:', atlasError.message);
+  }
+  
+  // 1. 카테고리 검색
   const categoryResults = await categorySearch(query, limit);
   
-  // 카테고리 매칭이 있으면 그것만 반환
+  // 카테고리 매칭이 있으면 Atlas 결과와 합치기
   if (categoryResults.length > 0) {
-    console.log('카테고리 검색 결과 반환:', { query, count: categoryResults.length });
-    return categoryResults.slice(0, limit).map(r => ({ ...r, finalScore: r.score }));
+    console.log('카테고리 검색 결과:', { query, count: categoryResults.length });
+    // Atlas 결과와 카테고리 결과 합치기
+    const combined = [...atlasResults, ...categoryResults];
+    const uniqueMap = new Map();
+    combined.forEach(r => {
+      const id = r.product._id.toString();
+      if (!uniqueMap.has(id)) {
+        uniqueMap.set(id, r);
+      } else {
+        const existing = uniqueMap.get(id);
+        if (r.score > existing.score) {
+          uniqueMap.set(id, r);
+        }
+      }
+    });
+    return Array.from(uniqueMap.values())
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, limit)
+      .map(r => ({ ...r, finalScore: r.score }));
   }
   
   // 2. 정확한 텍스트 매칭 검색
   const exactResults = await exactTextSearch(query, limit);
   
-  // 정확한 매칭이 충분하면 그것만 반환
+  // 정확한 매칭이 충분하면 Atlas 결과와 합치기
   if (exactResults.length >= limit) {
-    return exactResults.slice(0, limit).map(r => ({ ...r, finalScore: r.score }));
+    const combined = [...atlasResults, ...exactResults];
+    const uniqueMap = new Map();
+    combined.forEach(r => {
+      const id = r.product._id.toString();
+      if (!uniqueMap.has(id)) {
+        uniqueMap.set(id, r);
+      } else {
+        const existing = uniqueMap.get(id);
+        if (r.score > existing.score) {
+          uniqueMap.set(id, r);
+        }
+      }
+    });
+    return Array.from(uniqueMap.values())
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, limit)
+      .map(r => ({ ...r, finalScore: r.score }));
   }
   
   // 3. Phoneme 기반 검색
@@ -127,10 +175,16 @@ async function hybridSearch(searchQuery, limit = 20, phonemeWeight = 0.3, embedd
   // 4. Embedding 기반 검색
   const embeddingResults = await embeddingSearch(query, limit * 2);
   
-  // 5. 결과 통합 및 가중치 적용
-  const combinedResults = combineResults(exactResults, phonemeResults, embeddingResults, phonemeWeight, embeddingWeight);
+  // 5. 결과 통합 및 가중치 적용 (Atlas 결과 포함)
+  const combinedResults = combineResults(
+    [...atlasResults, ...exactResults], 
+    phonemeResults, 
+    embeddingResults, 
+    phonemeWeight, 
+    embeddingWeight
+  );
   
-  // 5. 상위 N개 반환
+  // 6. 상위 N개 반환
   return combinedResults.slice(0, limit);
 }
 

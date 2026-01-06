@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { MessageCircle, X, Send, Minimize2, Maximize2, Settings } from 'lucide-react';
-import { sendChatMessage, getOpenAIApiKey, setOpenAIApiKey } from '../services/chatService';
+import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart } from 'lucide-react';
+import { sendChatMessage } from '../services/chatService';
 import './ChatWidget.css';
 
 function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home', onViewProduct = null, onAddToCart = null }) {
@@ -11,20 +11,14 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showApiKeySettings, setShowApiKeySettings] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [apiKeyError, setApiKeyError] = useState('');
   const [addingToCart, setAddingToCart] = useState(null);
   
   // 로그인 상태에 따라 초기 메시지 설정
   const initialMessage = useMemo(() => {
-    const hasApiKey = !!getOpenAIApiKey();
-    const apiKeyNotice = !hasApiKey ? '\n\n💡 OpenAI API 키를 설정해야 AI 쇼핑 비서를 사용할 수 있습니다. 설정 버튼(⚙️)을 클릭하여 API 키를 입력해주세요.' : '';
-    
     if (isLoggedIn) {
       return {
         id: 1,
-        text: `안녕하세요! AI 쇼핑 비서입니다. 어떤 상품을 찾고 계신가요?${apiKeyNotice}`,
+        text: `안녕하세요! AI 쇼핑 비서입니다. 어떤 상품을 찾고 계신가요?`,
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -41,7 +35,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
       // 로그인/회원가입 페이지 등: 로그인 도우미
       return {
         id: 1,
-        text: `안녕하세요! 로그인/회원가입 도우미입니다. 로그인이나 회원가입에 대해 궁금한 점이 있으시면 언제든지 물어보세요!${apiKeyNotice}`,
+        text: `안녕하세요! 로그인/회원가입 도우미입니다. 로그인이나 회원가입에 대해 궁금한 점이 있으시면 언제든지 물어보세요!`,
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -72,15 +66,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     }
   }, [isLoggedIn, initialMessage, isHomePage]);
 
-  // 컴포넌트 마운트 시 저장된 API 키 확인
-  useEffect(() => {
-    const storedApiKey = getOpenAIApiKey();
-    if (storedApiKey) {
-      setApiKeyInput(storedApiKey);
-    }
-  }, []);
-
-  // API 키 관련 useEffect 제거 (서버 .env 사용)
+  // API 키는 서버에서 관리하므로 클라이언트에서 제거됨
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -222,6 +208,9 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
       const productCards = response.productCards || null;
       
       setMessages((prev) => {
+        // 검색 중 메시지 제거 (검색 결과가 도착했으므로)
+        const filteredPrev = prev.filter(msg => !msg.isSearching);
+        
         // TOOL_CALL 파싱 및 실행
         const toolCallPatterns = [
           /\*\*TOOL_CALL\*\*:\s*(\w+)\s*\(([^)]*)\)/i,
@@ -277,13 +266,13 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
         }
         
         const botMessage = {
-          id: prev.length + 1,
+          id: filteredPrev.length + 1,
           text: botResponse,
           sender: 'bot',
           timestamp: new Date(),
           productCards: productCards, // 상품 카드 데이터
         };
-        const newMessages = [...prev, botMessage];
+        const newMessages = [...filteredPrev, botMessage];
         
         // 사용자 메시지에서 장바구니 추가 의도 파악
         if (isLoggedIn && currentInput && productCards && productCards.length > 0) {
@@ -462,27 +451,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     }
   };
 
-  const handleSaveApiKey = () => {
-    if (!apiKeyInput.trim()) {
-      setApiKeyError('API 키를 입력해주세요.');
-      return;
-    }
-
-    setOpenAIApiKey(apiKeyInput.trim());
-    setApiKeyError('');
-    setShowApiKeySettings(false);
-    
-    // 성공 메시지 표시
-    setMessages((prev) => {
-      const successMessage = {
-        id: prev.length + 1,
-        text: '✅ API 키가 저장되었습니다. 이제 AI 쇼핑 비서를 사용하실 수 있습니다!',
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      return [...prev, successMessage];
-    });
-  };
+  // handleSaveApiKey 함수는 서버에서 API 키를 관리하므로 제거됨
 
   const handleToggle = () => {
     if (isOpen && isMinimized) {
@@ -599,55 +568,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
 
           {!isMinimized && (
             <>
-              {/* API 키 설정 UI */}
-              {showApiKeySettings && (
-                <div className="chat-widget__api-key-settings">
-                  <div className="chat-widget__api-key-header">
-                    <h4>OpenAI API 키 설정</h4>
-                    <button
-                      className="chat-widget__action-button"
-                      onClick={() => {
-                        setShowApiKeySettings(false);
-                        setApiKeyError('');
-                      }}
-                      aria-label="닫기"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <div className="chat-widget__api-key-content">
-                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                      OpenAI API 키를 입력하세요. API 키는 로컬에 저장되며, OpenAI에서 발급받을 수 있습니다.
-                    </p>
-                    <input
-                      type="password"
-                      className="chat-widget__api-key-input"
-                      placeholder="sk-..."
-                      value={apiKeyInput}
-                      onChange={(e) => {
-                        setApiKeyInput(e.target.value);
-                        setApiKeyError('');
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveApiKey();
-                        }
-                      }}
-                    />
-                    {apiKeyError && (
-                      <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.5rem' }}>
-                        {apiKeyError}
-                      </p>
-                    )}
-                    <button
-                      className="chat-widget__api-key-save-button"
-                      onClick={handleSaveApiKey}
-                    >
-                      저장
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* API 키 설정 UI는 서버에서 관리하므로 제거됨 */}
 
               <div className="chat-widget__messages">
                 {messages.map((message) => (
