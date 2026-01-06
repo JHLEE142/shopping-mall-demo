@@ -3,6 +3,9 @@ const Cart = require('../models/cart');
 const { Coupon, UserCoupon } = require('../models/coupon');
 const User = require('../models/user');
 const PointHistory = require('../models/point');
+const Product = require('../models/product');
+const InventoryHistory = require('../models/inventoryHistory');
+const mongoose = require('mongoose');
 const crypto = require('crypto');
 
 const PORTONE_API_BASE_URL = 'https://api.iamport.kr';
@@ -89,6 +92,33 @@ async function verifyPortOnePayment(impUid, expectedAmount) {
   }
 
   return paymentInfo;
+}
+
+// 포트원 결제 취소 함수
+async function cancelPortOnePayment(impUid, amount, reason = '') {
+  const accessToken = await getPortOneAccessToken();
+  
+  const response = await fetch(`${PORTONE_API_BASE_URL}/payments/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      imp_uid: impUid,
+      amount: amount,
+      reason: reason || '고객 요청에 의한 환불',
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || data?.code !== 0) {
+    const message = data?.message || '결제 취소에 실패했습니다.';
+    throw createHttpError(400, message);
+  }
+
+  return data.response;
 }
 
 // 적립금 계산 함수: 결제 금액의 1%를 원 단위로 절삭
@@ -188,14 +218,15 @@ async function generateUniqueOrderNumber() {
   return uniqueNumber;
 }
 
-function computeOrderTotals(items = [], summaryOverrides = {}, couponDiscount = 0) {
+function computeOrderTotals(items = [], summaryOverrides = {}, couponDiscount = 0, pointsDiscount = 0) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const discountTotal = items.reduce((sum, item) => sum + item.lineDiscount, 0);
   const shippingFee = Number(summaryOverrides.shippingFee ?? 0);
   const tax = Number(summaryOverrides.tax ?? 0);
   const couponDiscountAmount = Number(couponDiscount ?? 0);
+  const pointsDiscountAmount = Number(pointsDiscount ?? 0);
   const grandTotal =
-    Number(summaryOverrides.grandTotal ?? subtotal - discountTotal - couponDiscountAmount + shippingFee + tax);
+    Number(summaryOverrides.grandTotal ?? subtotal - discountTotal - couponDiscountAmount - pointsDiscountAmount + shippingFee + tax);
 
   return {
     currency: (summaryOverrides.currency || 'KRW').toUpperCase(),
@@ -204,6 +235,7 @@ function computeOrderTotals(items = [], summaryOverrides = {}, couponDiscount = 
     shippingFee,
     tax,
     couponDiscount: couponDiscountAmount,
+    pointsDiscount: pointsDiscountAmount,
     grandTotal: Math.max(0, grandTotal), // 최소 0원
   };
 }
@@ -274,6 +306,7 @@ async function createOrder(req, res, next) {
       orderNumber: providedOrderNumber,
       paymentVerification = {},
       coupon: couponData = null,
+      pointsUsed = 0, // 포인트 사용 금액
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -378,6 +411,37 @@ async function createOrder(req, res, next) {
       userCouponId = userCoupon._id;
     }
 
+    // 포인트 사용 처리
+    let pointsDiscount = 0;
+    let pointsUsedAmount = Number(pointsUsed) || 0;
+    if (pointsUsedAmount > 0) {
+      if (!req.user) {
+        return res.status(401).json({ message: '포인트 사용을 위해 로그인이 필요합니다.' });
+      }
+
+      const userId = req.user._id || req.user.id;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+      }
+
+      const availablePoints = user.points || 0;
+      if (availablePoints < pointsUsedAmount) {
+        return res.status(400).json({ 
+          message: `보유 포인트가 부족합니다. (보유: ${availablePoints}원, 사용 요청: ${pointsUsedAmount}원)` 
+        });
+      }
+
+      // 주문 총액 계산 (쿠폰 할인 전)
+      const subtotal = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      const shippingFee = Number(summary.shippingFee ?? 0);
+      const orderTotal = subtotal + shippingFee;
+
+      // 포인트는 주문 총액을 초과할 수 없음
+      pointsUsedAmount = Math.min(pointsUsedAmount, orderTotal);
+      pointsDiscount = pointsUsedAmount;
+    }
+
     // 무료배송 쿠폰 처리
     let finalShippingFee = Number(summary.shippingFee ?? 0);
     if (couponInfo) {
@@ -387,7 +451,7 @@ async function createOrder(req, res, next) {
       }
     }
     
-    const computedSummary = computeOrderTotals(normalizedItems, { ...summary, shippingFee: finalShippingFee }, couponDiscount);
+    const computedSummary = computeOrderTotals(normalizedItems, { ...summary, shippingFee: finalShippingFee }, couponDiscount, pointsDiscount);
 
     if (payment?.transactionId) {
       const duplicateOrder = await Order.findOne({
@@ -419,80 +483,205 @@ async function createOrder(req, res, next) {
       }
     }
 
-    const orderNumber = providedOrderNumber || (await generateUniqueOrderNumber());
+    // 재고 확인 및 차감 (트랜잭션 사용)
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // 비회원 주문인 경우 accessToken 생성
-    let guestAuth = undefined;
-    if (!req.user) {
-      const accessToken = crypto.randomBytes(32).toString('hex');
-      const tokenExpiresAt = new Date();
-      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30일 유효
-      
-      guestAuth = {
-        accessToken,
-        tokenExpiresAt,
-        passwordHash: '', // 필요시 추가
-      };
-    }
+    try {
+      // 재고 확인 및 차감
+      const inventoryUpdates = [];
+      for (const item of normalizedItems) {
+        const product = await Product.findById(item.product).session(session);
+        if (!product) {
+          await session.abortTransaction();
+          return res.status(400).json({ message: `상품을 찾을 수 없습니다: ${item.name}` });
+        }
 
-    const orderPayload = {
-      orderNumber,
-      user: req.user ? req.user._id : undefined,
-      isGuest: !req.user,
-      guestName: normalizeString(guestName),
-      guestEmail: normalizeString(guestEmail).toLowerCase(),
-      guestAuth: guestAuth,
-      contact: {
-        phone: normalizeString(contact.phone),
-        email: normalizeString(contact.email).toLowerCase(),
-      },
-      status: 'pending',
-      items: normalizedItems,
-      summary: computedSummary,
-      coupon: couponInfo || undefined,
-      payment: {
-        method: normalizeString(payment.method),
-        status: verifiedPaymentInfo ? 'paid' : normalizeString(payment.status || 'ready'),
-        amount: Number(payment.amount ?? computedSummary.grandTotal),
-        currency: (payment.currency || computedSummary.currency).toUpperCase(),
-        transactionId: normalizeString(
-          verifiedPaymentInfo?.imp_uid || payment.transactionId
-        ),
-        receiptUrl:
-          normalizeString(payment.receiptUrl) || normalizeString(verifiedPaymentInfo?.receipt_url),
-        paidAt: verifiedPaymentInfo?.paid_at
-          ? new Date(verifiedPaymentInfo.paid_at * 1000)
-          : payment.paidAt
-            ? new Date(payment.paidAt)
-            : undefined,
-      },
-      shipping: {
-        address: {
-          name: normalizeString(shipping.address.name),
-          phone: normalizeString(shipping.address.phone),
-          postalCode: normalizeString(shipping.address.postalCode),
-          address1: normalizeString(shipping.address.address1),
-          address2: normalizeString(shipping.address.address2),
-        },
-        request: normalizeString(shipping.request),
-        carrier: normalizeString(shipping.carrier),
-        trackingNumber: normalizeString(shipping.trackingNumber),
-        dispatchedAt: shipping.dispatchedAt ? new Date(shipping.dispatchedAt) : undefined,
-        deliveredAt: shipping.deliveredAt ? new Date(shipping.deliveredAt) : undefined,
-      },
-      sourceCart,
-      notes: normalizeString(notes),
-      audit: [
-        {
-          status: 'pending',
-          message: '주문 생성',
+        const currentStock = product.inventory?.stock || 0;
+        const currentReserved = product.inventory?.reserved || 0;
+        const availableStock = currentStock - currentReserved;
+
+        if (availableStock < item.quantity) {
+          await session.abortTransaction();
+          return res.status(400).json({ 
+            message: `재고가 부족합니다: ${item.name} (재고: ${availableStock}개, 주문: ${item.quantity}개)` 
+          });
+        }
+
+        // 재고 차감
+        const newReserved = currentReserved + item.quantity;
+        const newStock = currentStock; // stock은 그대로, reserved만 증가
+
+        await Product.findByIdAndUpdate(
+          item.product,
+          {
+            $inc: { 'inventory.reserved': item.quantity },
+            'inventory.updatedAt': new Date(),
+          },
+          { session }
+        );
+
+        // 재고 이력 기록
+        await InventoryHistory.create([{
+          product: item.product,
+          type: 'deduct',
+          quantity: item.quantity,
+          previousStock: currentStock,
+          newStock: newStock,
+          previousReserved: currentReserved,
+          newReserved: newReserved,
+          reason: `주문 생성: ${item.name}`,
           actor: req.user ? req.user._id : undefined,
-        },
-      ],
-      placedAt: new Date(),
-    };
+        }], { session });
 
-    const order = await Order.create(orderPayload);
+        inventoryUpdates.push({
+          productId: item.product,
+          productName: item.name,
+          quantity: item.quantity,
+        });
+      }
+
+      const orderNumber = providedOrderNumber || (await generateUniqueOrderNumber());
+
+      // 비회원 주문인 경우 accessToken 생성
+      let guestAuth = undefined;
+      if (!req.user) {
+        const accessToken = crypto.randomBytes(32).toString('hex');
+        const tokenExpiresAt = new Date();
+        tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30일 유효
+        
+        guestAuth = {
+          accessToken,
+          tokenExpiresAt,
+          passwordHash: '', // 필요시 추가
+        };
+      }
+
+      const paymentStatus = verifiedPaymentInfo ? 'paid' : normalizeString(payment.status || 'ready');
+      const orderStatus = paymentStatus === 'paid' ? 'paid' : 'pending';
+
+      const orderPayload = {
+        orderNumber,
+        user: req.user ? req.user._id : undefined,
+        isGuest: !req.user,
+        guestName: normalizeString(guestName),
+        guestEmail: normalizeString(guestEmail).toLowerCase(),
+        guestAuth: guestAuth,
+        contact: {
+          phone: normalizeString(contact.phone),
+          email: normalizeString(contact.email).toLowerCase(),
+        },
+        status: orderStatus,
+        items: normalizedItems,
+        summary: computedSummary,
+        coupon: couponInfo || undefined,
+        payment: {
+          method: normalizeString(payment.method),
+          status: paymentStatus,
+          amount: Number(payment.amount ?? computedSummary.grandTotal),
+          currency: (payment.currency || computedSummary.currency).toUpperCase(),
+          transactionId: normalizeString(
+            verifiedPaymentInfo?.imp_uid || payment.transactionId
+          ),
+          receiptUrl:
+            normalizeString(payment.receiptUrl) || normalizeString(verifiedPaymentInfo?.receipt_url),
+          paidAt: verifiedPaymentInfo?.paid_at
+            ? new Date(verifiedPaymentInfo.paid_at * 1000)
+            : payment.paidAt
+              ? new Date(payment.paidAt)
+              : undefined,
+        },
+        shipping: {
+          address: {
+            name: normalizeString(shipping.address.name),
+            phone: normalizeString(shipping.address.phone),
+            postalCode: normalizeString(shipping.address.postalCode),
+            address1: normalizeString(shipping.address.address1),
+            address2: normalizeString(shipping.address.address2),
+          },
+          request: normalizeString(shipping.request),
+          carrier: normalizeString(shipping.carrier),
+          trackingNumber: normalizeString(shipping.trackingNumber),
+          dispatchedAt: shipping.dispatchedAt ? new Date(shipping.dispatchedAt) : undefined,
+          deliveredAt: shipping.deliveredAt ? new Date(shipping.deliveredAt) : undefined,
+        },
+        sourceCart,
+        notes: normalizeString(notes),
+        audit: [
+          {
+            status: orderStatus,
+            message: '주문 생성',
+            actor: req.user ? req.user._id : undefined,
+          },
+        ],
+        placedAt: new Date(),
+      };
+
+      const order = await Order.create([orderPayload], { session });
+      const createdOrder = order[0];
+
+      // 쿠폰 사용 처리
+      if (userCouponId) {
+        await UserCoupon.findByIdAndUpdate(userCouponId, {
+          isUsed: true,
+          usedAt: new Date(),
+          orderId: createdOrder._id,
+        }, { session });
+
+        // 쿠폰 사용 횟수 증가
+        if (couponInfo && couponInfo.couponId) {
+          await Coupon.findByIdAndUpdate(couponInfo.couponId, {
+            $inc: { usedCount: 1 },
+          }, { session });
+        }
+      }
+
+      // 포인트 사용 처리
+      if (pointsUsedAmount > 0 && createdOrder.user) {
+        const user = await User.findById(createdOrder.user).session(session);
+        if (user) {
+          const currentPoints = user.points || 0;
+          const newBalance = currentPoints - pointsUsedAmount;
+
+          user.points = newBalance;
+          await user.save({ session });
+
+          // 포인트 사용 내역 저장
+          await PointHistory.create([{
+            user: createdOrder.user,
+            type: 'use',
+            amount: -pointsUsedAmount,
+            balance: newBalance,
+            description: `주문 결제 사용 (주문번호: ${createdOrder.orderNumber})`,
+            relatedOrder: createdOrder._id,
+          }], { session });
+        }
+      }
+
+      // 트랜잭션 커밋
+      await session.commitTransaction();
+
+      // 재고 이력에 주문 ID 업데이트
+      for (const update of inventoryUpdates) {
+        await InventoryHistory.updateMany(
+          { product: update.productId, order: null },
+          { $set: { order: createdOrder._id } }
+        );
+      }
+
+      // 결제 완료된 경우 적립금 적립 (트랜잭션 외부에서 처리)
+      if (createdOrder.payment?.status === 'paid' && createdOrder.user) {
+        await earnOrderRewardPoints(createdOrder);
+      }
+
+      const populatedOrder = await Order.findById(createdOrder._id).populate('user', 'name email user_type');
+      return res.status(201).json(populatedOrder);
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
 
     // 쿠폰 사용 처리
     if (userCouponId) {
@@ -665,9 +854,13 @@ async function updateOrder(req, res, next) {
     const auditEntries = [];
 
     if (status && status !== order.status) {
+      const previousStatus = order.status;
       order.status = status;
+      
       if (status === 'cancelled') {
         order.cancelledAt = new Date();
+        // 주문 취소 시 재고 복구 (트랜잭션 없이 처리 - 이미 취소된 주문이므로)
+        // 실제 재고 복구는 cancelOrder 함수에서 처리됨
       }
 
       auditEntries.push({
@@ -692,6 +885,11 @@ async function updateOrder(req, res, next) {
     }
 
     if (shipping) {
+      const previousTrackingNumber = order.shipping?.trackingNumber;
+      const newTrackingNumber = shipping.trackingNumber;
+      const previousDispatchedAt = order.shipping?.dispatchedAt;
+      const newDispatchedAt = shipping.dispatchedAt;
+
       order.set('shipping', {
         ...normalizeSubdocument(order.shipping),
         ...shipping,
@@ -700,6 +898,31 @@ async function updateOrder(req, res, next) {
           ...shipping.address,
         },
       });
+
+      // 배송 추적 번호가 새로 입력되거나 배송 시작 시간이 설정되면 fulfilled 상태로 변경
+      if ((newTrackingNumber && newTrackingNumber !== previousTrackingNumber) || 
+          (newDispatchedAt && !previousDispatchedAt)) {
+        if (order.status === 'paid' || order.status === 'pending') {
+          order.status = 'fulfilled';
+          auditEntries.push({
+            status: 'fulfilled',
+            message: '배송 시작',
+            actor: req.user ? req.user._id : undefined,
+          });
+        }
+      }
+
+      // 배송 완료 시간이 설정되면 상태 확인 (이미 fulfilled일 수 있음)
+      if (shipping.deliveredAt && !order.shipping?.deliveredAt) {
+        if (order.status !== 'fulfilled') {
+          order.status = 'fulfilled';
+          auditEntries.push({
+            status: 'fulfilled',
+            message: '배송 완료',
+            actor: req.user ? req.user._id : undefined,
+          });
+        }
+      }
     }
 
     if (summary) {
@@ -737,20 +960,65 @@ async function updateOrder(req, res, next) {
 }
 
 async function cancelOrder(req, res, next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).session(session);
 
     if (!order) {
+      await session.abortTransaction();
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
 
     if (!canAccessOrder(req.user, order)) {
+      await session.abortTransaction();
       return res.status(403).json({ message: '이 주문을 취소할 권한이 없습니다.' });
     }
 
     if (order.status === 'cancelled') {
+      await session.abortTransaction();
       const populated = await order.populate('user', 'name email user_type');
       return res.json(populated);
+    }
+
+    // 취소 불가능한 상태 확인
+    if (order.status === 'refunded') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: '이미 환불된 주문은 취소할 수 없습니다.' });
+    }
+
+    // 재고 복구
+    for (const item of order.items) {
+      const product = await Product.findById(item.product).session(session);
+      if (product && product.inventory) {
+        const currentStock = product.inventory.stock || 0;
+        const currentReserved = product.inventory.reserved || 0;
+        const newReserved = Math.max(0, currentReserved - item.quantity);
+
+        await Product.findByIdAndUpdate(
+          item.product,
+          {
+            $inc: { 'inventory.reserved': -item.quantity },
+            'inventory.updatedAt': new Date(),
+          },
+          { session }
+        );
+
+        // 재고 이력 기록
+        await InventoryHistory.create([{
+          product: item.product,
+          order: order._id,
+          type: 'restore',
+          quantity: item.quantity,
+          previousStock: currentStock,
+          newStock: currentStock,
+          previousReserved: currentReserved,
+          newReserved: newReserved,
+          reason: `주문 취소: ${item.name}`,
+          actor: req.user ? req.user._id : undefined,
+        }], { session });
+      }
     }
 
     order.status = 'cancelled';
@@ -770,12 +1038,18 @@ async function cancelOrder(req, res, next) {
       actor: req.user ? req.user._id : undefined,
     });
 
-    await order.save();
+    await order.save({ session });
 
-    const populatedOrder = await order.populate('user', 'name email user_type');
+    // 트랜잭션 커밋
+    await session.commitTransaction();
+
+    const populatedOrder = await Order.findById(order._id).populate('user', 'name email user_type');
     return res.json(populatedOrder);
   } catch (error) {
+    await session.abortTransaction();
     return next(error);
+  } finally {
+    session.endSession();
   }
 }
 
@@ -786,6 +1060,7 @@ module.exports = {
   updateOrder,
   cancelOrder,
   lookupGuestOrder,
+  cancelPortOnePayment, // 환불 처리를 위해 export
 };
 
 

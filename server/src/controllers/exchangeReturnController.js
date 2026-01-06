@@ -1,5 +1,9 @@
 const ExchangeReturn = require('../models/exchangeReturn');
 const Order = require('../models/order');
+const Product = require('../models/product');
+const InventoryHistory = require('../models/inventoryHistory');
+const mongoose = require('mongoose');
+const { cancelPortOnePayment } = require('./orderController');
 
 const REASON_LABELS = {
   'not-satisfied': '상품이 마음에 들지 않음',
@@ -185,47 +189,165 @@ async function getExchangeReturnById(req, res, next) {
 }
 
 async function updateExchangeReturnStatus(req, res, next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { id } = req.params;
     const { status, rejectedReason, notes } = req.body;
 
     const isAdmin = req.user && req.user.user_type === 'admin';
     if (!isAdmin) {
+      await session.abortTransaction();
       return res.status(403).json({ message: '관리자 권한이 필요합니다.' });
     }
 
     if (!status) {
+      await session.abortTransaction();
       return res.status(400).json({ message: '상태가 필요합니다.' });
     }
 
-    const updateData = { status };
-    if (status === 'rejected' && rejectedReason) {
-      updateData.rejectedReason = rejectedReason;
-    }
-    if (status === 'completed') {
-      updateData.completedAt = new Date();
-    }
-    if (status === 'processing') {
-      updateData.processedAt = new Date();
-    }
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
-
-    const exchangeReturn = await ExchangeReturn.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    })
+    const exchangeReturn = await ExchangeReturn.findById(id).session(session)
       .populate('order')
       .populate('user', 'name email');
 
     if (!exchangeReturn) {
+      await session.abortTransaction();
       return res.status(404).json({ message: '교환/반품 신청을 찾을 수 없습니다.' });
     }
 
-    res.json(sanitizeExchangeReturn(exchangeReturn));
+    const previousStatus = exchangeReturn.status;
+    exchangeReturn.status = status;
+
+    if (status === 'rejected' && rejectedReason) {
+      exchangeReturn.rejectedReason = rejectedReason;
+    }
+    if (status === 'completed') {
+      exchangeReturn.completedAt = new Date();
+    }
+    if (status === 'processing') {
+      exchangeReturn.processedAt = new Date();
+    }
+    if (notes !== undefined) {
+      exchangeReturn.notes = notes;
+    }
+
+    // 승인 완료 시 자동 처리
+    if (status === 'completed' && previousStatus !== 'completed') {
+      const order = exchangeReturn.order;
+
+      // 반품/환불인 경우
+      if (exchangeReturn.solution === 'return-refund') {
+        // 실제 환불 처리 (포트원 API)
+        if (order.payment?.transactionId && order.payment?.status === 'paid') {
+          try {
+            const refundAmount = exchangeReturn.refundAmount || order.payment.amount;
+            await cancelPortOnePayment(
+              order.payment.transactionId,
+              refundAmount,
+              `교환/반품 환불: ${exchangeReturn.reasonLabel}`
+            );
+          } catch (refundError) {
+            console.error('환불 처리 오류:', refundError);
+            // 환불 실패해도 상태는 업데이트 (수동 처리 필요)
+          }
+        }
+
+        // 주문 상태를 refunded로 변경
+        if (order.status !== 'refunded') {
+          order.status = 'refunded';
+          order.audit.push({
+            status: 'refunded',
+            message: `교환/반품 완료: ${exchangeReturn.reasonLabel}`,
+            actor: req.user ? req.user._id : undefined,
+          });
+          await order.save({ session });
+        }
+
+        // 재고 복구
+        for (const item of exchangeReturn.items) {
+          const product = await Product.findById(item.product).session(session);
+          if (product && product.inventory) {
+            const currentStock = product.inventory.stock || 0;
+            const currentReserved = product.inventory.reserved || 0;
+            const newReserved = Math.max(0, currentReserved - item.quantity);
+
+            await Product.findByIdAndUpdate(
+              item.product,
+              {
+                $inc: { 'inventory.reserved': -item.quantity },
+                'inventory.updatedAt': new Date(),
+              },
+              { session }
+            );
+
+            // 재고 이력 기록
+            await InventoryHistory.create([{
+              product: item.product,
+              order: order._id,
+              type: 'restore',
+              quantity: item.quantity,
+              previousStock: currentStock,
+              newStock: currentStock,
+              previousReserved: currentReserved,
+              newReserved: newReserved,
+              reason: `반품 완료: ${item.name}`,
+              actor: req.user ? req.user._id : undefined,
+            }], { session });
+          }
+        }
+      }
+
+      // 교환인 경우 (새 주문 생성은 나중에 구현)
+      if (exchangeReturn.solution === 'exchange') {
+        // 교환 상품 발송을 위한 새 주문 생성 로직은 추후 구현
+        // 현재는 재고만 복구
+        for (const item of exchangeReturn.items) {
+          const product = await Product.findById(item.product).session(session);
+          if (product && product.inventory) {
+            const currentStock = product.inventory.stock || 0;
+            const currentReserved = product.inventory.reserved || 0;
+            const newReserved = Math.max(0, currentReserved - item.quantity);
+
+            await Product.findByIdAndUpdate(
+              item.product,
+              {
+                $inc: { 'inventory.reserved': -item.quantity },
+                'inventory.updatedAt': new Date(),
+              },
+              { session }
+            );
+
+            await InventoryHistory.create([{
+              product: item.product,
+              order: order._id,
+              type: 'restore',
+              quantity: item.quantity,
+              previousStock: currentStock,
+              newStock: currentStock,
+              previousReserved: currentReserved,
+              newReserved: newReserved,
+              reason: `교환 완료 (기존 상품 반품): ${item.name}`,
+              actor: req.user ? req.user._id : undefined,
+            }], { session });
+          }
+        }
+      }
+    }
+
+    await exchangeReturn.save({ session });
+    await session.commitTransaction();
+
+    const populatedExchangeReturn = await ExchangeReturn.findById(exchangeReturn._id)
+      .populate('order')
+      .populate('user', 'name email');
+
+    res.json(sanitizeExchangeReturn(populatedExchangeReturn));
   } catch (error) {
+    await session.abortTransaction();
     next(error);
+  } finally {
+    session.endSession();
   }
 }
 

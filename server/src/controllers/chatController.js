@@ -3,6 +3,10 @@ const { getSystemPrompt } = require('../prompts/assistantPrompt');
 const { hybridSearch } = require('./searchController');
 const { atlasMultiFieldSearch } = require('../utils/atlasSearch');
 const Product = require('../models/product');
+const Conversation = require('../models/conversation');
+const ChatConfig = require('../config/chatConfig');
+const ChatLogger = require('../utils/chatLogger');
+const { randomUUID } = require('crypto');
 
 /**
  * AI 응답에서 역할/함수 설명 제거
@@ -83,23 +87,92 @@ function cleanAIResponse(response) {
 }
 
 /**
+ * 대화 컨텍스트 조회 또는 생성
+ */
+async function getOrCreateConversation(userId, conversationId) {
+  try {
+    if (!conversationId) {
+      conversationId = randomUUID();
+    }
+
+    let conversation = await Conversation.findOne({ conversationId });
+    
+    if (!conversation) {
+      conversation = new Conversation({
+        userId: userId || null,
+        conversationId,
+        messages: [],
+        metadata: {},
+      });
+      await conversation.save();
+      ChatLogger.debug('새 대화 생성', { conversationId, userId });
+    }
+
+    return conversation;
+  } catch (error) {
+    ChatLogger.error('대화 조회/생성 오류', error, { userId, conversationId });
+    return null;
+  }
+}
+
+/**
+ * 대화 히스토리에서 컨텍스트 메시지 추출
+ */
+function buildConversationContext(conversation, maxMessages = ChatConfig.CONVERSATION.CONTEXT_WINDOW_SIZE) {
+  if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+    return [];
+  }
+
+  const recentMessages = conversation.messages.slice(-maxMessages);
+  return recentMessages.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+  }));
+}
+
+/**
  * OpenAI API를 통해 채팅 메시지 처리
+ * 리뷰 문서의 개선 사항 반영:
+ * - 대화 컨텍스트 관리
+ * - 설정 파일 사용
+ * - 구조화된 로깅
+ * - 개선된 에러 처리
  */
 async function sendChatMessage(req, res) {
+  const startTime = Date.now();
+  let conversation = null;
+  
   try {
-    const { messages, isLoggedIn, currentView } = req.body;
-    // 환경 변수에서 API 키 가져오기 (우선순위: .env 파일)
-    const apiKey = process.env.OPENAI_API_KEY;
+    const { messages, isLoggedIn, currentView, conversationId, userId } = req.body;
+    
+    // 입력 검증
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      ChatLogger.warn('메시지 검증 실패', { messages });
+      return res.status(400).json({
+        message: '메시지가 필요합니다.',
+      });
+    }
 
+    // API 키 검증
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      ChatLogger.error('OpenAI API 키 없음', new Error('API key not set'));
       return res.status(400).json({
         message: 'OpenAI API 키가 서버에 설정되지 않았습니다. 서버 관리자에게 문의하세요.',
       });
     }
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({
-        message: '메시지가 필요합니다.',
+    // 대화 컨텍스트 관리
+    conversation = await getOrCreateConversation(userId, conversationId);
+    const conversationHistory = conversation 
+      ? buildConversationContext(conversation, ChatConfig.CONVERSATION.MAX_HISTORY_MESSAGES)
+      : [];
+
+    // 마지막 사용자 메시지 저장
+    const lastUserMessage = messages[messages.length - 1];
+    if (conversation && lastUserMessage) {
+      await conversation.addMessage('user', lastUserMessage.content || lastUserMessage.text, {
+        timestamp: new Date(),
       });
     }
 
@@ -107,15 +180,17 @@ async function sendChatMessage(req, res) {
     const systemPrompt = getSystemPrompt(isLoggedIn, currentView);
 
     // 사용자 메시지에서 검색 키워드 추출 (검색 의도가 있거나 상품명이 추출되면 검색 실행)
-    const lastUserMessage = messages[messages.length - 1]?.content || '';
-    const searchKeywords = extractSearchKeywords(lastUserMessage);
+    const lastUserMessageText = lastUserMessage?.content || lastUserMessage?.text || '';
+    const searchKeywords = extractSearchKeywords(lastUserMessageText);
+    
+    ChatLogger.searchQuery(lastUserMessageText, searchKeywords, 0);
     
     // 검색 키워드가 있으면 직접 데이터베이스 검색 + hybridSearch 병행
     let searchResults = [];
     if (searchKeywords && searchKeywords.length > 0) {
       try {
         const searchQuery = searchKeywords.join(' ');
-        console.log('[Chat] 내부 검색 실행:', searchQuery, '(키워드:', searchKeywords, ')');
+        ChatLogger.debug('검색 실행 시작', { searchQuery, keywords: searchKeywords });
         
         // 방법 1: MongoDB Atlas Search (최우선, 가장 빠르고 정확)
         let atlasSearchResults = [];
@@ -129,19 +204,25 @@ async function sendChatMessage(req, res) {
             description: result.product.description || '',
             score: result.score || 0,
           }));
-          console.log('[Chat] Atlas Search 결과:', atlasSearchResults.length, '개');
+          ChatLogger.debug('Atlas Search 완료', { count: atlasSearchResults.length });
         } catch (atlasError) {
-          console.warn('[Chat] Atlas Search 실패, 기존 검색 사용:', atlasError.message);
+          ChatLogger.warn('Atlas Search 실패', { error: atlasError.message });
         }
         
         // 방법 2: 직접 MongoDB 검색 (간단하고 확실한 방법)
-        const directSearchResults = await directProductSearch(searchQuery, 10);
-        console.log('[Chat] 직접 DB 검색 결과:', directSearchResults.length, '개');
+        const directSearchResults = await directProductSearch(
+          searchQuery, 
+          ChatConfig.SEARCH.DIRECT_SEARCH_LIMIT
+        );
+        ChatLogger.debug('직접 DB 검색 완료', { count: directSearchResults.length });
         
         // 방법 3: Hybrid 검색 (더 정교한 검색)
         let hybridSearchResults = [];
         try {
-          const searchResultsData = await hybridSearch(searchQuery, 10);
+          const searchResultsData = await hybridSearch(
+            searchQuery, 
+            ChatConfig.SEARCH.HYBRID_SEARCH_LIMIT
+          );
           hybridSearchResults = searchResultsData.map(result => ({
             id: result.product._id.toString(),
             name: result.product.name,
@@ -150,9 +231,9 @@ async function sendChatMessage(req, res) {
             description: result.product.description || '',
             score: result.score || result.finalScore || 0,
           }));
-          console.log('[Chat] Hybrid 검색 결과:', hybridSearchResults.length, '개');
+          ChatLogger.debug('Hybrid 검색 완료', { count: hybridSearchResults.length });
         } catch (hybridError) {
-          console.error('[Chat] Hybrid 검색 오류:', hybridError);
+          ChatLogger.error('Hybrid 검색 오류', hybridError);
         }
         
         // 세 검색 결과를 합치고 중복 제거 (Atlas Search 우선)
@@ -174,11 +255,11 @@ async function sendChatMessage(req, res) {
         
         searchResults = Array.from(uniqueResults.values())
           .sort((a, b) => (b.score || 0) - (a.score || 0))
-          .slice(0, 10);
+          .slice(0, ChatConfig.SEARCH.MAX_RESULTS);
         
-        console.log('[Chat] 최종 검색 결과:', searchResults.length, '개', searchResults.length > 0 ? `(예: ${searchResults[0].name})` : '');
+        ChatLogger.searchQuery(searchQuery, searchKeywords, searchResults.length);
       } catch (searchError) {
-        console.error('[Chat] 검색 오류:', searchError);
+        ChatLogger.error('검색 오류', searchError, { searchQuery });
       }
     }
 
@@ -188,12 +269,25 @@ async function sendChatMessage(req, res) {
       const searchQuery = searchKeywords.join(' ');
       const responseMessage = `검색 결과 ${searchResults.length}개를 찾았습니다. 어떤 제품이 마음에 드세요?`;
       
-      console.log('[Chat] 검색 결과 즉시 반환:', searchResults.length, '개 상품');
+      ChatLogger.info('검색 결과 즉시 반환', { 
+        resultsCount: searchResults.length,
+        searchQuery,
+        conversationId: conversation?.conversationId 
+      });
+      
+      // 대화 히스토리에 저장
+      if (conversation) {
+        await conversation.addMessage('assistant', responseMessage, {
+          productCards: searchResults.length,
+          searchQuery,
+        });
+      }
       
       return res.json({
         message: responseMessage,
         response: responseMessage,
         productCards: searchResults,
+        conversationId: conversation?.conversationId,
       });
     }
 
@@ -209,25 +303,52 @@ async function sendChatMessage(req, res) {
       }
     }
 
-    // OpenAI API 호출
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: enhancedSystemPrompt },
-          ...messages,
-        ],
-        temperature: 0.7,
-        max_tokens: 2000, // 상품 카드 정보를 포함하기 위해 증가
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
+    // 대화 히스토리를 메시지에 포함 (최근 N개만)
+    const contextMessages = conversationHistory.length > 0 
+      ? conversationHistory 
+      : messages.slice(-ChatConfig.CONVERSATION.CONTEXT_WINDOW_SIZE);
+
+    // OpenAI API 호출 (재시도 로직 포함)
+    let response;
+    let attempts = 0;
+    const maxAttempts = ChatConfig.ERROR.RETRY_ATTEMPTS + 1;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const aiStartTime = Date.now();
+        response = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: ChatConfig.AI.MODEL,
+            messages: [
+              { role: 'system', content: enhancedSystemPrompt },
+              ...contextMessages,
+            ],
+            temperature: ChatConfig.AI.TEMPERATURE,
+            max_tokens: ChatConfig.AI.MAX_TOKENS,
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: ChatConfig.AI.TIMEOUT,
+          }
+        );
+        
+        const aiResponseTime = Date.now() - aiStartTime;
+        ChatLogger.aiResponse(response.data.choices[0]?.message?.content || '', aiResponseTime);
+        break; // 성공하면 루프 종료
+      } catch (error) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw error; // 최대 재시도 횟수 초과 시 에러 throw
+        }
+        // 재시도 전 대기
+        await new Promise(resolve => setTimeout(resolve, ChatConfig.ERROR.RETRY_DELAY * attempts));
+        ChatLogger.warn('AI API 재시도', { attempt: attempts, error: error.message });
       }
-    );
+    }
 
     let aiMessage = response.data.choices[0]?.message?.content;
 
@@ -256,31 +377,60 @@ async function sendChatMessage(req, res) {
     // 응답에서 역할/함수 설명 제거
     aiMessage = cleanAIResponse(aiMessage);
 
+    // 대화 히스토리에 저장
+    if (conversation) {
+      await conversation.addMessage('assistant', aiMessage, {
+        productCards: productCards ? productCards.length : 0,
+        hasProductCards: !!productCards,
+      });
+    }
+
+    const responseTime = Date.now() - startTime;
+    ChatLogger.info('채팅 응답 완료', { 
+      responseTime: `${responseTime}ms`,
+      conversationId: conversation?.conversationId,
+      hasProductCards: !!productCards 
+    });
+
     res.json({
       message: aiMessage,
       response: aiMessage, // 호환성을 위해 두 필드 모두 제공
       productCards: productCards, // 상품 카드 데이터
+      conversationId: conversation?.conversationId,
     });
   } catch (error) {
-    console.error('OpenAI API error:', error.response?.data || error.message);
+    const responseTime = Date.now() - startTime;
+    ChatLogger.error('채팅 메시지 처리 오류', error, {
+      responseTime: `${responseTime}ms`,
+      conversationId: conversation?.conversationId,
+    });
 
     // OpenAI API 에러 처리
     if (error.response?.status === 401) {
       return res.status(401).json({
         message: 'OpenAI API 키가 유효하지 않습니다. API 키를 확인해주세요.',
+        conversationId: conversation?.conversationId,
       });
     } else if (error.response?.status === 429) {
       return res.status(429).json({
         message: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+        conversationId: conversation?.conversationId,
       });
     } else if (error.response?.status === 500) {
       return res.status(500).json({
         message: 'OpenAI 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        conversationId: conversation?.conversationId,
+      });
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      return res.status(504).json({
+        message: '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.',
+        conversationId: conversation?.conversationId,
       });
     }
 
     res.status(500).json({
       message: error.response?.data?.error?.message || '채팅 메시지 처리 중 오류가 발생했습니다.',
+      conversationId: conversation?.conversationId,
     });
   }
 }

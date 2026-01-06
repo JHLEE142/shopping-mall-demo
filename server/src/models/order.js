@@ -166,6 +166,11 @@ const orderSchema = new Schema(
         default: 0,
         min: [0, '쿠폰 할인액은 0 이상이어야 합니다.'],
       },
+      pointsDiscount: {
+        type: Number,
+        default: 0,
+        min: [0, '포인트 할인액은 0 이상이어야 합니다.'],
+      },
     },
     coupon: {
       couponId: {
