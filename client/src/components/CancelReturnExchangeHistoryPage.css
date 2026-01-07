@@ -1,0 +1,278 @@
+.cancel-return-exchange-history-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  padding-bottom: 4rem;
+}
+
+.cancel-return-exchange-history-page__container {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+/* 헤더 */
+.cancel-return-exchange-history-page__header {
+  margin-bottom: 2rem;
+}
+
+.cancel-return-exchange-history-page__back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: color 0.2s;
+}
+
+.cancel-return-exchange-history-page__back-button:hover {
+  color: #000000;
+}
+
+.cancel-return-exchange-history-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem;
+  color: #000000;
+}
+
+/* 검색바 */
+.cancel-return-exchange-history-page__search {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.cancel-return-exchange-history-page__search-input {
+  width: 100%;
+  padding: 1rem 3rem 1rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #000000;
+  background: #ffffff;
+}
+
+.cancel-return-exchange-history-page__search-input::placeholder {
+  color: #9ca3af;
+}
+
+.cancel-return-exchange-history-page__search-input:focus {
+  outline: none;
+  border-color: #374151;
+}
+
+.cancel-return-exchange-history-page__search-icon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* 상태 필터 */
+.cancel-return-exchange-history-page__status-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cancel-return-exchange-history-page__status-filter {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-return-exchange-history-page__status-filter:hover {
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.cancel-return-exchange-history-page__status-filter.is-active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* 로딩/에러/빈 상태 */
+.cancel-return-exchange-history-page__loading,
+.cancel-return-exchange-history-page__error,
+.cancel-return-exchange-history-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+.cancel-return-exchange-history-page__error {
+  color: #dc2626;
+}
+
+.cancel-return-exchange-history-page__empty svg {
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+/* 날짜 그룹 */
+.cancel-return-exchange-history-page__date-group {
+  margin-bottom: 2rem;
+}
+
+.cancel-return-exchange-history-page__date-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* 카드 */
+.cancel-return-exchange-history-page__card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.cancel-return-exchange-history-page__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.cancel-return-exchange-history-page__card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cancel-return-exchange-history-page__status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.cancel-return-exchange-history-page__status-badge--pending,
+.cancel-return-exchange-history-page__status-badge--processing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cancel-return-exchange-history-page__status-badge--completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cancel-return-exchange-history-page__status-badge--rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cancel-return-exchange-history-page__solution-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cancel-return-exchange-history-page__card-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 아이템 */
+.cancel-return-exchange-history-page__item {
+  padding: 1rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.cancel-return-exchange-history-page__item:last-child {
+  border-bottom: none;
+}
+
+.cancel-return-exchange-history-page__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cancel-return-exchange-history-page__item-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+}
+
+.cancel-return-exchange-history-page__item-details {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.cancel-return-exchange-history-page__item-reason {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.cancel-return-exchange-history-page__refund-info {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.9375rem;
+  color: #000000;
+}
+
+.cancel-return-exchange-history-page__refund-info strong {
+  color: #000000;
+  font-weight: 700;
+}
+
+.cancel-return-exchange-history-page__rejected-reason {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #991b1b;
+}
+
+.cancel-return-exchange-history-page__notes {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 반응형 */
+@media (max-width: 640px) {
+  .cancel-return-exchange-history-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .cancel-return-exchange-history-page__card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+

@@ -261,6 +261,31 @@ async function createProduct(req, res, next) {
       }
     }
     const newProduct = await Product.create(payload);
+    
+    // 신상품 알림 구독자에게 알림 전송 (비동기로 처리, 에러가 발생해도 상품 생성은 성공)
+    try {
+      const ProductNotificationSubscription = require('../models/productNotificationSubscription');
+      const Notification = require('../models/notification');
+      
+      const subscribers = await ProductNotificationSubscription.find({ isActive: true }).populate('user');
+      
+      if (subscribers.length > 0) {
+        const notifications = subscribers.map(sub => ({
+          user: sub.user._id,
+          type: 'new_product',
+          title: '새로운 상품이 등록되었습니다',
+          message: `${newProduct.name}이(가) 등록되었습니다. 지금 확인해보세요!`,
+          relatedProduct: newProduct._id,
+        }));
+        
+        // 알림 생성 (배치 처리)
+        await Notification.insertMany(notifications);
+      }
+    } catch (notificationError) {
+      // 알림 전송 실패해도 상품 생성은 성공으로 처리
+      console.error('신상품 알림 전송 실패:', notificationError);
+    }
+    
     res.status(201).json(newProduct);
   } catch (error) {
     next(error);
@@ -516,9 +541,13 @@ async function updateProduct(req, res, next) {
     // 다른 필드들도 업데이트 (inventory, discountRate, originalPrice 제외)
     Object.keys(payload).forEach((key) => {
       if (key !== 'inventory' && key !== 'discountRate' && key !== 'originalPrice' && key !== '_id' && key !== '__v') {
-        // image 필드는 빈 문자열이 아닐 때만 업데이트
-        if (key === 'image' && (!payload[key] || payload[key].trim() === '')) {
-          return; // 빈 이미지는 업데이트하지 않음
+        // image 필드는 유효한 값이 있을 때만 업데이트 (빈 문자열이면 기존 이미지 유지)
+        if (key === 'image') {
+          if (payload[key] && payload[key].trim() !== '') {
+            updateQuery[key] = payload[key].trim();
+          }
+          // 빈 문자열이면 updateQuery에 포함하지 않아서 기존 이미지가 유지됨
+          return;
         }
         updateQuery[key] = payload[key];
       }
@@ -959,10 +988,10 @@ async function importExcel(req, res, next) {
     const existingSkus = new Set(existingProducts.map(p => p.sku.toUpperCase()));
     console.log(`📊 [EXCEL IMPORT] Found ${existingSkus.size} existing SKUs in database`);
 
-    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 30 valid products)...`);
+    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 10000 valid products)...`);
     const previewData = [];
-    const targetValidProducts = 30;
-    const maxRowsToCheck = Math.min(allRows.length, 500); // 최대 500개 행까지 확인 (30개 찾을 때까지)
+    const targetValidProducts = 10000;
+    const maxRowsToCheck = Math.min(allRows.length, 10000); // 최대 10000개 행까지 확인
 
     for (let i = 0; i < maxRowsToCheck && previewData.length < targetValidProducts; i++) {
       const rowStartTime = Date.now();
@@ -1406,7 +1435,32 @@ async function commitImport(req, res, next) {
           // 최종 저장 전 로그
           console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Creating product - SKU: ${mapped.sku}, Description length: ${descriptionHtml.length}, Detail images in description: ${(descriptionHtml.match(/<img/g) || []).length}`);
 
-          await Product.create(productPayload);
+          const newProduct = await Product.create(productPayload);
+          
+          // 신상품 알림 구독자에게 알림 전송 (비동기로 처리, 에러가 발생해도 상품 생성은 성공)
+          try {
+            const ProductNotificationSubscription = require('../models/productNotificationSubscription');
+            const Notification = require('../models/notification');
+            
+            const subscribers = await ProductNotificationSubscription.find({ isActive: true }).populate('user');
+            
+            if (subscribers.length > 0) {
+              const notifications = subscribers.map(sub => ({
+                user: sub.user._id,
+                type: 'new_product',
+                title: '새로운 상품이 등록되었습니다',
+                message: `${newProduct.name}이(가) 등록되었습니다. 지금 확인해보세요!`,
+                relatedProduct: newProduct._id,
+              }));
+              
+              // 알림 생성 (배치 처리)
+              await Notification.insertMany(notifications);
+            }
+          } catch (notificationError) {
+            // 알림 전송 실패해도 상품 생성은 성공으로 처리
+            console.error('신상품 알림 전송 실패:', notificationError);
+          }
+          
           results.successCount++;
         }
       } catch (error) {

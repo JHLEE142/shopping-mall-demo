@@ -65,6 +65,98 @@ async function sendInquiryNotificationToSeller(productId, inquiryId, question) {
 }
 
 /**
+ * 사용자별 상품 문의 목록 조회
+ */
+async function getUserInquiries(req, res, next) {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: '인증이 필요합니다.' });
+    }
+
+    const { page = 1, limit = 20, status } = req.query;
+    const query = { userId };
+
+    if (status) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+    const [inquiries, total] = await Promise.all([
+      ProductInquiry.find(query)
+        .populate('productId', 'name image')
+        .populate('userId', 'name email')
+        .populate('answer.answeredBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean(),
+      ProductInquiry.countDocuments(query),
+    ]);
+
+    res.json({
+      items: inquiries,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        pages: Math.ceil(total / parseInt(limit, 10)),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * 상품 문의 목록 조회 (관리자용 - 모든 문의)
+ */
+async function getAllInquiries(req, res, next) {
+  try {
+    if (req.user?.user_type !== 'admin') {
+      return res.status(403).json({ message: '관리자만 접근할 수 있습니다.' });
+    }
+
+    const { page = 1, limit = 20, status, search } = req.query;
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+    if (search) {
+      query.question = { $regex: search, $options: 'i' };
+    }
+
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+    const [inquiries, total] = await Promise.all([
+      ProductInquiry.find(query)
+        .populate('userId', 'name email')
+        .populate('productId', 'name image')
+        .populate('answer.answeredBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean(),
+      ProductInquiry.countDocuments(query),
+    ]);
+
+    res.json({
+      items: inquiries,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit, 10)),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * 상품별 문의 목록 조회
  */
 async function getInquiriesByProduct(req, res, next) {
@@ -304,6 +396,8 @@ async function deleteInquiry(req, res, next) {
 }
 
 module.exports = {
+  getUserInquiries,
+  getAllInquiries,
   getInquiriesByProduct,
   createInquiry,
   answerInquiry,

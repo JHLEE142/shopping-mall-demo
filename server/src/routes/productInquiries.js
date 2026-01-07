@@ -1,5 +1,7 @@
 const { Router } = require('express');
 const {
+  getUserInquiries,
+  getAllInquiries,
   getInquiriesByProduct,
   createInquiry,
   answerInquiry,
@@ -9,6 +11,12 @@ const {
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 
 const router = Router();
+
+// 사용자별 상품 문의 목록 조회
+router.get('/my', authenticate, getUserInquiries);
+
+// 관리자용 모든 상품 문의 목록 조회
+router.get('/admin/all', authenticate, authorize('admin'), getAllInquiries);
 
 // 상품별 문의 목록 조회
 router.get('/product/:productId', getInquiriesByProduct);

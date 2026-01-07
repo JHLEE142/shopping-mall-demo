@@ -8,6 +8,36 @@ function buildAuthHeaders() {
 }
 
 /**
+ * 사용자별 상품 문의 목록 조회
+ */
+export async function getUserInquiries({ page = 1, limit = 20, status } = {}) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  if (status) {
+    params.set('status', status);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/product-inquiries/my?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = data?.message || '상품 문의 목록을 불러오는데 실패했습니다.';
+    throw new Error(message);
+  }
+
+  const result = await response.json();
+  return result;
+}
+
+/**
  * 상품별 문의 목록 조회
  */
 export async function getInquiriesByProduct(productId, { page = 1, limit = 20, search } = {}) {
@@ -120,5 +150,36 @@ export async function deleteInquiry(inquiryId) {
   }
 
   return true;
+}
+
+/**
+ * 관리자용 모든 상품 문의 목록 조회
+ */
+export async function getAllInquiries({ page = 1, limit = 20, status, search } = {}) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  if (status) {
+    params.set('status', status);
+  }
+  if (search) {
+    params.set('search', search);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/product-inquiries/admin/all?${params.toString()}`, {
+    headers: {
+      ...buildAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = data?.message || '상품 문의 목록을 불러오는데 실패했습니다.';
+    throw new Error(message);
+  }
+
+  const result = await response.json();
+  return result;
 }
 

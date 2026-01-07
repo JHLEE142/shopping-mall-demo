@@ -1,0 +1,60 @@
+.event-benefit-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  padding-bottom: 4rem;
+}
+
+.event-benefit-page__container {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+.event-benefit-page__back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  margin-bottom: 2rem;
+  transition: color 0.2s;
+}
+
+.event-benefit-page__back-button:hover {
+  color: #000000;
+}
+
+.event-benefit-page__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.event-benefit-page__coming-soon {
+  text-align: center;
+}
+
+.event-benefit-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 1rem;
+}
+
+.event-benefit-page__message {
+  font-size: 1.25rem;
+  color: #6b7280;
+  margin: 0 0 1rem;
+}
+
+.event-benefit-page__description {
+  font-size: 0.9375rem;
+  color: #9ca3af;
+  margin: 0;
+}
+

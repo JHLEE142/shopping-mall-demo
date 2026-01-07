@@ -3,6 +3,7 @@ import { Heart, ShoppingBag, Star, ChevronLeft, ChevronRight, Search } from 'luc
 import { fetchProducts, searchProducts as searchProductsAPI } from '../services/productService';
 import { fetchCategories } from '../services/categoryService';
 import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../services/wishlistService';
+import { subscribeToNewProducts, getSubscriptionStatus } from '../services/notificationService';
 import { loadSession } from '../utils/sessionStorage';
 
 const FALLBACK_CATALOG = [
@@ -317,6 +318,8 @@ function HomeHero({
   const previousSearchQuery = useRef(null);
   const [wishlistedItems, setWishlistedItems] = useState(new Set());
   const [togglingWishlist, setTogglingWishlist] = useState(new Set());
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   // 페이지 로드 시 스크롤을 맨 위로 이동
   useEffect(() => {
@@ -377,6 +380,27 @@ function HomeHero({
       loadWishlistStatus();
     }
   }, [products]);
+
+  // 알림 구독 상태 확인
+  useEffect(() => {
+    const session = loadSession();
+    if (!session?.user) {
+      setIsSubscribed(false);
+      return;
+    }
+
+    async function checkSubscriptionStatus() {
+      try {
+        const data = await getSubscriptionStatus();
+        setIsSubscribed(data.subscribed || false);
+      } catch (error) {
+        console.error('구독 상태 확인 실패:', error.message);
+        setIsSubscribed(false);
+      }
+    }
+
+    checkSubscriptionStatus();
+  }, []);
 
   // initialCategory가 변경되면 categoryFilter 업데이트
   useEffect(() => {
@@ -587,6 +611,32 @@ function HomeHero({
     }
   };
 
+  const handleSubscribeToNewProducts = async (e) => {
+    e.preventDefault();
+    const session = loadSession();
+    if (!session?.user) {
+      alert('로그인이 필요합니다.');
+      onMoveToLogin();
+      return;
+    }
+
+    if (isSubscribed) {
+      alert('이미 신상품 알림을 구독 중입니다.');
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      await subscribeToNewProducts();
+      setIsSubscribed(true);
+      alert('신상품 알림 구독이 완료되었습니다. 새로운 상품이 등록되면 알림을 받으실 수 있습니다.');
+    } catch (error) {
+      alert(error.message || '알림 구독에 실패했습니다.');
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
   return (
     <>
       {/* 검색 바 */}
@@ -686,7 +736,10 @@ function HomeHero({
             <p className="collection-card__breadcrumb">For Everyone &gt; Collection &gt; New Season</p>
           </div>
           <p className="collection-card__description">
-            기능보다 형태, 유행보다 무드를 말합니다. 도시의 리듬 속에서 자유로움을 입는 사람들을 위한 새로운 해석.
+          쓰임은 단순하게, 무드는 깊게.
+          </p>
+          <p className="collection-card__description">
+          일상을 위한 생활용품.
           </p>
           <div className="collection-card__actions">
             <button type="button" className="collection-card__button collection-card__button--primary" onClick={onMoveToLookbook}>
@@ -695,9 +748,10 @@ function HomeHero({
             <button
               type="button"
               className="collection-card__button collection-card__button--secondary"
-              onClick={onMoveToSignUp}
+              onClick={handleSubscribeToNewProducts}
+              disabled={subscribing || isSubscribed}
             >
-              신상품 알림받기
+              {subscribing ? '구독 중...' : isSubscribed ? '알림 구독 완료' : '신상품 알림받기'}
             </button>
           </div>
         </div>

@@ -1,0 +1,151 @@
+.product-inquiry-history-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  padding-bottom: 4rem;
+}
+
+.product-inquiry-history-page__container {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+.product-inquiry-history-page__back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: color 0.2s;
+}
+
+.product-inquiry-history-page__back-button:hover {
+  color: #000000;
+}
+
+.product-inquiry-history-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 2rem;
+}
+
+.product-inquiry-history-page__loading,
+.product-inquiry-history-page__error,
+.product-inquiry-history-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+.product-inquiry-history-page__error {
+  color: #dc2626;
+}
+
+.product-inquiry-history-page__empty svg {
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+.product-inquiry-history-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.product-inquiry-history-page__card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.product-inquiry-history-page__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.product-inquiry-history-page__product-info {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.product-inquiry-history-page__product-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.product-inquiry-history-page__product-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+  margin-bottom: 0.5rem;
+}
+
+.product-inquiry-history-page__card-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.product-inquiry-history-page__status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.product-inquiry-history-page__status-badge--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.product-inquiry-history-page__status-badge--answered {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.product-inquiry-history-page__status-badge--closed {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.product-inquiry-history-page__question {
+  font-size: 0.9375rem;
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.product-inquiry-history-page__question strong {
+  color: #000000;
+  margin-right: 0.5rem;
+}
+
+.product-inquiry-history-page__answer {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  color: #374151;
+}
+
+.product-inquiry-history-page__answer strong {
+  color: #000000;
+  margin-right: 0.5rem;
+}
+

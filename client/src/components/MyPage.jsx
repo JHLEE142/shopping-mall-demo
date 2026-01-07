@@ -3,7 +3,23 @@ import { ArrowRight, Bell, Settings, ChevronRight, UserRound } from 'lucide-reac
 import { getUnreviewedProducts } from '../services/reviewService';
 import './MyPage.css';
 
-function MyPage({ user, onBack, onMoveToSettings, onMoveToPoints, onMoveToOrder, onMoveToWishlist, onLogout, pointsBalance = 0 }) {
+function MyPage({ 
+  user, 
+  onBack, 
+  onMoveToSettings, 
+  onMoveToPoints, 
+  onMoveToOrder, 
+  onMoveToWishlist, 
+  onLogout, 
+  pointsBalance = 0,
+  onMoveToCancelReturnExchange,
+  onMoveToEventBenefit,
+  onMoveToFeedback,
+  onMoveToInquiry,
+  onMoveToProductInquiry,
+  onMoveToNotice,
+  onMoveToRecentlyViewedProducts
+}) {
   const [unreviewedProducts, setUnreviewedProducts] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -131,22 +147,28 @@ function MyPage({ user, onBack, onMoveToSettings, onMoveToPoints, onMoveToOrder,
             </div>
             <ChevronRight size={20} />
           </button>
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToCancelReturnExchange) {
+                onMoveToCancelReturnExchange();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">취소/반품/교환 내역</div>
-            </div>
-            <ChevronRight size={20} />
-          </button>
-          <button type="button" className="my-page__menu-item">
-            <div className="my-page__menu-content">
-              <div className="my-page__menu-title">재입고 알림 내역</div>
             </div>
             <ChevronRight size={20} />
           </button>
           <button 
             type="button"
             className="my-page__menu-item"
-            onClick={() => {/* 최근 본 상품 페이지로 이동 */}}
+            onClick={() => {
+              if (onMoveToRecentlyViewedProducts) {
+                onMoveToRecentlyViewedProducts();
+              }
+            }}
           >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">최근 본 상품</div>
@@ -155,40 +177,36 @@ function MyPage({ user, onBack, onMoveToSettings, onMoveToPoints, onMoveToOrder,
           </button>
         </section>
 
-        {/* 기타 메뉴 섹션 */}
-        <section className="my-page__menu-section">
-          <button type="button" className="my-page__menu-item">
-            <div className="my-page__menu-content">
-              <div className="my-page__menu-title">
-                중고 거래
-                <span className="my-page__badge-new">신규</span>
-              </div>
-              <div className="my-page__menu-subtitle">무지 쉬운 중고 거래</div>
-            </div>
-            <ChevronRight size={20} />
-          </button>
-          <button type="button" className="my-page__menu-item">
-            <div className="my-page__menu-content">
-              <div className="my-page__menu-title">나의 맞춤 정보</div>
-              <div className="my-page__menu-subtitle">체형, 피부, 취향 정보 입력하고 상품 추천받기</div>
-            </div>
-            <ChevronRight size={20} />
-          </button>
-        </section>
 
         {/* 이벤트/혜택 섹션 */}
         <section className="my-page__menu-section">
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToEventBenefit) {
+                onMoveToEventBenefit();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">
                 이벤트/회원혜택
-                <span className="my-page__badge-new">신규</span>
+                <span className="my-page__badge-new">준비중</span>
               </div>
               <div className="my-page__menu-subtitle">출석체크 등 매일 새로운 미션으로 혜택받기</div>
             </div>
             <ChevronRight size={20} />
           </button>
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToFeedback) {
+                onMoveToFeedback();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">개선 의견/리서치 참여</div>
             </div>
@@ -199,19 +217,43 @@ function MyPage({ user, onBack, onMoveToSettings, onMoveToPoints, onMoveToOrder,
         {/* 고객센터 섹션 */}
         <section className="my-page__menu-section">
           <div className="my-page__section-title">고객센터</div>
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToInquiry) {
+                onMoveToInquiry();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">1:1 문의 내역</div>
             </div>
             <ChevronRight size={20} />
           </button>
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToProductInquiry) {
+                onMoveToProductInquiry();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">상품 문의 내역</div>
             </div>
             <ChevronRight size={20} />
           </button>
-          <button type="button" className="my-page__menu-item">
+          <button 
+            type="button" 
+            className="my-page__menu-item"
+            onClick={() => {
+              if (onMoveToNotice) {
+                onMoveToNotice();
+              }
+            }}
+          >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">공지사항</div>
             </div>

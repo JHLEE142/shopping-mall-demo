@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Star,
   Truck,
+  X,
 } from 'lucide-react';
 import { fetchProductById, fetchSimilarProducts } from '../services/productService';
 import { addItemToCart } from '../services/cartService';
@@ -24,7 +25,7 @@ import {
   deleteInquiry 
 } from '../services/productInquiryService';
 import { loadSession } from '../utils/sessionStorage';
-import { X } from 'lucide-react';
+import { addRecentlyViewedProduct } from '../services/recentlyViewedProductService';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -318,6 +319,17 @@ function ProductDetailPage({
     if (targetId) {
       loadReviews(targetId);
       loadRecommendedProducts(targetId);
+      
+      // 최근 본 상품 기록 (로그인한 사용자만)
+      const session = loadSession();
+      if (session?.user && targetId) {
+        addRecentlyViewedProduct(targetId).catch((err) => {
+          // 로그인하지 않은 경우나 에러는 무시
+          if (err.status !== 401) {
+            console.error('Failed to add recently viewed product:', err);
+          }
+        });
+      }
     }
   }, [initialProduct, productId]);
 

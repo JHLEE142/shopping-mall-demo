@@ -181,32 +181,24 @@ async function sendChatMessage(req, res) {
     const systemPrompt = getSystemPrompt(isLoggedIn, currentView);
 
     // 사용자 메시지에서 검색 키워드 추출 (검색 의도가 있거나 상품명이 추출되면 검색 실행)
-<<<<<<< HEAD
+
     const lastUserMessageText = lastUserMessage?.content || lastUserMessage?.text || '';
     const searchKeywords = extractSearchKeywords(lastUserMessageText);
     
     ChatLogger.searchQuery(lastUserMessageText, searchKeywords, 0);
-    
-=======
-    const lastUserMessage = messages[messages.length - 1]?.content || '';
-    const searchKeywords = extractSearchKeywords(lastUserMessage);
-    
->>>>>>> 6f8e09c (update chat function3)
+
     // 검색 키워드가 있으면 직접 데이터베이스 검색 + hybridSearch 병행
     let searchResults = [];
     if (searchKeywords && searchKeywords.length > 0) {
       try {
         const searchQuery = searchKeywords.join(' ');
-<<<<<<< HEAD
+
         ChatLogger.debug('검색 실행 시작', { searchQuery, keywords: searchKeywords });
-=======
-        console.log('[Chat] 내부 검색 실행:', searchQuery, '(키워드:', searchKeywords, ')');
->>>>>>> 6f8e09c (update chat function3)
         
         // 방법 1: MongoDB Atlas Search (최우선, 가장 빠르고 정확)
         let atlasSearchResults = [];
         try {
-          const atlasResultsData = await atlasMultiFieldSearch(searchQuery, 10);
+          const atlasResultsData = await atlasMultiFieldSearch(searchQuery, ChatConfig.SEARCH.MAX_RESULTS || 10);
           atlasSearchResults = atlasResultsData.map(result => ({
             id: result.product._id.toString(),
             name: result.product.name,
@@ -215,7 +207,6 @@ async function sendChatMessage(req, res) {
             description: result.product.description || '',
             score: result.score || 0,
           }));
-<<<<<<< HEAD
           ChatLogger.debug('Atlas Search 완료', { count: atlasSearchResults.length });
         } catch (atlasError) {
           ChatLogger.warn('Atlas Search 실패', { error: atlasError.message });
@@ -224,31 +215,17 @@ async function sendChatMessage(req, res) {
         // 방법 2: 직접 MongoDB 검색 (간단하고 확실한 방법)
         const directSearchResults = await directProductSearch(
           searchQuery, 
-          ChatConfig.SEARCH.DIRECT_SEARCH_LIMIT
+          ChatConfig.SEARCH.DIRECT_SEARCH_LIMIT || 10
         );
         ChatLogger.debug('직접 DB 검색 완료', { count: directSearchResults.length });
-=======
-          console.log('[Chat] Atlas Search 결과:', atlasSearchResults.length, '개');
-        } catch (atlasError) {
-          console.warn('[Chat] Atlas Search 실패, 기존 검색 사용:', atlasError.message);
-        }
-        
-        // 방법 2: 직접 MongoDB 검색 (간단하고 확실한 방법)
-        const directSearchResults = await directProductSearch(searchQuery, 10);
-        console.log('[Chat] 직접 DB 검색 결과:', directSearchResults.length, '개');
->>>>>>> 6f8e09c (update chat function3)
         
         // 방법 3: Hybrid 검색 (더 정교한 검색)
         let hybridSearchResults = [];
         try {
-<<<<<<< HEAD
           const searchResultsData = await hybridSearch(
             searchQuery, 
-            ChatConfig.SEARCH.HYBRID_SEARCH_LIMIT
+            ChatConfig.SEARCH.HYBRID_SEARCH_LIMIT || 10
           );
-=======
-          const searchResultsData = await hybridSearch(searchQuery, 10);
->>>>>>> 6f8e09c (update chat function3)
           hybridSearchResults = searchResultsData.map(result => ({
             id: result.product._id.toString(),
             name: result.product.name,
@@ -257,15 +234,9 @@ async function sendChatMessage(req, res) {
             description: result.product.description || '',
             score: result.score || result.finalScore || 0,
           }));
-<<<<<<< HEAD
           ChatLogger.debug('Hybrid 검색 완료', { count: hybridSearchResults.length });
         } catch (hybridError) {
           ChatLogger.error('Hybrid 검색 오류', hybridError);
-=======
-          console.log('[Chat] Hybrid 검색 결과:', hybridSearchResults.length, '개');
-        } catch (hybridError) {
-          console.error('[Chat] Hybrid 검색 오류:', hybridError);
->>>>>>> 6f8e09c (update chat function3)
         }
         
         // 세 검색 결과를 합치고 중복 제거 (Atlas Search 우선)
@@ -287,15 +258,9 @@ async function sendChatMessage(req, res) {
         
         searchResults = Array.from(uniqueResults.values())
           .sort((a, b) => (b.score || 0) - (a.score || 0))
-<<<<<<< HEAD
-          .slice(0, ChatConfig.SEARCH.MAX_RESULTS);
+          .slice(0, ChatConfig.SEARCH.MAX_RESULTS || 10);
         
         ChatLogger.searchQuery(searchQuery, searchKeywords, searchResults.length);
-=======
-          .slice(0, 10);
-        
-        console.log('[Chat] 최종 검색 결과:', searchResults.length, '개', searchResults.length > 0 ? `(예: ${searchResults[0].name})` : '');
->>>>>>> 6f8e09c (update chat function3)
       } catch (searchError) {
         ChatLogger.error('검색 오류', searchError, { searchQuery });
       }
@@ -307,7 +272,6 @@ async function sendChatMessage(req, res) {
       const searchQuery = searchKeywords.join(' ');
       const responseMessage = `검색 결과 ${searchResults.length}개를 찾았습니다. 어떤 제품이 마음에 드세요?`;
       
-<<<<<<< HEAD
       ChatLogger.info('검색 결과 즉시 반환', { 
         resultsCount: searchResults.length,
         searchQuery,
@@ -321,18 +285,12 @@ async function sendChatMessage(req, res) {
           searchQuery,
         });
       }
-=======
-      console.log('[Chat] 검색 결과 즉시 반환:', searchResults.length, '개 상품');
->>>>>>> 6f8e09c (update chat function3)
       
       return res.json({
         message: responseMessage,
         response: responseMessage,
         productCards: searchResults,
-<<<<<<< HEAD
         conversationId: conversation?.conversationId,
-=======
->>>>>>> 6f8e09c (update chat function3)
       });
     }
 

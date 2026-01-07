@@ -1,0 +1,204 @@
+.recently-viewed-products-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  padding-bottom: 4rem;
+}
+
+.recently-viewed-products-page__container {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+.recently-viewed-products-page__header {
+  margin-bottom: 2rem;
+}
+
+.recently-viewed-products-page__back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: color 0.2s;
+}
+
+.recently-viewed-products-page__back-button:hover {
+  color: #000000;
+}
+
+.recently-viewed-products-page__header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recently-viewed-products-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 0;
+}
+
+.recently-viewed-products-page__delete-all-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.recently-viewed-products-page__delete-all-button:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.recently-viewed-products-page__loading,
+.recently-viewed-products-page__error,
+.recently-viewed-products-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+.recently-viewed-products-page__error {
+  color: #dc2626;
+}
+
+.recently-viewed-products-page__empty svg {
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+.recently-viewed-products-page__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.recently-viewed-products-page__card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.recently-viewed-products-page__card:hover {
+  border-color: #9ca3af;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.recently-viewed-products-page__card-image {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.recently-viewed-products-page__card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recently-viewed-products-page__card-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.recently-viewed-products-page__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.recently-viewed-products-page__card-title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #000000;
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.recently-viewed-products-page__delete-button {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recently-viewed-products-page__delete-button:hover {
+  color: #dc2626;
+}
+
+.recently-viewed-products-page__card-price {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.recently-viewed-products-page__price-sale {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+.recently-viewed-products-page__price-original {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.recently-viewed-products-page__card-date {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .recently-viewed-products-page__list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .recently-viewed-products-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .recently-viewed-products-page__list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+

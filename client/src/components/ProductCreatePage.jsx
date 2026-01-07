@@ -793,6 +793,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         ? formData.images.filter(img => img && img.trim())
         : (formData.image ? [formData.image.trim()] : []);
 
+      // 대표 이미지 결정: productImages의 첫 번째 이미지 또는 formData.image
+      const mainImage = productImages[0] || formData.image?.trim() || null;
+
       // 할인율과 원래 가격 처리
       const discountRate = formData.discountRate ? Number(formData.discountRate) : 0;
       const originalPrice = formData.originalPrice ? Number(formData.originalPrice) : null;
@@ -811,7 +814,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         categoryMain: categoryMain,
         categoryMid: categoryMid,
         categorySub: categorySub,
-        image: productImages[0] || formData.image?.trim() || '',
+        // 대표 이미지: 유효한 값이 있을 때만 포함
+        // 수정 모드에서 이미지가 없으면 필드를 보내지 않아서 기존 이미지가 유지됨
+        ...(mainImage && mainImage.trim() !== '' ? { image: mainImage.trim() } : {}),
         images: productImages,
         description: formData.description?.trim() || '',
         colors: formData.colors.filter(c => c.name && c.value),
@@ -877,14 +882,14 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         if (!excelPreview || !excelPreview.preview) return;
         
         if (checked) {
-          // 유효한 행만 선택 (중복 제외, 최대 100개)
+          // 유효한 행만 선택 (중복 제외, 최대 10000개)
           const validRows = excelPreview.preview
             .filter((item) => {
               const sku = item.mapped?.sku;
               const isDuplicate = sku && duplicateSkus.has(sku);
               return item.validation.ok && !isDuplicate;
             })
-            .slice(0, 100)
+            .slice(0, 10000)
             .map((item) => item.rowIndex);
           setSelectedRows(new Set(validRows));
         } else {
@@ -1200,12 +1205,12 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       return;
     }
 
-    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 100개)
+    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 10000개)
     let rowsToCommit = excelPreview.preview;
     if (selectedRows.size > 0) {
       rowsToCommit = excelPreview.preview.filter((item) => selectedRows.has(item.rowIndex));
     } else {
-      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 100개)
+      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 10000개)
       const skuSet = new Set();
       rowsToCommit = excelPreview.preview
         .filter((item) => {
@@ -1216,7 +1221,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           if (sku) skuSet.add(sku);
           return true;
         })
-        .slice(0, 100);
+        .slice(0, 10000);
     }
 
     if (rowsToCommit.length === 0) {
@@ -1361,7 +1366,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
               }}>
                 <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
                 <span style={{ fontWeight: 600, color: '#1e40af' }}>
-                  최대 100개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
+                  최대 10,000개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
                 </span>
               </div>
 
@@ -1702,7 +1707,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       }
                       return item.validation.ok && !isDuplicate;
                     })
-                    .slice(0, 100)
+                    .slice(0, 10000)
                     .map((item, idx) => (
                       <div
                         key={idx}
