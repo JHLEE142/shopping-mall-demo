@@ -1688,7 +1688,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                     <span><strong>{selectedRows.size}개</strong> 상품이 선택되었습니다.</span>
                   ) : (
                     <span>
-                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 100)}개</strong> 상품이 추가됩니다.
+                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 10000)}개</strong> 상품이 추가됩니다.
                       {duplicateSkus.size > 0 && (
                         <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>
                           (중복 {duplicateSkus.size}개 제외)
