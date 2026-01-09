@@ -1146,12 +1146,16 @@ function AdminDashboard({
 
     try {
       setIsDeletingSelected(true);
-      // 모든 페이지의 상품을 삭제하기 위해 여러 페이지를 순회
-      let currentPage = 1;
+      // 모든 페이지의 상품을 삭제하기 위해 항상 1페이지를 가져와서 삭제
+      // 삭제 후 다음 항목들이 자동으로 1페이지로 올라오므로 계속 1페이지를 삭제하면 됨
       let totalDeleted = 0;
+      let maxIterations = 1000; // 무한 루프 방지 (최대 1000번 반복)
+      let iteration = 0;
       
-      while (true) {
-        const data = await fetchProducts(currentPage, PRODUCTS_PAGE_SIZE, null, null);
+      while (iteration < maxIterations) {
+        iteration++;
+        // 항상 1페이지를 가져옴 (삭제 후 다음 항목들이 자동으로 1페이지로 올라옴)
+        const data = await fetchProducts(1, PRODUCTS_PAGE_SIZE, null, null);
         const products = data?.items || [];
         
         if (products.length === 0) break;
@@ -1159,8 +1163,12 @@ function AdminDashboard({
         await Promise.all(products.map(product => deleteProduct(product._id)));
         totalDeleted += products.length;
         
-        if (currentPage >= (data?.totalPages || 1)) break;
-        currentPage++;
+        // 삭제 후 잠시 대기 (DB 업데이트 시간 확보)
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (iteration >= maxIterations) {
+        console.warn('모두 삭제: 최대 반복 횟수에 도달했습니다.');
       }
       
       setSelectedProducts(new Set());

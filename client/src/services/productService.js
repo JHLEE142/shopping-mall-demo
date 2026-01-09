@@ -1,10 +1,75 @@
-import { getAuthToken } from '../utils/sessionStorage';
+import { getAuthToken, getRemainingTime } from '../utils/sessionStorage';
+import { refreshToken } from './authService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500';
 
 function buildAuthHeaders() {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// 토큰 유효성 검증 및 필요시 갱신
+async function ensureValidToken() {
+  const remainingTime = getRemainingTime();
+  // 5분 이하 남았으면 갱신
+  if (remainingTime < 5 * 60 * 1000) {
+    console.log('[Token] Token expires soon, refreshing...');
+    try {
+      await refreshToken();
+      console.log('[Token] Token refreshed successfully');
+    } catch (error) {
+      console.error('[Token] Token refresh failed:', error);
+      throw new Error('토큰 갱신에 실패했습니다. 다시 로그인해주세요.');
+    }
+  }
+}
+
+// 401 에러 시 토큰 갱신 후 재시도하는 래퍼 함수
+async function fetchWithRetry(url, options, maxRetries = 1) {
+  let lastError = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // 401 에러인 경우 토큰 갱신 후 재시도
+      if (response.status === 401 && attempt < maxRetries) {
+        console.log(`[Retry] 401 error detected, attempt ${attempt + 1}/${maxRetries + 1}, refreshing token...`);
+        try {
+          await refreshToken();
+          // 토큰 갱신 후 새로운 옵션 객체 생성 (FormData를 보존하기 위해)
+          const newToken = getAuthToken();
+          if (newToken) {
+            const newOptions = {
+              ...options,
+              headers: {
+                ...options.headers,
+                Authorization: `Bearer ${newToken}`,
+              },
+            };
+            options = newOptions;
+            console.log('[Retry] Token refreshed, retrying request...');
+            continue; // 재시도
+          }
+        } catch (refreshError) {
+          console.error('[Retry] Token refresh failed:', refreshError);
+          throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries && !error.message?.includes('로그인 세션이 만료')) {
+        console.log(`[Retry] Request failed, attempt ${attempt + 1}/${maxRetries + 1}, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 500)); // 재시도 전 짧은 딜레이
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Request failed after retries');
 }
 
 export async function createProduct(productPayload) {
@@ -151,13 +216,16 @@ export async function importExcel(file) {
     url: `${API_BASE_URL}/api/products/import/excel`
   });
 
-  const formData = new FormData();
-  formData.append('file', file);
+  // 토큰 유효성 검증 및 필요시 갱신
+  await ensureValidToken();
 
   const requestStartTime = Date.now();
   
-  try {
-    console.log('[importExcel] Sending fetch request...');
+  // 401 에러 시 재시도를 위한 래퍼
+  const makeRequest = async (retryCount = 0) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
     const response = await fetch(`${API_BASE_URL}/api/products/import/excel`, {
       method: 'POST',
       headers: {
@@ -165,6 +233,26 @@ export async function importExcel(file) {
       },
       body: formData,
     });
+
+    // 401 에러인 경우 토큰 갱신 후 재시도
+    if (response.status === 401 && retryCount < 1) {
+      console.log(`[importExcel] 401 error detected, attempt ${retryCount + 1}/2, refreshing token...`);
+      try {
+        await refreshToken();
+        console.log('[importExcel] Token refreshed, retrying request...');
+        return makeRequest(retryCount + 1); // 재시도
+      } catch (refreshError) {
+        console.error('[importExcel] Token refresh failed:', refreshError);
+        throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+      }
+    }
+
+    return response;
+  };
+  
+  try {
+    console.log('[importExcel] Sending fetch request...');
+    const response = await makeRequest();
 
     const requestDuration = Date.now() - requestStartTime;
     console.log('[importExcel] Response received:', {
@@ -208,7 +296,10 @@ export async function importExcel(file) {
  * @returns {Promise<Object>} - 커밋 결과 리포트
  */
 export async function commitImport(preview) {
-  const response = await fetch(`${API_BASE_URL}/api/products/import/commit`, {
+  // 토큰 유효성 검증 및 필요시 갱신
+  await ensureValidToken();
+
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/products/import/commit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -207,6 +207,11 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
   const [excelFileName, setExcelFileName] = useState(null);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [duplicateSkus, setDuplicateSkus] = useState(new Set()); // 중복된 SKU 집합
+  
+  // 배치 자동 실행 관련 상태
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, processed: 0, success: 0, failed: 0 });
+  const [allExcelRows, setAllExcelRows] = useState(null); // 전체 엑셀 데이터 저장
 
   useEffect(() => {
     loadCategories();
@@ -882,20 +887,160 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         if (!excelPreview || !excelPreview.preview) return;
         
         if (checked) {
-          // 유효한 행만 선택 (중복 제외, 최대 10000개)
-          const validRows = excelPreview.preview
-            .filter((item) => {
-              const sku = item.mapped?.sku;
-              const isDuplicate = sku && duplicateSkus.has(sku);
-              return item.validation.ok && !isDuplicate;
-            })
-            .slice(0, 10000)
+           // 유효한 행만 선택 (중복 제외, 최대 500개)
+           const validRows = excelPreview.preview
+             .filter((item) => {
+               const sku = item.mapped?.sku;
+               const isDuplicate = sku && duplicateSkus.has(sku);
+               return item.validation.ok && !isDuplicate;
+             })
+             .slice(0, 500)
             .map((item) => item.rowIndex);
           setSelectedRows(new Set(validRows));
         } else {
           setSelectedRows(new Set());
         }
       };
+
+  // 배치 자동 실행 처리 함수
+  const processBatchAuto = async (file, allRowsData, headers) => {
+    const MAX_TOTAL_ROWS = 10000; // 최대 1만 건
+    const BATCH_SIZE = 500; // 배치 크기
+    const maxRowsToProcess = Math.min(allRowsData.length, MAX_TOTAL_ROWS);
+    
+    // 전체 데이터를 500건씩 청크로 분할
+    const chunks = [];
+    for (let i = 0; i < maxRowsToProcess; i += BATCH_SIZE) {
+      chunks.push({
+        start: i,
+        end: Math.min(i + BATCH_SIZE, maxRowsToProcess),
+        rows: allRowsData.slice(i, Math.min(i + BATCH_SIZE, maxRowsToProcess))
+      });
+    }
+    
+    console.log(`🔄 [Batch Auto] Starting batch processing: ${chunks.length} chunks, ${maxRowsToProcess} total rows`);
+    
+    // 배치 시작 전 토큰 검증 및 갱신
+    try {
+      const { getRemainingTime } = await import('../utils/sessionStorage');
+      const { refreshToken } = await import('../services/authService');
+      const remainingTime = getRemainingTime();
+      if (remainingTime < 10 * 60 * 1000) { // 10분 이하 남았으면 갱신
+        console.log('[Batch Auto] Token expires soon, refreshing before batch start...');
+        await refreshToken();
+        console.log('[Batch Auto] Token refreshed successfully');
+      }
+    } catch (tokenError) {
+      console.error('[Batch Auto] Token refresh failed before batch start:', tokenError);
+      throw new Error('토큰 갱신에 실패했습니다. 다시 로그인해주세요.');
+    }
+    
+    setBatchProcessing(true);
+    setBatchProgress({ current: 0, total: chunks.length, processed: 0, success: 0, failed: 0 });
+    
+    let totalSuccess = 0;
+    let totalFailed = 0;
+    
+    // 각 청크를 순차적으로 처리
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      console.log(`📦 [Batch Auto] Processing chunk ${chunkIndex + 1}/${chunks.length} (rows ${chunk.start + 1}-${chunk.end})`);
+      
+      setBatchProgress(prev => ({ ...prev, current: chunkIndex + 1 }));
+      
+      // 각 청크 처리 전 토큰 검증 (5개 청크마다)
+      if (chunkIndex > 0 && chunkIndex % 5 === 0) {
+        try {
+          const { getRemainingTime } = await import('../utils/sessionStorage');
+          const { refreshToken } = await import('../services/authService');
+          const remainingTime = getRemainingTime();
+          if (remainingTime < 10 * 60 * 1000) { // 10분 이하 남았으면 갱신
+            console.log(`[Batch Auto] Token expires soon at chunk ${chunkIndex + 1}, refreshing...`);
+            await refreshToken();
+            console.log(`[Batch Auto] Token refreshed successfully`);
+          }
+        } catch (tokenError) {
+          console.error(`[Batch Auto] Token refresh failed at chunk ${chunkIndex + 1}:`, tokenError);
+          // 토큰 갱신 실패해도 계속 진행 (각 요청에서 재시도됨)
+        }
+      }
+      
+      try {
+        // 청크 데이터를 임시 엑셀 파일로 변환
+        const chunkWorkbook = XLSX.utils.book_new();
+        const chunkWorksheet = XLSX.utils.aoa_to_sheet([headers, ...chunk.rows]);
+        XLSX.utils.book_append_sheet(chunkWorkbook, chunkWorksheet, 'Sheet1');
+        const chunkFileBuffer = XLSX.write(chunkWorkbook, { type: 'array', bookType: 'xlsx' });
+        const chunkBlob = new Blob([chunkFileBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const chunkFile = new File([chunkBlob], `chunk_${chunkIndex + 1}.xlsx`, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        
+        // 서버에 미리보기 요청 (기존 상품 자동 필터링됨)
+        console.log(`📤 [Batch Auto] Chunk ${chunkIndex + 1}: Sending to server for preview...`);
+        const previewResult = await importExcel(chunkFile);
+        
+        if (!previewResult || !previewResult.preview || previewResult.preview.length === 0) {
+          console.log(`⏭️ [Batch Auto] Chunk ${chunkIndex + 1}: No new products found, skipping...`);
+          setBatchProgress(prev => ({ ...prev, processed: prev.processed + chunk.rows.length }));
+          continue;
+        }
+        
+        // 신규 상품만 추출 (validation.ok인 항목만)
+        const newProducts = previewResult.preview.filter(item => item.validation && item.validation.ok);
+        
+        if (newProducts.length === 0) {
+          console.log(`⏭️ [Batch Auto] Chunk ${chunkIndex + 1}: No valid new products, skipping...`);
+          setBatchProgress(prev => ({ ...prev, processed: prev.processed + chunk.rows.length }));
+          continue;
+        }
+        
+        console.log(`✅ [Batch Auto] Chunk ${chunkIndex + 1}: Found ${newProducts.length} new products, auto-committing...`);
+        
+        // 자동으로 커밋 실행
+        const commitResult = await commitImport(newProducts);
+        
+        if (commitResult && commitResult.successCount) {
+          totalSuccess += commitResult.successCount;
+          totalFailed += commitResult.failCount || 0;
+          console.log(`✅ [Batch Auto] Chunk ${chunkIndex + 1}: Committed ${commitResult.successCount} products successfully`);
+          setBatchProgress(prev => ({ 
+            ...prev, 
+            processed: prev.processed + chunk.rows.length,
+            success: prev.success + (commitResult.successCount || 0),
+            failed: prev.failed + (commitResult.failCount || 0)
+          }));
+        } else {
+          console.warn(`⚠️ [Batch Auto] Chunk ${chunkIndex + 1}: Commit result unexpected:`, commitResult);
+          setBatchProgress(prev => ({ ...prev, processed: prev.processed + chunk.rows.length }));
+        }
+        
+        // 청크 간 짧은 딜레이 (서버 부하 방지)
+        if (chunkIndex < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+      } catch (chunkError) {
+        console.error(`❌ [Batch Auto] Chunk ${chunkIndex + 1}: Error:`, chunkError);
+        totalFailed += chunk.rows.length;
+        setBatchProgress(prev => ({ 
+          ...prev, 
+          processed: prev.processed + chunk.rows.length,
+          failed: prev.failed + chunk.rows.length
+        }));
+        // 에러가 발생해도 다음 청크 계속 처리
+      }
+    }
+    
+    console.log(`🎉 [Batch Auto] Batch processing completed! Total: ${totalSuccess} success, ${totalFailed} failed`);
+    setBatchProcessing(false);
+    
+    // 최종 결과 표시
+    setExcelResult({
+      successCount: totalSuccess,
+      failCount: totalFailed,
+      processedCount: maxRowsToProcess,
+      message: `배치 처리 완료: ${totalSuccess}개 성공, ${totalFailed}개 실패`
+    });
+  };
 
   // 엑셀 파일 업로드 핸들러
   const handleExcelUpload = async (e) => {
@@ -930,6 +1075,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     setError('');
     setSelectedRows(new Set()); // 파일 업로드 시 선택 초기화
     setDuplicateSkus(new Set());
+    setBatchProcessing(false);
+    setBatchProgress({ current: 0, total: 0, processed: 0, success: 0, failed: 0 });
 
     const uploadStartTime = Date.now();
 
@@ -950,228 +1097,14 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       const headers = data[0] || [];
       const allRows = data.slice(1);
       
-      // 최대 1만개 행만 처리 (먼저 slice하여 효율성 향상)
-      const maxRowsToProcess = 10000;
-      const rows = allRows.slice(0, maxRowsToProcess);
+      console.log(`[Excel Upload] Total rows in file: ${allRows.length}`);
       
-      console.log(`[Excel Upload] Total rows in file: ${allRows.length}, Processing: ${rows.length} rows`);
-      
-      // 컬럼명으로 매핑된 객체 배열로 변환 (1만개만)
-      const mappedData = rows.map(row => {
-        const obj = {};
-        headers.forEach((header, index) => {
-          obj[header] = row[index] !== undefined ? row[index] : null;
-        });
-        // G열(인덱스 6) 데이터 직접 추가
-        obj['__G_COLUMN__'] = row[6] !== undefined ? row[6] : null;
-        return obj;
-      });
-      
-      const maxRows = mappedData.length; // 이미 1만개로 제한됨
-      console.log(`[Excel Upload] File parsed: ${maxRows} rows found`);
-      
-      // 컬럼 찾기 헬퍼
-      const findColumn = (row, possibleNames) => {
-        for (const name of possibleNames) {
-          if (row.hasOwnProperty(name)) {
-            return row[name];
-          }
-        }
-        return null;
-      };
-      
-      // 실시간 미리보기를 위한 상태 초기화
-      const initialPreview = {
-        preview: [],
-        totalRows: maxRows,
-        validRows: 0,
-        invalidRows: 0,
-      };
-      setExcelPreview(initialPreview);
-      
-      // 1개씩 처리하여 실시간 미리보기 업데이트
-      const previewItems = [];
-      const skuMap = new Map();
-      const duplicates = new Set();
-      
-      for (let i = 0; i < maxRows; i++) {
-        const row = mappedData[i];
-        const rowIndex = i + 2; // 엑셀 행 번호 (헤더 제외, 1-based)
-        
-        // 1개씩 읽을 때마다 콘솔 로그
-        const percentage = ((i + 1) / maxRows * 100).toFixed(1);
-        console.log(`📊 [Excel Upload] Row ${i + 1}/${maxRows} (${percentage}%): Processing...`);
-        
-        // 원본 데이터 추출
-        const barcode = findColumn(row, ['바코드', 'barcode', 'Barcode', 'BARCODE', 'SKU', 'sku']);
-        const name = findColumn(row, ['상품명', 'name', 'Name', 'NAME', '제품명', 'product_name']);
-        const vip5 = row['__G_COLUMN__'] !== null && row['__G_COLUMN__'] !== undefined 
-          ? row['__G_COLUMN__'] 
-          : findColumn(row, ['우수회원5', 'VIP5', 'vip5', '우수회원', 'member_price']);
-        const categoryPath = findColumn(row, ['카테고리', 'category', 'Category', 'CATEGORY', 'category_path']);
-        
-        const raw = { barcode, name, vip5, categoryPath };
-        
-        // 검증 및 매핑
-        const validation = { ok: true, errors: [] };
-        const mapped = { sku: null, name: null, price: null, category: { l1: null, l2: null, l3: null }, categoryId: null };
-        
-        // SKU 검증
-        if (!barcode || (typeof barcode === 'string' && !barcode.trim())) {
-          validation.ok = false;
-          validation.errors.push('Barcode is required');
-        } else {
-          mapped.sku = String(barcode).trim().toUpperCase();
-        }
-        
-        // 상품명 검증
-        if (!name || (typeof name === 'string' && !name.trim())) {
-          validation.ok = false;
-          validation.errors.push('Product name is required');
-        } else {
-          mapped.name = String(name).trim();
-        }
-        
-        // 할인율 랜덤 배정 함수 (10~60%, 비율에 따라 가중치 적용)
-        function getRandomDiscountRate() {
-          const discountOptions = [
-            // 10%대: 가중치 1
-            ...Array(1).fill().map(() => Math.floor(Math.random() * 10) + 10),
-            // 20%대: 가중치 2
-            ...Array(2).fill().map(() => Math.floor(Math.random() * 10) + 20),
-            // 30%대: 가중치 3
-            ...Array(3).fill().map(() => Math.floor(Math.random() * 10) + 30),
-            // 40%: 가중치 2
-            ...Array(2).fill(40),
-            // 50%: 가중치 1
-            ...Array(1).fill(50),
-            // 60%: 가중치 1
-            ...Array(1).fill(60),
-          ];
-          return discountOptions[Math.floor(Math.random() * discountOptions.length)];
-        }
-        
-        // 카테고리 경로 추출 (가격 계산을 위해 먼저 처리)
-        let categoryPathText = null;
-        if (categoryPath && String(categoryPath).trim()) {
-          categoryPathText = String(categoryPath).trim();
-        }
-        
-        // 가격 계산: 카테고리별 multiplier 적용 후 10원 단위로 절삭
-        if (vip5 !== null && vip5 !== undefined && vip5 !== '') {
-          const vip5Num = Number(vip5);
-          if (!isNaN(vip5Num) && vip5Num >= 0) {
-            // 카테고리별 multiplier 계산
-            const multiplier = categoryPathText ? getCategoryMultiplier(categoryPathText) : 2.10;
-            
-            // 우수회원5 값에 multiplier를 곱한 후 10원 단위로 절삭
-            const calculatedPrice = vip5Num * multiplier;
-            mapped.price = Math.floor(calculatedPrice / 10) * 10;
-            
-            // 할인율 랜덤 배정
-            const discountRate = getRandomDiscountRate();
-            mapped.discountRate = discountRate;
-            
-            // 원래 가격 역산: 현재 가격 / (1 - 할인율/100), 100원 단위로 절삭
-            const originalPrice = mapped.price / (1 - discountRate / 100);
-            mapped.originalPrice = Math.floor(originalPrice / 100) * 100;
-          } else {
-            validation.ok = false;
-            validation.errors.push(`VIP5 price must be a valid number`);
-          }
-        } else {
-          validation.ok = false;
-          validation.errors.push('VIP5 price is required');
-        }
-        
-        // 카테고리 처리
-        if (categoryPathText) {
-          const parts = categoryPathText.split('>').map(p => p.trim()).filter(p => p);
-          mapped.category.l1 = parts[0] || null;
-          mapped.category.l2 = parts[1] || null;
-          mapped.category.l3 = parts[2] || null;
-        } else {
-          validation.ok = false;
-          validation.errors.push('Category is required');
-        }
-        
-        // 미리보기 아이템 생성
-        const previewItem = {
-          rowIndex,
-          raw,
-          mapped,
-          validation,
-        };
-        
-        previewItems.push(previewItem);
-        
-        // 실시간 미리보기 업데이트 (1개씩 추가)
-        const currentValidCount = previewItems.filter(item => item.validation.ok).length;
-        const currentInvalidCount = previewItems.length - currentValidCount;
-        
-        setExcelPreview({
-          preview: [...previewItems],
-          totalRows: maxRows,
-          validRows: currentValidCount,
-          invalidRows: currentInvalidCount,
-        });
-        
-        // 1개씩 처리 완료 후 콘솔 로그
-        const status = validation.ok ? '✅ Valid' : '❌ Invalid';
-        const errors = validation.errors.length > 0 ? ` - ${validation.errors.join(', ')}` : '';
-        console.log(`📦 [Excel Upload] Row ${rowIndex} processed: ${status} | SKU: ${mapped.sku || 'N/A'} | Name: ${mapped.name || 'N/A'}${errors}`);
-        
-        // 중복 체크
-        const sku = mapped.sku;
-        if (sku && validation.ok) {
-          if (skuMap.has(sku)) {
-            duplicates.add(sku);
-          } else {
-            skuMap.set(sku, rowIndex);
-          }
-        }
-        
-        // UI 업데이트를 위한 짧은 딜레이 (너무 빠르면 브라우저가 업데이트를 따라가지 못할 수 있음)
-        if ((i + 1) % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-      
-      // 중복 SKU 설정
-      setDuplicateSkus(duplicates);
-      
-      // 최종 결과를 서버로 보내서 검증 및 카테고리 처리
-      console.log('[Excel Upload] Sending to server for validation and category processing...');
-      const finalResult = await importExcel(file);
-      
-      // 서버에서 받은 최종 결과로 업데이트 (카테고리 ID 등 서버 검증 결과 포함)
-      setExcelPreview(finalResult);
-      
-      // 서버 결과 기반 중복 재계산
-      const finalSkuMap = new Map();
-      const finalDuplicates = new Set();
-      if (finalResult.preview) {
-        finalResult.preview.forEach((item) => {
-          const sku = item.mapped?.sku;
-          if (sku && item.validation?.ok) {
-            if (finalSkuMap.has(sku)) {
-              finalDuplicates.add(sku);
-            } else {
-              finalSkuMap.set(sku, item.rowIndex);
-            }
-          }
-        });
-      }
-      setDuplicateSkus(finalDuplicates);
+      // 배치 자동 실행 시작
+      console.log('[Excel Upload] Starting batch auto-processing...');
+      await processBatchAuto(file, allRows, headers);
       
       const uploadDuration = Date.now() - uploadStartTime;
-      console.log('[Excel Upload] Upload completed successfully:', {
-        duration: uploadDuration + 'ms',
-        validRows: finalResult.validRows,
-        invalidRows: finalResult.invalidRows,
-        totalRows: finalResult.totalRows,
-        preview: finalResult.preview?.length || 0
-      });
+      console.log('[Excel Upload] Batch processing completed in', uploadDuration + 'ms');
     } catch (uploadError) {
       const uploadDuration = Date.now() - uploadStartTime;
       console.error('[Excel Upload] Upload failed after', uploadDuration + 'ms:', uploadError);
@@ -1205,12 +1138,12 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       return;
     }
 
-    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 10000개)
+    // 선택된 행이 있으면 선택된 행만, 없으면 모든 유효한 행 사용 (중복 제외, 최대 500개)
     let rowsToCommit = excelPreview.preview;
     if (selectedRows.size > 0) {
       rowsToCommit = excelPreview.preview.filter((item) => selectedRows.has(item.rowIndex));
     } else {
-      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 10000개)
+      // 선택된 행이 없으면 모든 유효한 행 처리 (중복 제외, 최대 500개)
       const skuSet = new Set();
       rowsToCommit = excelPreview.preview
         .filter((item) => {
@@ -1221,7 +1154,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
           if (sku) skuSet.add(sku);
           return true;
         })
-        .slice(0, 10000);
+        .slice(0, 500);
     }
 
     if (rowsToCommit.length === 0) {
@@ -1365,9 +1298,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                 gap: '0.5rem',
               }}>
                 <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
-                <span style={{ fontWeight: 600, color: '#1e40af' }}>
-                  최대 10,000개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
-                </span>
+                 <span style={{ fontWeight: 600, color: '#1e40af' }}>
+                   최대 500개까지 처리 가능합니다. 중복된 상품은 자동으로 제외됩니다.
+                 </span>
               </div>
 
               {/* 파일 업로드 */}
@@ -1421,27 +1354,27 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                 <div style={{
                   marginTop: '1rem',
                   padding: '0.75rem 1rem',
-                  background: excelUploading ? '#fef3c7' : (excelPreview ? '#f0fdf4' : '#f0f9ff'),
-                  border: excelUploading ? '1px solid #fbbf24' : (excelPreview ? '1px solid #86efac' : '1px solid #bae6fd'),
+                  background: batchProcessing ? '#fef3c7' : (excelUploading ? '#fef3c7' : (excelPreview ? '#f0fdf4' : '#f0f9ff')),
+                  border: batchProcessing ? '1px solid #fbbf24' : (excelUploading ? '1px solid #fbbf24' : (excelPreview ? '1px solid #86efac' : '1px solid #bae6fd')),
                   borderRadius: '6px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                 }}>
-                  {excelUploading ? (
+                  {batchProcessing || excelUploading ? (
                     <div className="loading-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', borderColor: '#f59e0b #f59e0b transparent #f59e0b' }}></div>
                   ) : (
                     <FileSpreadsheet size={20} color={excelPreview ? "#059669" : "#0369a1"} />
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 500, color: excelUploading ? '#92400e' : (excelPreview ? '#059669' : '#0369a1') }}>
-                      {excelUploading ? '⏳ 파일 업로드 중...' : (excelPreview ? '✓ 파일 업로드 완료' : '📤 파일 선택됨')}
+                    <div style={{ fontSize: '0.875rem', fontWeight: 500, color: batchProcessing ? '#92400e' : (excelUploading ? '#92400e' : (excelPreview ? '#059669' : '#0369a1')) }}>
+                      {batchProcessing ? '🔄 배치 처리 중...' : (excelUploading ? '⏳ 파일 업로드 중...' : (excelPreview ? '✓ 파일 업로드 완료' : '📤 파일 선택됨'))}
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: excelUploading ? '#78350f' : (excelPreview ? '#047857' : '#075985'), marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: batchProcessing ? '#78350f' : (excelUploading ? '#78350f' : (excelPreview ? '#047857' : '#075985')), marginTop: '0.25rem' }}>
                       {excelFileName}
                     </div>
                   </div>
-                  {excelPreview && (
+                  {excelPreview && !batchProcessing && (
                     <div style={{
                       padding: '0.25rem 0.75rem',
                       background: '#10b981',
@@ -1453,6 +1386,45 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       ✓ 준비 완료
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 배치 처리 진행 상황 표시 */}
+              {batchProcessing && batchProgress.total > 0 && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  background: '#fef3c7',
+                  border: '1px solid #fbbf24',
+                  borderRadius: '6px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>
+                      배치 처리 진행 중...
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#78350f' }}>
+                      {batchProgress.current} / {batchProgress.total} 청크
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '8px',
+                    background: '#fde68a',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginBottom: '0.5rem',
+                  }}>
+                    <div style={{
+                      width: `${(batchProgress.current / batchProgress.total) * 100}%`,
+                      height: '100%',
+                      background: '#f59e0b',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#78350f' }}>
+                    <span>처리된 행: {batchProgress.processed.toLocaleString()}</span>
+                    <span>성공: {batchProgress.success.toLocaleString()} | 실패: {batchProgress.failed.toLocaleString()}</span>
+                  </div>
                 </div>
               )}
 
@@ -1687,8 +1659,8 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                   {selectedRows.size > 0 ? (
                     <span><strong>{selectedRows.size}개</strong> 상품이 선택되었습니다.</span>
                   ) : (
-                    <span>
-                      <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 10000)}개</strong> 상품이 추가됩니다.
+                     <span>
+                       <strong>{Math.min(excelPreview.validRows - duplicateSkus.size, 500)}개</strong> 상품이 추가됩니다.
                       {duplicateSkus.size > 0 && (
                         <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>
                           (중복 {duplicateSkus.size}개 제외)
@@ -1707,7 +1679,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       }
                       return item.validation.ok && !isDuplicate;
                     })
-                    .slice(0, 10000)
+                     .slice(0, 500)
                     .map((item, idx) => (
                       <div
                         key={idx}

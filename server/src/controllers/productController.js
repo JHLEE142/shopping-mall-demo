@@ -599,19 +599,215 @@ async function fetchProductImages(productUrl) {
       return { mainImage: '', detailImages: [] };
     }
 
-    // HTTP 요청으로 HTML 가져오기
-    const response = await axios.get(url, {
-      timeout: 10000, // 10초 타임아웃
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    // HTTP 요청으로 HTML 가져오기 (타임아웃 10초, 재시도 1회)
+    let response;
+    const startTime = Date.now();
+    try {
+      response = await axios.get(url, {
+        timeout: 10000, // 10초 타임아웃 (이미지 가져오기 성공률 향상)
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
+        maxRedirects: 5,
+        validateStatus: (status) => status < 500 // 5xx 에러가 아니면 계속 진행
+      });
+      const fetchDuration = Date.now() - startTime;
+      console.log(`✅ [FETCH IMAGES] Successfully fetched HTML from ${url} in ${fetchDuration}ms (Status: ${response.status})`);
+    } catch (firstError) {
+      const firstAttemptDuration = Date.now() - startTime;
+      console.warn(`⚠️ [FETCH IMAGES] First attempt failed for ${url} after ${firstAttemptDuration}ms:`, firstError.message);
+      // 첫 번째 시도 실패 시 1회 재시도
+      console.log(`🔄 [FETCH IMAGES] Retrying for ${url}...`);
+      const retryStartTime = Date.now();
+      try {
+        response = await axios.get(url, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          },
+          maxRedirects: 5,
+          validateStatus: (status) => status < 500
+        });
+        const retryDuration = Date.now() - retryStartTime;
+        console.log(`✅ [FETCH IMAGES] Retry successful for ${url} in ${retryDuration}ms (Status: ${response.status})`);
+      } catch (retryError) {
+        const retryDuration = Date.now() - retryStartTime;
+        console.error(`❌ [FETCH IMAGES] Retry also failed for ${url} after ${retryDuration}ms:`, retryError.message);
+        throw retryError; // 재시도도 실패하면 에러 throw
       }
-    });
+    }
 
     const html = response.data;
     const $ = cheerio.load(html);
 
     let mainImage = '';
     const detailImages = [];
+
+    // tckjong.com 사이트 특화 이미지 추출
+    const isTckjongSite = url.includes('tckjong.com');
+    
+    if (isTckjongSite) {
+      console.log(`🔍 [FETCH IMAGES] Detected tckjong.com site, using specialized extraction...`);
+      
+      // 1. 대표 이미지: id="mainImg" 속성을 가진 img 태그에서 가져오기 (최우선)
+      const mainImgElement = $('#mainImg').first();
+      if (mainImgElement.length > 0) {
+        let src = mainImgElement.attr('src') || mainImgElement.attr('data-src') || mainImgElement.attr('data-original') || mainImgElement.attr('data-lazy-src');
+        if (src) {
+          // 상대 경로를 절대 경로로 변환
+          if (src.startsWith('//')) {
+            src = 'https:' + src;
+          } else if (src.startsWith('/')) {
+            const urlObj = new URL(url);
+            src = urlObj.origin + src;
+          } else if (!src.startsWith('http')) {
+            const urlObj = new URL(url);
+            src = new URL(src, urlObj.origin).href;
+          }
+          
+          // 쿼리 파라미터 제거
+          mainImage = src.split('?')[0];
+          console.log(`✅ [FETCH IMAGES] Main image found from id="mainImg": ${mainImage}`);
+        }
+      }
+      
+      // 2. id="mainImg"에서 못 찾은 경우, 다양한 패턴으로 찾기
+      if (!mainImage) {
+        // 패턴 1: tckjongg.wisacdn.com/data/product/ 또는 tckjonge.wisacdn.com/data/product/
+        const productImagePattern1 = /https?:\/\/(tckjongg|tckjonge)\.wisacdn\.com\/data\/product\/[^\s"'<>)]+\.(jpg|jpeg|png|gif|webp|JPG|JPEG|PNG|GIF|WEBP)(\?[^\s"'<>)]*)?/gi;
+        const productImageMatches1 = html.match(productImagePattern1);
+        
+        if (productImageMatches1 && productImageMatches1.length > 0) {
+          mainImage = productImageMatches1[0].split('?')[0];
+          console.log(`✅ [FETCH IMAGES] Main image found (pattern 1 - data/product/): ${mainImage}`);
+        }
+        
+        // 패턴 2: tckjongg.wisacdn.com/_data/product/ 또는 tckjonge.wisacdn.com/_data/product/ (언더스코어 포함)
+        if (!mainImage) {
+          const productImagePattern2 = /https?:\/\/(tckjongg|tckjonge)\.wisacdn\.com\/_data\/product\/[^\s"'<>)]+\.(jpg|jpeg|png|gif|webp|JPG|JPEG|PNG|GIF|WEBP)(\?[^\s"'<>)]*)?/gi;
+          const productImageMatches2 = html.match(productImagePattern2);
+          
+          if (productImageMatches2 && productImageMatches2.length > 0) {
+            mainImage = productImageMatches2[0].split('?')[0];
+            console.log(`✅ [FETCH IMAGES] Main image found (pattern 2 - _data/product/): ${mainImage}`);
+          }
+        }
+        
+        // 패턴 3: img 태그에서 직접 찾기
+        if (!mainImage) {
+          $('img').each((index, elem) => {
+            const img = $(elem);
+            let src = img.attr('src') || img.attr('data-src') || img.attr('data-original') || img.attr('data-lazy-src');
+            
+            if (src) {
+              // 상대 경로를 절대 경로로 변환
+              if (src.startsWith('//')) {
+                src = 'https:' + src;
+              } else if (src.startsWith('/')) {
+                const urlObj = new URL(url);
+                src = urlObj.origin + src;
+              } else if (!src.startsWith('http')) {
+                const urlObj = new URL(url);
+                src = new URL(src, urlObj.origin).href;
+              }
+              
+              const cleanSrc = src.split('?')[0];
+              
+              // data/product/ 또는 _data/product/ 패턴 확인
+              if ((cleanSrc.includes('tckjongg.wisacdn.com/data/product/') || 
+                   cleanSrc.includes('tckjonge.wisacdn.com/data/product/') ||
+                   cleanSrc.includes('tckjongg.wisacdn.com/_data/product/') ||
+                   cleanSrc.includes('tckjonge.wisacdn.com/_data/product/')) && !mainImage) {
+                mainImage = cleanSrc;
+                console.log(`✅ [FETCH IMAGES] Main image found from img tag: ${mainImage}`);
+                return false; // break
+              }
+            }
+          });
+        }
+      }
+      
+      // 3. 상세 이미지: 다양한 패턴으로 찾기
+      // 패턴 1: data/attach/
+      const attachImagePattern1 = /https?:\/\/(tckjongg|tckjonge)\.wisacdn\.com\/data\/attach\/[^\s"'<>)]+\.(jpg|jpeg|png|gif|webp|JPG|JPEG|PNG|GIF|WEBP)(\?[^\s"'<>)]*)?/gi;
+      const attachImageMatches1 = html.match(attachImagePattern1);
+      
+      if (attachImageMatches1 && attachImageMatches1.length > 0) {
+        const uniqueAttachImages = [...new Set(attachImageMatches1.map(url => url.split('?')[0]))];
+        uniqueAttachImages.forEach(imgUrl => {
+          if (imgUrl !== mainImage && detailImages.indexOf(imgUrl) === -1 && detailImages.length < 20) {
+            detailImages.push(imgUrl);
+            console.log(`  ✅ [FETCH IMAGES] Detail image found (pattern 1 - data/attach/): ${imgUrl}`);
+          }
+        });
+      }
+      
+      // 패턴 2: _data/attach/ (언더스코어 포함)
+      const attachImagePattern2 = /https?:\/\/(tckjongg|tckjonge)\.wisacdn\.com\/_data\/attach\/[^\s"'<>)]+\.(jpg|jpeg|png|gif|webp|JPG|JPEG|PNG|GIF|WEBP)(\?[^\s"'<>)]*)?/gi;
+      const attachImageMatches2 = html.match(attachImagePattern2);
+      
+      if (attachImageMatches2 && attachImageMatches2.length > 0) {
+        const uniqueAttachImages = [...new Set(attachImageMatches2.map(url => url.split('?')[0]))];
+        uniqueAttachImages.forEach(imgUrl => {
+          if (imgUrl !== mainImage && detailImages.indexOf(imgUrl) === -1 && detailImages.length < 20) {
+            detailImages.push(imgUrl);
+            console.log(`  ✅ [FETCH IMAGES] Detail image found (pattern 2 - _data/attach/): ${imgUrl}`);
+          }
+        });
+      }
+      
+      // 패턴 3: img 태그에서 직접 찾기
+      $('img').each((index, elem) => {
+        const img = $(elem);
+        const imgId = img.attr('id');
+        // 이미 id="mainImg"는 처리했으므로 건너뛰기
+        if (imgId === 'mainImg' || imgId === 'mainimg') return;
+        
+        let src = img.attr('src') || img.attr('data-src') || img.attr('data-original') || img.attr('data-lazy-src');
+        
+        if (src) {
+          // 상대 경로를 절대 경로로 변환
+          if (src.startsWith('//')) {
+            src = 'https:' + src;
+          } else if (src.startsWith('/')) {
+            const urlObj = new URL(url);
+            src = urlObj.origin + src;
+          } else if (!src.startsWith('http')) {
+            const urlObj = new URL(url);
+            src = new URL(src, urlObj.origin).href;
+          }
+          
+          // 쿼리 파라미터 제거
+          const cleanSrc = src.split('?')[0];
+          
+          // 상세 이미지 패턴 확인 (data/attach/ 또는 _data/attach/)
+          if ((cleanSrc.includes('tckjongg.wisacdn.com/data/attach/') || 
+               cleanSrc.includes('tckjonge.wisacdn.com/data/attach/') ||
+               cleanSrc.includes('tckjongg.wisacdn.com/_data/attach/') ||
+               cleanSrc.includes('tckjonge.wisacdn.com/_data/attach/')) && 
+              cleanSrc !== mainImage && 
+              detailImages.indexOf(cleanSrc) === -1 && 
+              detailImages.length < 20) {
+            detailImages.push(cleanSrc);
+            console.log(`  ✅ [FETCH IMAGES] Detail image found from img tag: ${cleanSrc}`);
+          }
+        }
+      });
+      
+      // tckjong 사이트 처리 완료
+      if (mainImage || detailImages.length > 0) {
+        console.log(`✅ [FETCH IMAGES] tckjong.com extraction completed - Main: ${mainImage ? 'YES (' + mainImage.substring(0, 60) + '...)' : 'NO'}, Details: ${detailImages.length}`);
+        return {
+          mainImage: mainImage || '',
+          detailImages: detailImages
+        };
+      } else {
+        console.warn(`⚠️ [FETCH IMAGES] tckjong.com extraction failed - no images found. HTML length: ${html.length}`);
+        // HTML 일부를 로그로 출력 (디버깅용)
+        const htmlSample = html.substring(0, 2000);
+        console.log(`🔍 [FETCH IMAGES] HTML sample (first 2000 chars):`, htmlSample);
+      }
+    }
 
     // UI 요소 필터링 헬퍼 함수
     const isUIElement = (src) => {
@@ -626,7 +822,7 @@ async function fetchProductImages(productUrl) {
       return uiPatterns.some(pattern => lowerSrc.includes(pattern));
     };
 
-    // 1. 대표 이미지 추출
+    // 1. 대표 이미지 추출 (일반적인 쇼핑몰 구조)
     // 우선순위: id="mainImg" > 일반적인 쇼핑몰 구조
     // 먼저 id="mainImg"로 명시적으로 지정된 이미지 찾기
     const mainImgElement = $('#mainImg').first();
@@ -808,7 +1004,14 @@ async function fetchProductImages(productUrl) {
       });
     }
 
-    console.log(`✅ [FETCH IMAGES] Found ${detailImages.length} detail images`);
+    console.log(`✅ [FETCH IMAGES] Image extraction completed for ${url}:`);
+    console.log(`   - Main image: ${mainImage ? 'YES (' + mainImage.substring(0, 60) + '...)' : 'NO'}`);
+    console.log(`   - Detail images: ${detailImages.length} found`);
+    if (detailImages.length > 0 && detailImages.length <= 3) {
+      detailImages.forEach((img, idx) => {
+        console.log(`   - Detail ${idx + 1}: ${img.substring(0, 60)}...`);
+      });
+    }
     
     return {
       mainImage: mainImage || '',
@@ -988,12 +1191,19 @@ async function importExcel(req, res, next) {
     const existingSkus = new Set(existingProducts.map(p => p.sku.toUpperCase()));
     console.log(`📊 [EXCEL IMPORT] Found ${existingSkus.size} existing SKUs in database`);
 
-    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 10000 valid products)...`);
+    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 500 valid unique products)...`);
     const previewData = [];
-    const targetValidProducts = 10000;
-    const maxRowsToCheck = Math.min(allRows.length, 10000); // 최대 10000개 행까지 확인
+    const targetValidProducts = 500;
+    // 중복 제외를 고려하여 더 많은 행 읽기 (최대 1500개 행까지 읽어서 중복 제외 후 500개 채우기)
+    const maxRowsToCheck = Math.min(allRows.length, 1500);
+    
+    // 엑셀 파일 내 중복 체크를 위한 SKU Map
+    const fileSkuMap = new Map(); // SKU -> 첫 번째 발견된 rowIndex
+    const fileDuplicateSkus = new Set(); // 중복된 SKU들
+    let actualRowsProcessed = 0; // 실제 처리한 행 수 추적
 
     for (let i = 0; i < maxRowsToCheck && previewData.length < targetValidProducts; i++) {
+      actualRowsProcessed = i + 1; // 실제 처리한 행 수 업데이트
       const rowStartTime = Date.now();
       const rawRow = allRows[i];
       const rowIndex = i + 2; // 엑셀 행 번호 (헤더 제외, 1-based)
@@ -1029,9 +1239,16 @@ async function importExcel(req, res, next) {
           vip5,
           vip5Type: typeof vip5,
           vip5Value: vip5,
-          categoryPath
+          categoryPath,
+          productUrl,
+          productUrlType: typeof productUrl
         });
         console.log('📋 [EXCEL IMPORT] First row - Full row data:', JSON.stringify(row, null, 2));
+      }
+      
+      // productUrl이 있는 경우 로그 (처음 5개 행만)
+      if (i < 5 && productUrl && productUrl.trim()) {
+        console.log(`🔗 [EXCEL IMPORT] Row ${rowIndex}: Product URL found: ${productUrl}`);
       }
 
       const raw = { barcode, name, vip5, categoryPath, productUrl };
@@ -1041,17 +1258,31 @@ async function importExcel(req, res, next) {
       const mapped = { sku: null, name: null, price: null, category: { l1: null, l2: null, l3: null }, categoryId: null };
 
       // SKU 검증 (필수)
+      let sku = null;
       if (!barcode || (typeof barcode === 'string' && !barcode.trim())) {
         validation.ok = false;
         validation.errors.push('Barcode is required');
       } else {
-        mapped.sku = String(barcode).trim().toUpperCase();
+        sku = String(barcode).trim().toUpperCase();
+        mapped.sku = sku;
         
-        // DB에 이미 있는 SKU인지 체크
-        if (existingSkus.has(mapped.sku)) {
+        // 엑셀 파일 내 SKU 중복 체크 (실시간)
+        if (fileSkuMap.has(sku)) {
+          // 중복 발견: 이전 행과 현재 행 모두 중복으로 표시
+          fileDuplicateSkus.add(sku);
           validation.ok = false;
-          validation.errors.push(`SKU already exists in database: ${mapped.sku}`);
-          console.log(`⏭️ [EXCEL IMPORT] Row ${rowIndex}: Skipping - SKU already exists: ${mapped.sku}`);
+          validation.errors.push(`Duplicate SKU in Excel file: ${sku} (first found at row ${fileSkuMap.get(sku)})`);
+          console.log(`⏭️ [EXCEL IMPORT] Row ${rowIndex}: Skipping - Duplicate SKU in file: ${sku} (first found at row ${fileSkuMap.get(sku)})`);
+        } else {
+          // 첫 번째 발견된 SKU
+          fileSkuMap.set(sku, rowIndex);
+          
+          // DB에 이미 있는 SKU인지 체크 (기존 상품은 제외)
+          if (existingSkus.has(sku)) {
+            validation.ok = false;
+            validation.errors.push(`SKU already exists in database: ${sku}`);
+            console.log(`⏭️ [EXCEL IMPORT] Row ${rowIndex}: Skipping - SKU already exists in DB: ${sku}`);
+          }
         }
       }
 
@@ -1171,31 +1402,40 @@ async function importExcel(req, res, next) {
         console.warn(`⚠️ [EXCEL IMPORT] Row ${rowIndex}: Processing took ${rowDuration}ms`);
       }
 
-      // 유효한 상품만 previewData에 추가 (DB 중복 제외)
-      if (validation.ok) {
-        previewData.push({
-          rowIndex,
-          raw,
-          mapped,
-          validation,
-        });
-        console.log(`✅ [EXCEL IMPORT] Row ${rowIndex} added: SKU: ${mapped.sku} | Name: ${mapped.name} (${previewData.length}/${targetValidProducts})`);
+      // 미리보기 아이템 생성
+      const previewItem = {
+        rowIndex,
+        raw,
+        mapped,
+        validation,
+      };
+      
+      // 중복된 SKU는 미리보기에 추가하지 않음 (실시간 제외)
+      // 기존 상품도 미리보기에서 제외 (신규 상품만 포함)
+      if (!fileDuplicateSkus.has(sku) && validation.ok && (!sku || !existingSkus.has(sku))) {
+        // 유효하고 중복이 아니며 기존 상품이 아닌 항목만 previewData에 추가
+        previewData.push(previewItem);
+        console.log(`✅ [EXCEL IMPORT] Row ${rowIndex} added (new): SKU: ${mapped.sku} | Name: ${mapped.name} (${previewData.length}/${targetValidProducts})`);
       } else {
-        // 1개씩 처리 완료 후 콘솔 로그 (유효하지 않은 경우)
+        // 1개씩 처리 완료 후 콘솔 로그 (유효하지 않거나 중복이거나 기존 상품인 경우)
         const errors = validation.errors.length > 0 ? ` - ${validation.errors.join(', ')}` : '';
         console.log(`⏭️ [EXCEL IMPORT] Row ${rowIndex} skipped: SKU: ${mapped.sku || 'N/A'} | Name: ${mapped.name || 'N/A'}${errors}`);
       }
       
-      // 목표 개수에 도달하면 중단
+      // 목표 개수에 도달하면 중단 (중복 제외한 유효 항목 기준)
       if (previewData.length >= targetValidProducts) {
-        console.log(`🎯 [EXCEL IMPORT] Target reached: ${previewData.length} valid products found. Stopping...`);
+        console.log(`🎯 [EXCEL IMPORT] Target reached: ${previewData.length} valid unique products found. Stopping...`);
         break;
       }
     }
 
     const totalDuration = Date.now() - startTime;
-    const validCount = previewData.filter(item => item.validation.ok).length;
-    const invalidCount = previewData.filter(item => !item.validation.ok).length;
+    // previewData에는 이미 중복이 제외된 유효한 항목만 있음
+    const validCount = previewData.length;
+    // 실제 처리한 행 수에서 유효 행 수를 뺀 것
+    const invalidCount = Math.max(0, actualRowsProcessed - validCount);
+    
+    console.log(`📊 [EXCEL IMPORT] Processing summary: ${actualRowsProcessed} total rows processed, ${validCount} valid unique products added to preview, ${invalidCount} invalid/duplicate rows excluded, ${fileDuplicateSkus.size} duplicate SKUs found in file`);
 
     console.log('✅ [EXCEL IMPORT] Processing completed:', {
       totalRows: previewData.length,
@@ -1240,7 +1480,7 @@ async function importExcel(req, res, next) {
   }
 }
 
-// 상품 등록 커밋 (최대 1만개까지 처리)
+// 상품 등록 커밋 (최대 500개까지 처리)
 async function commitImport(req, res, next) {
   try {
     const { preview } = req.body;
@@ -1249,8 +1489,8 @@ async function commitImport(req, res, next) {
       return res.status(400).json({ message: 'Preview data is required' });
     }
 
-    // 유효한 행만 필터링 (최대 1만개)
-    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 10000);
+    // 유효한 행만 필터링 (최대 500개)
+    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 500);
 
     if (validRows.length === 0) {
       return res.status(400).json({ message: 'No valid rows to import' });
@@ -1296,6 +1536,19 @@ async function commitImport(req, res, next) {
 
     const totalItems = rowsToProcess.length;
     console.log(`📦 [EXCEL COMMIT] Starting import of ${totalItems} products...`);
+    
+    // 첫 번째 항목의 구조 확인 (디버깅)
+    if (rowsToProcess.length > 0) {
+      const firstItem = rowsToProcess[0];
+      console.log(`🔍 [EXCEL COMMIT] First item structure check:`, {
+        hasRaw: !!firstItem.raw,
+        rawKeys: firstItem.raw ? Object.keys(firstItem.raw) : [],
+        productUrl: firstItem.raw?.productUrl,
+        rowIndex: firstItem.rowIndex,
+        sku: firstItem.mapped?.sku,
+        name: firstItem.mapped?.name
+      });
+    }
 
     for (let index = 0; index < rowsToProcess.length; index++) {
       const item = rowsToProcess[index];
@@ -1328,7 +1581,7 @@ async function commitImport(req, res, next) {
 
         // 카테고리 재확인 및 upsert
         let categoryId = mapped.categoryId;
-        if (item.raw.categoryPath) {
+        if (item.raw && item.raw.categoryPath) {
           try {
             const categoryResult = await upsertCategoryFromPath(String(item.raw.categoryPath).trim());
             categoryId = categoryResult.category._id;
@@ -1351,21 +1604,33 @@ async function commitImport(req, res, next) {
         if (mapped.category.l3) categoryParts.push(mapped.category.l3);
         const categoryPathText = categoryParts.join(' > ');
 
-        // 이미지 추출 (상품URL이 있는 경우)
+        // 이미지 추출 (상품URL이 있는 경우) - 순차 처리로 복원
         let mainImage = '';
         let detailImages = [];
         let descriptionHtml = '';
-        if (item.raw.productUrl && item.raw.productUrl.trim()) {
-          console.log(`🖼️ [EXCEL COMMIT] Row ${item.rowIndex}: Fetching images from URL: ${item.raw.productUrl}`);
+        
+        // raw 필드가 없거나 productUrl이 없는 경우 확인
+        if (!item.raw) {
+          console.warn(`⚠️ [EXCEL COMMIT] Row ${item.rowIndex}: No raw field found - SKU: ${sku}, Name: ${mapped.name}`);
+        }
+        
+        const productUrl = item.raw?.productUrl;
+        if (productUrl && String(productUrl).trim()) {
+          const urlToFetch = String(productUrl).trim();
+          console.log(`🖼️ [EXCEL COMMIT] Row ${item.rowIndex}: Fetching images from URL: ${urlToFetch}`);
           try {
-            const imageResult = await fetchProductImages(item.raw.productUrl);
+            const imageResult = await fetchProductImages(urlToFetch);
             mainImage = imageResult.mainImage || '';
             detailImages = imageResult.detailImages || [];
-            console.log(`✅ [EXCEL COMMIT] Row ${item.rowIndex}: Images fetched - Main: ${mainImage ? mainImage : 'No'}, Details: ${detailImages.length}`);
+            console.log(`✅ [EXCEL COMMIT] Row ${item.rowIndex}: Images fetched - Main: ${mainImage ? mainImage.substring(0, 80) + '...' : 'No'}, Details: ${detailImages.length}`);
+            
+            if (mainImage) {
+              console.log(`📸 [EXCEL COMMIT] Row ${item.rowIndex}: Main image URL: ${mainImage}`);
+            }
             
             // 상세 이미지 로그 출력
             if (detailImages.length > 0) {
-              console.log(`📸 [EXCEL COMMIT] Row ${item.rowIndex}: Detail images URLs:`, detailImages);
+              console.log(`📸 [EXCEL COMMIT] Row ${item.rowIndex}: Detail images URLs (${detailImages.length}):`, detailImages.slice(0, 3).map(url => url.substring(0, 80) + '...'));
               // 상세 이미지들을 HTML 형식으로 변환하여 description에 추가
               const imageTags = detailImages.map(imgUrl => `<img src="${imgUrl}" alt="${mapped.name}" style="max-width: 100%; height: auto; margin: 10px 0; display: block;" />`).join('\n');
               descriptionHtml = `<div class="product-detail-images">${imageTags}</div>`;
@@ -1379,19 +1644,42 @@ async function commitImport(req, res, next) {
             // 이미지 추출 실패해도 상품 등록은 계속 진행
           }
         } else {
-          console.log(`⚠️ [EXCEL COMMIT] Row ${item.rowIndex}: No product URL provided`);
+          if (index < 5) { // 처음 5개만 로그
+            console.log(`⚠️ [EXCEL COMMIT] Row ${item.rowIndex}: No product URL provided - SKU: ${sku}, raw: ${item.raw ? 'exists' : 'missing'}, productUrl: ${productUrl || 'empty'}`);
+          }
         }
 
-        // 기존 상품인 경우 가격 업데이트, 신규 상품인 경우 생성
+        // 기존 상품인 경우 업데이트, 신규 상품인 경우 생성
         if (isExistingProduct) {
-          // 기존 상품 가격 업데이트
+          // 기존 상품 업데이트 (가격, 이미지, 카테고리, 상품명 등)
           const updatePayload = {
+            name: mapped.name, // 상품명 업데이트
             price: mapped.price,
             originalPrice: mapped.originalPrice || null,
             discountRate: mapped.discountRate || 0,
+            categoryId: categoryId,
+            categoryPathText: categoryPathText,
+            categoryMain: mapped.category.l1 || null,
+            categoryMid: mapped.category.l2 || null,
+            categorySub: mapped.category.l3 || null,
+            category: mapped.category.l3 || mapped.category.l2 || mapped.category.l1 || '',
           };
           
-          console.log(`💰 [EXCEL COMMIT] Row ${item.rowIndex}: Updating product price - SKU: ${mapped.sku}, Price: ${mapped.price}, OriginalPrice: ${mapped.originalPrice}, DiscountRate: ${mapped.discountRate}`);
+          // 이미지가 추출된 경우에만 업데이트
+          if (mainImage) {
+            updatePayload.image = mainImage;
+          }
+          if (detailImages.length > 0) {
+            updatePayload.images = detailImages.slice(0, 4);
+          }
+          if (descriptionHtml) {
+            updatePayload.description = descriptionHtml;
+          }
+          
+          console.log(`🔄 [EXCEL COMMIT] Row ${item.rowIndex}: Updating product - SKU: ${mapped.sku}, Name: ${mapped.name}, Price: ${mapped.price}, OriginalPrice: ${mapped.originalPrice}, DiscountRate: ${mapped.discountRate}`);
+          if (mainImage) {
+            console.log(`📸 [EXCEL COMMIT] Row ${item.rowIndex}: Updating images - Main: ${mainImage.substring(0, 80)}..., Details: ${detailImages.length}`);
+          }
           
           await Product.findByIdAndUpdate(
             existingProduct._id,
@@ -1433,9 +1721,15 @@ async function commitImport(req, res, next) {
           };
           
           // 최종 저장 전 로그
-          console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Creating product - SKU: ${mapped.sku}, Description length: ${descriptionHtml.length}, Detail images in description: ${(descriptionHtml.match(/<img/g) || []).length}`);
+          console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Creating product - SKU: ${mapped.sku}, Name: ${mapped.name}`);
+          console.log(`💾 [EXCEL COMMIT] Row ${item.rowIndex}: Image data - Main: ${mainImage ? mainImage.substring(0, 80) + '...' : '(empty)'}, Details: ${detailImages.length}, Description length: ${descriptionHtml.length}`);
 
           const newProduct = await Product.create(productPayload);
+          
+          // 저장 후 확인 로그 - 실제 저장된 값 확인
+          console.log(`✅ [EXCEL COMMIT] Row ${item.rowIndex}: Product created - ID: ${newProduct._id}`);
+          console.log(`✅ [EXCEL COMMIT] Row ${item.rowIndex}: Saved image field: ${newProduct.image ? newProduct.image.substring(0, 80) + '...' : '(empty)'}`);
+          console.log(`✅ [EXCEL COMMIT] Row ${item.rowIndex}: Saved images array: ${newProduct.images?.length || 0} items${newProduct.images?.length > 0 ? ' - ' + newProduct.images.slice(0, 2).map(img => img.substring(0, 50) + '...').join(', ') : ''}`);
           
           // 신상품 알림 구독자에게 알림 전송 (비동기로 처리, 에러가 발생해도 상품 생성은 성공)
           try {
