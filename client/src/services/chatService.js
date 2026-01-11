@@ -6,9 +6,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500
  * @param {boolean} isLoggedIn - 로그인 여부
  * @param {string} currentView - 현재 페이지 (login, signup, home 등)
  * @param {string} apiKey - OpenAI API 키
+ * @param {number} page - 검색 결과 페이지 번호 (기본값: 1)
+ * @param {number} searchLimit - 검색 결과 페이지당 항목 수 (기본값: 40)
  * @returns {Promise<string>} AI 응답 텍스트
  */
-export async function sendChatMessage(messages, isLoggedIn = false, currentView = 'home', apiKey = null) {
+export async function sendChatMessage(messages, isLoggedIn = false, currentView = 'home', apiKey = null, page = 1, searchLimit = 40) {
   try {
     // API key는 서버의 .env에서 사용하므로 클라이언트에서는 전달하지 않음
     // 서버가 자동으로 process.env.OPENAI_API_KEY를 사용함
@@ -24,6 +26,8 @@ export async function sendChatMessage(messages, isLoggedIn = false, currentView 
         })),
         isLoggedIn,
         currentView, // 현재 페이지 정보 추가
+        page, // 검색 결과 페이지 번호
+        searchLimit, // 검색 결과 페이지당 항목 수
       }),
     });
 
@@ -38,6 +42,7 @@ export async function sendChatMessage(messages, isLoggedIn = false, currentView 
       message: data.message || data.response || '응답을 받을 수 없습니다.',
       response: data.message || data.response || '응답을 받을 수 없습니다.',
       productCards: data.productCards || null,
+      pagination: data.pagination || null,
     };
   } catch (error) {
     console.error('Chat API error:', error);

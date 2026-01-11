@@ -6,10 +6,10 @@
 const ChatConfig = {
   // 검색 관련 설정
   SEARCH: {
-    MAX_RESULTS: 10, // 최대 검색 결과 수
-    ATLAS_SEARCH_LIMIT: 10,
-    DIRECT_SEARCH_LIMIT: 10,
-    HYBRID_SEARCH_LIMIT: 10,
+    MAX_RESULTS: 100, // 최대 검색 결과 수
+    ATLAS_SEARCH_LIMIT: 50,
+    DIRECT_SEARCH_LIMIT: 50,
+    HYBRID_SEARCH_LIMIT: 50,
   },
 
   // 대화 컨텍스트 설정

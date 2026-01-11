@@ -316,6 +316,7 @@ function HomeHero({
   const searchInputRef = useRef(null);
   const isInitialLoad = useRef(true);
   const previousSearchQuery = useRef(null);
+  const searchInputValueRef = useRef(initialSearchQuery || '');
   const [wishlistedItems, setWishlistedItems] = useState(new Set());
   const [togglingWishlist, setTogglingWishlist] = useState(new Set());
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -415,6 +416,10 @@ function HomeHero({
   useEffect(() => {
     if (initialSearchQuery !== null && initialSearchQuery !== undefined) {
       setSearchQuery(initialSearchQuery);
+      searchInputValueRef.current = initialSearchQuery;
+      if (searchInputRef.current) {
+        searchInputRef.current.value = initialSearchQuery;
+      }
       setCategoryFilter(null);
       setCurrentPage(1);
     }
@@ -443,12 +448,12 @@ function HomeHero({
         // submittedSearchQuery가 있으면 Hybrid 검색 API 사용, 없으면 일반 상품 목록 API 사용
         let data;
         if (submittedSearchQuery && submittedSearchQuery.trim()) {
-          // Hybrid 검색 사용
-          const searchResult = await searchProductsAPI(submittedSearchQuery.trim(), itemsPerPage);
+          // Hybrid 검색 사용 (페이지 번호 전달)
+          const searchResult = await searchProductsAPI(submittedSearchQuery.trim(), itemsPerPage, currentPage);
           data = {
             items: searchResult.results || [],
             totalItems: searchResult.total || 0,
-            totalPages: Math.ceil((searchResult.total || 0) / itemsPerPage),
+            totalPages: searchResult.totalPages || Math.ceil((searchResult.total || 0) / itemsPerPage),
             page: currentPage,
           };
         } else {
@@ -546,7 +551,11 @@ function HomeHero({
 
   const handleSearch = (e) => {
     e.preventDefault();
-    const query = searchQuery.trim();
+    // 현재 입력 필드의 값을 가져옴 (ref 또는 input 요소에서)
+    const currentValue = searchInputRef.current?.value || searchInputValueRef.current || '';
+    const query = currentValue.trim();
+    // 상태 업데이트 (제출 시에만)
+    setSearchQuery(query);
     if (query) {
       setSubmittedSearchQuery(query);
       setCategoryFilter(null);
@@ -560,7 +569,10 @@ function HomeHero({
   };
 
   const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
+    const value = e.target.value;
+    // ref에만 값을 저장 (상태 업데이트 없이, 리렌더링 없이)
+    searchInputValueRef.current = value;
+    // 상태는 업데이트하지 않음 (제출 시에만 업데이트)
   };
 
   const handleToggleWishlist = async (e, product) => {
@@ -649,7 +661,7 @@ function HomeHero({
                 type="text"
                 className="hero-search-input"
                 placeholder="무엇이든 찾아보세요!"
-                value={searchQuery}
+                defaultValue={initialSearchQuery || ''}
                 onChange={handleSearchChange}
               />
               <button type="submit" className="hero-search-icon-button" aria-label="검색">

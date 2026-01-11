@@ -4,6 +4,7 @@ const { convertToPhoneme, convertEnglishToPhoneme, isKorean, calculateStringSimi
 const { getEmbedding, cosineSimilarity } = require('../utils/embeddingService');
 const { get: cacheGet, set: cacheSet, getSearchCacheKey, getEmbeddingCacheKey, getPhonemeCacheKey } = require('../utils/cacheService');
 const { atlasSearch, atlasMultiFieldSearch } = require('../utils/atlasSearch');
+const { generateSearchQueries } = require('../utils/searchExpander');
 
 /**
  * 카테고리 검색 (최우선)
@@ -11,6 +12,7 @@ const { atlasSearch, atlasMultiFieldSearch } = require('../utils/atlasSearch');
 async function categorySearch(query, limit = 20) {
   try {
     const trimmedQuery = query.trim();
+    const allProducts = new Map();
     
     // 1. 정확한 카테고리 이름 매칭 시도
     let category = await Category.findOne({
@@ -26,30 +28,96 @@ async function categorySearch(query, limit = 20) {
       }).lean();
     }
     
-    if (!category) {
-      return [];
+    if (category) {
+      console.log('카테고리 검색 매칭:', { query: trimmedQuery, categoryName: category.name, categoryId: category._id });
+      
+      // 해당 카테고리와 하위 카테고리의 모든 상품 조회
+      // 방법 1: category 필드로 검색
+      const products1 = await Product.find({
+        $or: [
+          { category: category.name },
+          { categoryMain: category.name },
+          { 'categoryPathText': { $regex: new RegExp(`^${category.name}`, 'i') } },
+          { categoryId: category._id },
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+      
+      products1.forEach(product => {
+        const id = product._id.toString();
+        if (!allProducts.has(id)) {
+          allProducts.set(id, {
+            product,
+            score: 1.0,
+            type: 'category',
+          });
+        }
+      });
+      
+      // 방법 2: 하위 카테고리도 포함 (categoryId가 pathIds에 포함된 경우)
+      const childCategories = await Category.find({
+        $or: [
+          { pathIds: category._id },
+          { parentId: category._id },
+        ],
+        isActive: true
+      }).lean();
+      
+      if (childCategories.length > 0) {
+        const childCategoryIds = childCategories.map(c => c._id);
+        const products2 = await Product.find({
+          categoryId: { $in: childCategoryIds }
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+        
+        products2.forEach(product => {
+          const id = product._id.toString();
+          if (!allProducts.has(id)) {
+            allProducts.set(id, {
+              product,
+              score: 0.95, // 하위 카테고리는 약간 낮은 점수
+              type: 'category',
+            });
+          }
+        });
+      }
     }
     
-    console.log('카테고리 검색 매칭:', { query: trimmedQuery, categoryName: category.name });
-    
-    // 해당 카테고리의 모든 상품 조회 (limit 제한 없이 모든 상품 반환)
-    const products = await Product.find({
-      category: category.name
+    // 3. 제품 이름/설명에서 카테고리 이름이 포함된 경우도 검색
+    const products3 = await Product.find({
+      $or: [
+        { name: { $regex: new RegExp(trimmedQuery, 'i') } },
+        { description: { $regex: new RegExp(trimmedQuery, 'i') } },
+        { categoryPathText: { $regex: new RegExp(trimmedQuery, 'i') } },
+      ]
     })
-    .sort({ createdAt: -1 })
+    .limit(limit * 2)
     .lean();
     
-    console.log('카테고리 검색 결과:', { 
-      categoryName: category.name, 
-      count: products.length,
-      productNames: products.map(p => p.name).slice(0, 5)
+    products3.forEach(product => {
+      const id = product._id.toString();
+      if (!allProducts.has(id)) {
+        // 이름에 정확히 포함된 경우만 카테고리 관련으로 간주
+        if (product.categoryPathText && product.categoryPathText.includes(trimmedQuery)) {
+          allProducts.set(id, {
+            product,
+            score: 0.9,
+            type: 'category',
+          });
+        }
+      }
     });
     
-    return products.map(product => ({
-      product,
-      score: 1.0, // 카테고리 매칭은 최고 점수
-      type: 'category',
-    }));
+    const results = Array.from(allProducts.values());
+    console.log('카테고리 검색 결과:', { 
+      query: trimmedQuery, 
+      count: results.length,
+      productNames: results.map(r => r.product.name).slice(0, 5)
+    });
+    
+    return results;
   } catch (error) {
     console.error('Category search error:', error);
     return [];
@@ -57,33 +125,61 @@ async function categorySearch(query, limit = 20) {
 }
 
 /**
- * 정확한 텍스트 매칭 검색
+ * 정확한 텍스트 매칭 검색 (검색어 확장 포함)
  */
 async function exactTextSearch(query, limit = 20) {
   try {
     const trimmedQuery = query.trim();
-    const searchRegex = new RegExp(trimmedQuery, 'i');
+    const allResults = new Map();
     
-    console.log('정확한 텍스트 검색:', { query: trimmedQuery, regex: searchRegex });
-    
-    const products = await Product.find({
-      $or: [
-        { name: searchRegex },
-        { description: searchRegex },
-      ]
-    }).lean();
-    
-    console.log('정확한 텍스트 검색 결과:', { 
-      query: trimmedQuery, 
-      count: products.length,
-      productNames: products.map(p => p.name).slice(0, 5)
+    // 검색어 확장 (유사어, 오타 등)
+    const expandedQueries = generateSearchQueries(trimmedQuery);
+    console.log('정확한 텍스트 검색 - 확장된 검색어:', { 
+      original: trimmedQuery, 
+      expanded: expandedQueries.map(q => q.query),
+      count: expandedQueries.length 
     });
     
-    return products.map(product => ({
-      product,
-      score: 1.0, // 정확한 매칭은 최고 점수
-      type: 'exact',
-    }));
+    // 각 확장된 검색어에 대해 검색 수행
+    for (const expandedQuery of expandedQueries) {
+      const searchRegex = new RegExp(expandedQuery.query, 'i');
+      
+      const products = await Product.find({
+        $or: [
+          { name: searchRegex },
+          { description: searchRegex },
+          { categoryPathText: searchRegex },
+        ]
+      })
+      .limit(limit * 2)
+      .lean();
+      
+      products.forEach(product => {
+        const id = product._id.toString();
+        if (!allResults.has(id)) {
+          allResults.set(id, {
+            product,
+            score: expandedQuery.weight, // 확장된 검색어의 가중치 적용
+            type: 'exact',
+          });
+        } else {
+          // 이미 있는 경우 더 높은 점수로 업데이트
+          const existing = allResults.get(id);
+          if (expandedQuery.weight > existing.score) {
+            existing.score = expandedQuery.weight;
+          }
+        }
+      });
+    }
+    
+    const results = Array.from(allResults.values());
+    console.log('정확한 텍스트 검색 결과:', { 
+      query: trimmedQuery, 
+      count: results.length,
+      productNames: results.map(r => r.product.name).slice(0, 5)
+    });
+    
+    return results;
   } catch (error) {
     console.error('Exact text search error:', error);
     return [];
@@ -370,7 +466,7 @@ function combineResults(exactResults, phonemeResults, embeddingResults, phonemeW
  */
 async function searchProducts(req, res, next) {
   try {
-    const { q: query, limit = 20, phonemeWeight = 0.4, embeddingWeight = 0.6 } = req.query;
+    const { q: query, limit = 20, page = 1, phonemeWeight = 0.4, embeddingWeight = 0.6 } = req.query;
     
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return res.status(400).json({
@@ -379,47 +475,71 @@ async function searchProducts(req, res, next) {
     }
     
     const trimmedQuery = query.trim();
-    console.log('검색 요청:', { query: trimmedQuery, limit, phonemeWeight, embeddingWeight });
+    const requestedLimit = parseInt(limit);
+    const requestedPage = parseInt(page);
+    const skip = (requestedPage - 1) * requestedLimit;
+    
+    console.log('검색 요청:', { query: trimmedQuery, limit: requestedLimit, page: requestedPage, skip, phonemeWeight, embeddingWeight });
     
     // 캐시 확인 (개발 중에는 캐시 비활성화 가능)
     const useCache = req.query.cache !== 'false'; // cache=false 파라미터로 캐시 비활성화 가능
     const cacheKey = getSearchCacheKey(trimmedQuery);
     const cachedResult = useCache ? cacheGet(cacheKey) : null;
     if (cachedResult) {
-      console.log('캐시에서 검색 결과 반환:', { query: trimmedQuery, count: cachedResult.length });
+      console.log('캐시에서 검색 결과 반환:', { query: trimmedQuery, count: cachedResult.length, page: requestedPage, skip });
+      const totalCount = cachedResult.length;
+      const paginatedResults = cachedResult.slice(skip, skip + requestedLimit);
       return res.json({
         query: trimmedQuery,
-        results: cachedResult.slice(0, parseInt(limit)),
-        total: cachedResult.length,
+        results: paginatedResults,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / requestedLimit),
+        currentPage: requestedPage,
         cached: true,
       });
     }
     
-    // Hybrid 검색 수행
+    // Hybrid 검색 수행 (limit을 크게 설정하여 전체 결과 가져오기)
     console.log('새로운 검색 수행:', trimmedQuery);
-    const results = await hybridSearch(
+    const searchLimit = Math.max(requestedLimit * 10, 1000); // 충분한 결과 가져오기 (최소 1000개)
+    
+    const allResults = await hybridSearch(
       trimmedQuery,
-      parseInt(limit),
+      searchLimit,
       parseFloat(phonemeWeight),
       parseFloat(embeddingWeight)
     );
     
+    const totalCount = allResults.length; // 전체 검색 결과 수
+    const totalPages = Math.ceil(totalCount / requestedLimit);
+    
+    // 페이지네이션 적용
+    const paginatedResults = allResults.slice(skip, skip + requestedLimit);
+    
     console.log('검색 결과:', { 
       query: trimmedQuery, 
-      resultCount: results.length,
-      productNames: results.map(r => r.product?.name || r.product?._id).slice(0, 5)
+      totalCount: totalCount,
+      totalPages: totalPages,
+      currentPage: requestedPage,
+      returnedCount: paginatedResults.length,
+      requestedLimit: requestedLimit,
+      skip: skip,
+      productNames: paginatedResults.map(r => r.product?.name || r.product?._id).slice(0, 5)
     });
     
     // 결과를 상품 객체 배열로 변환
-    const products = results.map(result => result.product);
+    const products = paginatedResults.map(result => result.product);
     
-    // 캐시에 저장
-    cacheSet(cacheKey, products, 1800); // 30분
+    // 캐시에 저장 (전체 결과 저장)
+    const allProducts = allResults.map(result => result.product);
+    cacheSet(cacheKey, allProducts, 1800); // 30분
     
     res.json({
       query: trimmedQuery,
       results: products,
-      total: products.length,
+      total: totalCount, // 전체 검색 결과 수 반환
+      totalPages: totalPages,
+      currentPage: requestedPage,
       cached: false,
     });
   } catch (error) {

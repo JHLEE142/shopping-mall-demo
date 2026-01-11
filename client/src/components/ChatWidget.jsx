@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart } from 'lucide-react';
+import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { sendChatMessage } from '../services/chatService';
 import './ChatWidget.css';
 
@@ -46,6 +46,8 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const lastSearchQueryRef = useRef(null); // 마지막 검색 쿼리 저장
+  const [currentSearchPage, setCurrentSearchPage] = useState(1);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -202,10 +204,17 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     }
 
     try {
-      // OpenAI API 호출
-      const response = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView);
+      // OpenAI API 호출 (새 검색이면 page=1, 페이지네이션은 별도 처리)
+      const pageToUse = currentInput === lastSearchQueryRef.current ? currentSearchPage : 1;
+      if (currentInput !== lastSearchQueryRef.current) {
+        setCurrentSearchPage(1);
+        lastSearchQueryRef.current = currentInput;
+      }
+      
+      const response = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView, null, pageToUse, 40);
       const botResponse = typeof response === 'string' ? response : response.message || response.response || '';
       const productCards = response.productCards || null;
+      const pagination = response.pagination || null;
       
       setMessages((prev) => {
         // 검색 중 메시지 제거 (검색 결과가 도착했으므로)
@@ -271,6 +280,8 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
           sender: 'bot',
           timestamp: new Date(),
           productCards: productCards, // 상품 카드 데이터
+          pagination: pagination, // 페이지네이션 정보
+          searchQuery: currentInput, // 검색 쿼리 저장
         };
         const newMessages = [...filteredPrev, botMessage];
         
@@ -598,8 +609,9 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
                       
                       {/* 상품 카드 표시 */}
                       {message.productCards && message.productCards.length > 0 && (
-                        <div className="chat-widget__product-cards" style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
-                          {message.productCards.map((product, idx) => (
+                        <div style={{ marginTop: '1rem' }}>
+                          <div className="chat-widget__product-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                            {message.productCards.map((product, idx) => (
                             <div
                               key={product.id || idx}
                               className="chat-widget__product-card"
@@ -681,7 +693,156 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
                                 )}
                               </div>
                             </div>
-                          ))}
+                            ))}
+                          </div>
+                          
+                          {/* 페이지네이션 (40개 초과 시 표시) */}
+                          {message.pagination && message.pagination.total > 40 && (
+                            <div style={{ 
+                              marginTop: '1rem', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              gap: '0.5rem',
+                              padding: '0.5rem',
+                              borderTop: '1px solid #e5e7eb',
+                            }}>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (message.pagination && message.pagination.page > 1 && message.searchQuery) {
+                                    const newPage = message.pagination.page - 1;
+                                    setCurrentSearchPage(newPage);
+                                    setIsLoading(true);
+                                    try {
+                                      // 마지막 검색 쿼리를 사용하여 같은 검색 재실행
+                                      const searchMessages = [...messages.filter(msg => msg.sender === 'user'), {
+                                        id: Date.now(),
+                                        text: message.searchQuery,
+                                        sender: 'user',
+                                        timestamp: new Date(),
+                                      }];
+                                      
+                                      const response = await sendChatMessage(
+                                        searchMessages,
+                                        isLoggedIn,
+                                        currentView,
+                                        null,
+                                        newPage,
+                                        40
+                                      );
+                                      const botResponse = typeof response === 'string' ? response : response.message || response.response || '';
+                                      const productCards = response.productCards || null;
+                                      const pagination = response.pagination || null;
+                                      
+                                      setMessages((prev) => {
+                                        const messageIndex = prev.findIndex(msg => msg.id === message.id);
+                                        if (messageIndex === -1) return prev;
+                                        
+                                        const updatedMessages = [...prev];
+                                        updatedMessages[messageIndex] = {
+                                          ...message,
+                                          productCards: productCards,
+                                          pagination: pagination,
+                                          text: botResponse,
+                                        };
+                                        return updatedMessages;
+                                      });
+                                    } catch (error) {
+                                      console.error('페이지네이션 오류:', error);
+                                    } finally {
+                                      setIsLoading(false);
+                                    }
+                                  }
+                                }}
+                                disabled={!message.pagination || message.pagination.page <= 1 || isLoading}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  background: (!message.pagination || message.pagination.page <= 1 || isLoading) ? '#f3f4f6' : 'white',
+                                  cursor: (!message.pagination || message.pagination.page <= 1 || isLoading) ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  fontSize: '0.75rem',
+                                }}
+                              >
+                                <ChevronLeft size={14} />
+                                이전
+                              </button>
+                              
+                              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                {message.pagination.page} / {message.pagination.totalPages} 페이지
+                                {' '}(총 {message.pagination.total}개)
+                              </span>
+                              
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (message.pagination && message.pagination.page < message.pagination.totalPages && message.searchQuery) {
+                                    const newPage = message.pagination.page + 1;
+                                    setCurrentSearchPage(newPage);
+                                    setIsLoading(true);
+                                    try {
+                                      // 마지막 검색 쿼리를 사용하여 같은 검색 재실행
+                                      const searchMessages = [...messages.filter(msg => msg.sender === 'user'), {
+                                        id: Date.now(),
+                                        text: message.searchQuery,
+                                        sender: 'user',
+                                        timestamp: new Date(),
+                                      }];
+                                      
+                                      const response = await sendChatMessage(
+                                        searchMessages,
+                                        isLoggedIn,
+                                        currentView,
+                                        null,
+                                        newPage,
+                                        40
+                                      );
+                                      const botResponse = typeof response === 'string' ? response : response.message || response.response || '';
+                                      const productCards = response.productCards || null;
+                                      const pagination = response.pagination || null;
+                                      
+                                      setMessages((prev) => {
+                                        const messageIndex = prev.findIndex(msg => msg.id === message.id);
+                                        if (messageIndex === -1) return prev;
+                                        
+                                        const updatedMessages = [...prev];
+                                        updatedMessages[messageIndex] = {
+                                          ...message,
+                                          productCards: productCards,
+                                          pagination: pagination,
+                                          text: botResponse,
+                                        };
+                                        return updatedMessages;
+                                      });
+                                    } catch (error) {
+                                      console.error('페이지네이션 오류:', error);
+                                    } finally {
+                                      setIsLoading(false);
+                                    }
+                                  }
+                                }}
+                                disabled={!message.pagination || message.pagination.page >= message.pagination.totalPages || isLoading}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  background: (!message.pagination || message.pagination.page >= message.pagination.totalPages || isLoading) ? '#f3f4f6' : 'white',
+                                  cursor: (!message.pagination || message.pagination.page >= message.pagination.totalPages || isLoading) ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  fontSize: '0.75rem',
+                                }}
+                              >
+                                다음
+                                <ChevronRight size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                       

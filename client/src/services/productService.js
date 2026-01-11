@@ -320,15 +320,17 @@ export async function commitImport(preview) {
 /**
  * Hybrid 검색 API 호출
  * @param {string} query - 검색 쿼리
- * @param {number} limit - 반환할 결과 수
+ * @param {number} limit - 페이지당 반환할 결과 수
+ * @param {number} page - 페이지 번호 (1부터 시작)
  * @param {number} phonemeWeight - Phoneme 검색 가중치
  * @param {number} embeddingWeight - Embedding 검색 가중치
  * @returns {Promise<Object>} - 검색 결과
  */
-export async function searchProducts(query, limit = 20, phonemeWeight = 0.4, embeddingWeight = 0.6) {
+export async function searchProducts(query, limit = 20, page = 1, phonemeWeight = 0.4, embeddingWeight = 0.6) {
   const params = new URLSearchParams({
     q: query,
     limit: String(limit),
+    page: String(page),
     phonemeWeight: String(phonemeWeight),
     embeddingWeight: String(embeddingWeight),
   });

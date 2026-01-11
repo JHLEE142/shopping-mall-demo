@@ -7,6 +7,7 @@ const Conversation = require('../models/conversation');
 const ChatConfig = require('../config/chatConfig');
 const ChatLogger = require('../utils/chatLogger');
 const { randomUUID } = require('crypto');
+const { generateSearchQueries, expandSynonyms } = require('../utils/searchExpander');
 
 
 /**
@@ -189,16 +190,31 @@ async function sendChatMessage(req, res) {
 
     // 검색 키워드가 있으면 직접 데이터베이스 검색 + hybridSearch 병행
     let searchResults = [];
+    let totalSearchResults = 0;
+    let searchPage = 1;
+    let searchLimit = 40;
+    let totalSearchPages = 1;
+    
     if (searchKeywords && searchKeywords.length > 0) {
       try {
         const searchQuery = searchKeywords.join(' ');
+        
+        // 페이지네이션 파라미터 파싱
+        searchPage = parseInt(req.body.page) || 1;
+        searchLimit = parseInt(req.body.searchLimit) || 40;
+        searchPage = Math.max(1, searchPage);
+        searchLimit = Math.min(searchLimit, 1000); // 최대 1000개
 
-        ChatLogger.debug('검색 실행 시작', { searchQuery, keywords: searchKeywords });
+        ChatLogger.debug('검색 실행 시작', { searchQuery, keywords: searchKeywords, page: searchPage, limit: searchLimit });
+        
+        // 전체 상품 개수 조회 (최대 검색 결과 수 결정)
+        const totalProductsCount = await Product.countDocuments();
+        const maxResults = Math.min(ChatConfig.SEARCH.MAX_RESULTS || 100, totalProductsCount);
         
         // 방법 1: MongoDB Atlas Search (최우선, 가장 빠르고 정확)
         let atlasSearchResults = [];
         try {
-          const atlasResultsData = await atlasMultiFieldSearch(searchQuery, ChatConfig.SEARCH.MAX_RESULTS || 10);
+          const atlasResultsData = await atlasMultiFieldSearch(searchQuery, maxResults);
           atlasSearchResults = atlasResultsData.map(result => ({
             id: result.product._id.toString(),
             name: result.product.name,
@@ -215,7 +231,7 @@ async function sendChatMessage(req, res) {
         // 방법 2: 직접 MongoDB 검색 (간단하고 확실한 방법)
         const directSearchResults = await directProductSearch(
           searchQuery, 
-          ChatConfig.SEARCH.DIRECT_SEARCH_LIMIT || 10
+          Math.min(ChatConfig.SEARCH.DIRECT_SEARCH_LIMIT || 50, maxResults)
         );
         ChatLogger.debug('직접 DB 검색 완료', { count: directSearchResults.length });
         
@@ -224,7 +240,7 @@ async function sendChatMessage(req, res) {
         try {
           const searchResultsData = await hybridSearch(
             searchQuery, 
-            ChatConfig.SEARCH.HYBRID_SEARCH_LIMIT || 10
+            Math.min(ChatConfig.SEARCH.HYBRID_SEARCH_LIMIT || 50, maxResults)
           );
           hybridSearchResults = searchResultsData.map(result => ({
             id: result.product._id.toString(),
@@ -256,11 +272,19 @@ async function sendChatMessage(req, res) {
           }
         });
         
-        searchResults = Array.from(uniqueResults.values())
-          .sort((a, b) => (b.score || 0) - (a.score || 0))
-          .slice(0, ChatConfig.SEARCH.MAX_RESULTS || 10);
+        // 전체 검색 결과
+        const sortedResults = Array.from(uniqueResults.values())
+          .sort((a, b) => (b.score || 0) - (a.score || 0));
         
-        ChatLogger.searchQuery(searchQuery, searchKeywords, searchResults.length);
+        totalSearchResults = sortedResults.length;
+        totalSearchPages = Math.ceil(totalSearchResults / searchLimit);
+        
+        // 페이지네이션 적용
+        const startIndex = (searchPage - 1) * searchLimit;
+        const endIndex = startIndex + searchLimit;
+        searchResults = sortedResults.slice(startIndex, endIndex);
+        
+        ChatLogger.searchQuery(searchQuery, searchKeywords, totalSearchResults);
       } catch (searchError) {
         ChatLogger.error('검색 오류', searchError, { searchQuery });
       }
@@ -270,7 +294,9 @@ async function sendChatMessage(req, res) {
     // "찾아보겠습니다" 같은 메시지 없이 바로 결과 표시
     if (searchResults.length > 0) {
       const searchQuery = searchKeywords.join(' ');
-      const responseMessage = `검색 결과 ${searchResults.length}개를 찾았습니다. 어떤 제품이 마음에 드세요?`;
+      const responseMessage = totalSearchResults > searchLimit 
+        ? `검색 결과 총 ${totalSearchResults}개 중 ${(searchPage - 1) * searchLimit + 1}-${Math.min(searchPage * searchLimit, totalSearchResults)}번째를 표시합니다. 어떤 제품이 마음에 드세요?`
+        : `검색 결과 ${totalSearchResults}개를 찾았습니다. 어떤 제품이 마음에 드세요?`;
       
       ChatLogger.info('검색 결과 즉시 반환', { 
         resultsCount: searchResults.length,
@@ -291,6 +317,13 @@ async function sendChatMessage(req, res) {
         response: responseMessage,
         productCards: searchResults,
         conversationId: conversation?.conversationId,
+        pagination: {
+          page: searchPage,
+          limit: searchLimit,
+          total: totalSearchResults,
+          totalPages: totalSearchPages,
+          hasMore: searchPage < totalSearchPages,
+        },
       });
     }
 
@@ -440,6 +473,7 @@ async function sendChatMessage(req, res) {
 
 /**
  * 직접 MongoDB에서 상품 검색 (간단하고 확실한 방법)
+ * 유사어, 오타, 동의어 등 모든 케이스 처리
  */
 async function directProductSearch(query, limit = 10) {
   try {
@@ -449,56 +483,36 @@ async function directProductSearch(query, limit = 10) {
     }
 
     const allResults = new Map();
-    const searchRegex = new RegExp(trimmedQuery, 'i');
+    const mongoose = require('mongoose');
 
-    // 방법 1: 전체 검색어로 검색 (가장 우선, 높은 점수)
-    try {
-      const products1 = await Product.find({
-        $or: [
-          { name: searchRegex },
-          { description: searchRegex },
-        ]
-      })
-      .limit(limit * 2)
-      .lean();
+    // 검색 쿼리 확장 (유사어, 오타 변형 포함)
+    const searchQueries = generateSearchQueries(trimmedQuery);
+    console.log('[Chat] 확장된 검색 쿼리:', searchQueries.map(q => q.query).join(', '));
 
-      products1.forEach(product => {
-        const id = product._id.toString();
-        if (!allResults.has(id)) {
-          allResults.set(id, {
-            id: id,
-            name: product.name,
-            price: product.priceSale || product.price,
-            image: product.image || product.gallery?.[0] || '',
-            description: product.description || '',
-            score: 1.0, // 전체 매칭은 최고 점수
-          });
-        }
-      });
-      console.log('[Chat] 전체 검색어 매칭:', products1.length, '개');
-    } catch (error1) {
-      console.error('[Chat] 전체 검색어 검색 오류:', error1);
-    }
-
-    // 방법 2: 단어별 검색 (검색어를 공백으로 분리하여 각 단어로 검색)
-    const words = trimmedQuery.split(/\s+/).filter(w => w.length > 0);
-    if (words.length > 1) {
+    // 방법 1: 원본 및 확장된 검색어로 검색 (가중치 적용)
+    for (const searchQuery of searchQueries) {
       try {
-        // 각 단어가 포함된 상품 찾기
-        const wordQueries = words.map(word => ({
-          $or: [
-            { name: { $regex: word, $options: 'i' } },
-            { description: { $regex: word, $options: 'i' } },
-          ]
-        }));
+        const searchRegex = new RegExp(searchQuery.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        
+        const excludeIds = Array.from(allResults.keys()).map(id => {
+          try {
+            return new mongoose.Types.ObjectId(id);
+          } catch (e) {
+            return null;
+          }
+        }).filter(id => id !== null);
 
-        const products2 = await Product.find({
-          $and: wordQueries // 모든 단어가 포함된 상품
+        const products = await Product.find({
+          $or: [
+            { name: searchRegex },
+            { description: searchRegex },
+          ],
+          ...(excludeIds.length > 0 ? { _id: { $nin: excludeIds } } : {})
         })
         .limit(limit * 2)
         .lean();
 
-        products2.forEach(product => {
+        products.forEach(product => {
           const id = product._id.toString();
           if (!allResults.has(id)) {
             allResults.set(id, {
@@ -507,19 +521,92 @@ async function directProductSearch(query, limit = 10) {
               price: product.priceSale || product.price,
               image: product.image || product.gallery?.[0] || '',
               description: product.description || '',
-              score: 0.9, // 단어별 매칭은 높은 점수
+              score: searchQuery.weight, // 확장 쿼리 가중치 적용
             });
           } else {
-            // 이미 있는 경우 점수 업데이트 (더 높은 점수로)
+            // 이미 있는 경우 더 높은 점수로 업데이트
             const existing = allResults.get(id);
-            if (0.9 > existing.score) {
-              existing.score = 0.9;
+            if (searchQuery.weight > existing.score) {
+              existing.score = searchQuery.weight;
             }
           }
         });
-        console.log('[Chat] 단어별 검색 매칭:', products2.length, '개');
-      } catch (error2) {
-        console.error('[Chat] 단어별 검색 오류:', error2);
+        
+        if (searchQuery.type === 'original') {
+          console.log('[Chat] 전체 검색어 매칭:', products.length, '개');
+        } else if (searchQuery.type === 'synonym') {
+          console.log(`[Chat] 유사어 검색 (${searchQuery.query}):`, products.length, '개');
+        } else if (searchQuery.type === 'typo') {
+          console.log(`[Chat] 오타 변형 검색 (${searchQuery.query}):`, products.length, '개');
+        }
+      } catch (error1) {
+        console.error(`[Chat] 검색 오류 (${searchQuery.query}):`, error1);
+      }
+      
+      // 충분한 결과가 있으면 중단
+      if (allResults.size >= limit * 2) {
+        break;
+      }
+    }
+
+    // 방법 2: 단어별 검색 (확장된 단어 사용)
+    if (allResults.size < limit) {
+      const words = trimmedQuery.split(/\s+/).filter(w => w.length > 0);
+      if (words.length > 1) {
+        try {
+          // 각 단어의 유사어 확장
+          const expandedWordQueries = words.map(word => {
+            const synonyms = expandSynonyms(word);
+            return synonyms.map(syn => ({
+              $or: [
+                { name: { $regex: syn, $options: 'i' } },
+                { description: { $regex: syn, $options: 'i' } },
+              ]
+            }));
+          });
+
+          // 각 단어별로 OR 조건 생성
+          const wordQueries = expandedWordQueries.map(wordOrs => ({
+            $or: wordOrs
+          }));
+
+          const excludeIds = Array.from(allResults.keys()).map(id => {
+            try {
+              return new mongoose.Types.ObjectId(id);
+            } catch (e) {
+              return null;
+            }
+          }).filter(id => id !== null);
+
+          const products2 = await Product.find({
+            $and: wordQueries, // 모든 단어가 포함된 상품
+            ...(excludeIds.length > 0 ? { _id: { $nin: excludeIds } } : {})
+          })
+          .limit(limit * 2)
+          .lean();
+
+          products2.forEach(product => {
+            const id = product._id.toString();
+            if (!allResults.has(id)) {
+              allResults.set(id, {
+                id: id,
+                name: product.name,
+                price: product.priceSale || product.price,
+                image: product.image || product.gallery?.[0] || '',
+                description: product.description || '',
+                score: 0.85, // 확장된 단어별 매칭은 높은 점수
+              });
+            } else {
+              const existing = allResults.get(id);
+              if (0.85 > existing.score) {
+                existing.score = 0.85;
+              }
+            }
+          });
+          console.log('[Chat] 확장된 단어별 검색 매칭:', products2.length, '개');
+        } catch (error2) {
+          console.error('[Chat] 확장된 단어별 검색 오류:', error2);
+        }
       }
     }
 
@@ -528,9 +615,8 @@ async function directProductSearch(query, limit = 10) {
       try {
         // 검색어의 첫 2글자 이상으로 검색
         const partialQuery = trimmedQuery.substring(0, Math.max(2, trimmedQuery.length - 1));
-        const partialRegex = new RegExp(partialQuery, 'i');
+        const partialRegex = new RegExp(partialQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         
-        const mongoose = require('mongoose');
         const excludeIds = Array.from(allResults.keys()).map(id => {
           try {
             return new mongoose.Types.ObjectId(id);
