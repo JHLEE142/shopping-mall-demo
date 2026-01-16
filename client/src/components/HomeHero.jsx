@@ -294,6 +294,9 @@ function HomeHero({
   onWishlistChange = () => {},
   initialCategory = null,
   initialSearchQuery = null,
+  initialPage = 1,
+  initialScrollY = null,
+  onCatalogStateChange = () => {},
   onCategoryFiltered = () => {},
 }) {
   const [products, setProducts] = useState([]);
@@ -306,37 +309,48 @@ function HomeHero({
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage || 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 40;
   const [currentSlide, setCurrentSlide] = useState(0);
-  const slideIntervalRef = useRef(null);
   const catalogToolbarRef = useRef(null);
   const searchInputRef = useRef(null);
   const isInitialLoad = useRef(true);
   const previousSearchQuery = useRef(null);
   const searchInputValueRef = useRef(initialSearchQuery || '');
+  const hasRestoredScroll = useRef(false);
+  const hasAppliedInitialPage = useRef(false);
+  const heroTouchStartX = useRef(null);
+  const catalogStateRef = useRef({
+    categoryFilter,
+    currentPage: initialPage || 1,
+    searchQuery: initialSearchQuery || '',
+  });
   const [wishlistedItems, setWishlistedItems] = useState(new Set());
   const [togglingWishlist, setTogglingWishlist] = useState(new Set());
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
 
-  // 페이지 로드 시 스크롤을 맨 위로 이동
+  // 페이지 로드 시 스크롤 복원 제어
   useEffect(() => {
     // 브라우저의 스크롤 복원 방지
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
-    // 즉시 스크롤을 상단으로 이동
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    if (initialScrollY === null || initialScrollY === undefined) {
+      // 즉시 스크롤을 상단으로 이동
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
     isInitialLoad.current = false;
   }, []);
 
-  // 페이지 로드 시 스크롤을 상단으로 이동
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }, []);
+    if (!hasAppliedInitialPage.current && initialPage && initialPage !== currentPage) {
+      setCurrentPage(initialPage);
+      hasAppliedInitialPage.current = true;
+    }
+  }, [initialPage, currentPage]);
 
   // 카테고리 목록 로드
   useEffect(() => {
@@ -408,9 +422,9 @@ function HomeHero({
     if (initialCategory) {
       setCategoryFilter(initialCategory);
       setSearchQuery('');
-      setCurrentPage(1);
+      setCurrentPage(initialPage || 1);
     }
-  }, [initialCategory]);
+  }, [initialCategory, initialPage]);
 
   // initialSearchQuery가 변경되면 searchQuery 업데이트
   useEffect(() => {
@@ -421,22 +435,9 @@ function HomeHero({
         searchInputRef.current.value = initialSearchQuery;
       }
       setCategoryFilter(null);
-      setCurrentPage(1);
+      setCurrentPage(initialPage || 1);
     }
-  }, [initialSearchQuery]);
-
-  // 슬라이드 자동 전환
-  useEffect(() => {
-    slideIntervalRef.current = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % SLIDE_DATA.length);
-    }, 4000); // 4초마다 전환
-
-    return () => {
-      if (slideIntervalRef.current) {
-        clearInterval(slideIntervalRef.current);
-      }
-    };
-  }, []);
+  }, [initialSearchQuery, initialPage]);
 
   useEffect(() => {
     let isMounted = true;
@@ -510,13 +511,69 @@ function HomeHero({
 
   const handleSlideClick = (index) => {
     setCurrentSlide(index);
-    if (slideIntervalRef.current) {
-      clearInterval(slideIntervalRef.current);
-    }
-    slideIntervalRef.current = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % SLIDE_DATA.length);
-    }, 4000);
   };
+
+  const handleHeroTouchStart = (event) => {
+    if (event.touches && event.touches.length > 0) {
+      heroTouchStartX.current = event.touches[0].clientX;
+    }
+  };
+
+  const handleHeroTouchEnd = (event) => {
+    if (!heroTouchStartX.current || !event.changedTouches || event.changedTouches.length === 0) {
+      heroTouchStartX.current = null;
+      return;
+    }
+    const deltaX = event.changedTouches[0].clientX - heroTouchStartX.current;
+    const threshold = 40;
+    if (Math.abs(deltaX) >= threshold) {
+      if (deltaX < 0) {
+        setCurrentSlide((prev) => (prev + 1) % SLIDE_DATA.length);
+      } else {
+        setCurrentSlide((prev) => (prev - 1 + SLIDE_DATA.length) % SLIDE_DATA.length);
+      }
+    }
+    heroTouchStartX.current = null;
+  };
+
+  useEffect(() => {
+    if (
+      !hasRestoredScroll.current &&
+      (initialScrollY !== null && initialScrollY !== undefined) &&
+      productsStatus === 'success'
+    ) {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: initialScrollY, behavior: 'auto' });
+      });
+      hasRestoredScroll.current = true;
+    }
+  }, [initialScrollY, productsStatus]);
+
+  useEffect(() => {
+    catalogStateRef.current = {
+      categoryFilter,
+      currentPage,
+      searchQuery: submittedSearchQuery,
+    };
+    onCatalogStateChange({
+      ...catalogStateRef.current,
+      scrollY: window.scrollY,
+    });
+  }, [categoryFilter, currentPage, submittedSearchQuery, onCatalogStateChange]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      onCatalogStateChange({
+        ...catalogStateRef.current,
+        scrollY: window.scrollY,
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [onCatalogStateChange]);
 
   const catalogProducts = useMemo(() => {
     // 검색 중이면 검색 결과를 그대로 사용 (필터링 없음)
@@ -674,7 +731,11 @@ function HomeHero({
 
       {/* 메인 슬라이드 */}
       <section className="hero-slider">
-        <div className="hero-slider__container">
+        <div
+          className="hero-slider__container"
+          onTouchStart={handleHeroTouchStart}
+          onTouchEnd={handleHeroTouchEnd}
+        >
           <div
             className="hero-slider__track"
             style={{
@@ -898,7 +959,7 @@ function HomeHero({
                 onViewProduct(product.detail);
               }
             }}>
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
               <button
                 type="button"
                 className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}

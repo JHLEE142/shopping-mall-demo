@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import HomeHero from './components/HomeHero';
 import SignUpPage from './components/SignUpPage';
@@ -62,6 +62,10 @@ function App() {
   const [pointsBalance, setPointsBalance] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [directOrderItem, setDirectOrderItem] = useState(null); // 바로구매 아이템
+  const [homeCatalogState, setHomeCatalogState] = useState(null);
+  const [homeRestoreState, setHomeRestoreState] = useState(null);
+  const [pendingHomeRestore, setPendingHomeRestore] = useState(false);
+  const lastHomeStateRef = useRef(null);
   const handleCartUpdate = (nextCount) => {
     setCartCount(Math.max(0, Number(nextCount) || 0));
   };
@@ -76,20 +80,72 @@ function App() {
     }
   };
 
+  const homeInitialState = pendingHomeRestore ? homeRestoreState : null;
+  const homeInitialCategory = homeInitialState?.categoryFilter ?? selectedCategory;
+  const homeInitialSearchQuery = homeInitialState?.searchQuery ?? null;
+  const homeInitialPage = homeInitialState?.currentPage ?? 1;
+  const homeInitialScrollY = homeInitialState?.scrollY ?? null;
+
   // 브라우저 히스토리와 동기화된 setView
   const setView = (newView, options = {}) => {
-    const { replace = false, skipHistory = false } = options;
+    const { replace = false, skipHistory = false, state = {} } = options;
     
     if (!skipHistory) {
       const url = newView === 'home' ? '/' : `/${newView}`;
       if (replace) {
-        window.history.replaceState({ view: newView }, '', url);
+        window.history.replaceState({ view: newView, ...state }, '', url);
       } else {
-        window.history.pushState({ view: newView }, '', url);
+        window.history.pushState({ view: newView, ...state }, '', url);
       }
     }
     
     setViewState(newView);
+  };
+
+  const areCatalogStatesEqual = (left, right) => {
+    if (!left || !right) {
+      return false;
+    }
+    return (
+      left.categoryFilter === right.categoryFilter &&
+      left.currentPage === right.currentPage &&
+      left.searchQuery === right.searchQuery &&
+      left.scrollY === right.scrollY
+    );
+  };
+
+  const handleCatalogStateChange = useCallback(
+    (nextState) => {
+      setHomeCatalogState((prev) => {
+        const last = lastHomeStateRef.current || prev;
+        if (areCatalogStatesEqual(last, nextState)) {
+          return prev;
+        }
+        lastHomeStateRef.current = nextState;
+        return nextState;
+      });
+      if (view === 'home') {
+        const url = window.location.pathname + window.location.search;
+        const currentState = window.history.state?.homeState;
+        if (!areCatalogStatesEqual(currentState, nextState)) {
+          window.history.replaceState({ view: 'home', homeState: nextState }, '', url);
+        }
+      }
+    },
+    [view]
+  );
+
+  const goHome = (options = {}) => {
+    const { restoreState = null } = options;
+    if (restoreState) {
+      setHomeRestoreState(restoreState);
+      setPendingHomeRestore(true);
+      setSelectedCategory(restoreState.categoryFilter || null);
+    } else {
+      setHomeRestoreState(null);
+      setPendingHomeRestore(false);
+    }
+    setView('home');
   };
 
   const handleLogout = async () => {
@@ -118,11 +174,16 @@ function App() {
       return;
     }
     const productId = product.id || product._id;
+    const homeState = view === 'home' ? homeCatalogState : null;
     setSelectedProductId(productId);
     setSelectedProductData(product);
     // URL에 productId를 쿼리 파라미터로 추가
     const url = `/product-detail?productId=${productId}`;
-    window.history.pushState({ view: 'product-detail', productId }, '', url);
+    window.history.pushState({ view: 'product-detail', productId, homeState }, '', url);
+    if (homeState) {
+      setHomeRestoreState(homeState);
+      setPendingHomeRestore(true);
+    }
     setViewState('product-detail');
   };
 
@@ -151,6 +212,11 @@ function App() {
       const state = event.state;
       if (state && state.view) {
         setViewState(state.view);
+        if (state.view === 'home' && state.homeState) {
+          setHomeRestoreState(state.homeState);
+          setPendingHomeRestore(true);
+          setSelectedCategory(state.homeState.categoryFilter || null);
+        }
         // productId가 state에 있으면 복원
         if (state.productId) {
           setSelectedProductId(state.productId);
@@ -182,10 +248,20 @@ function App() {
 
   // home 뷰로 전환 시 스크롤을 맨 위로 이동
   useEffect(() => {
-    if (view === 'home') {
+    if (view === 'home' && !(pendingHomeRestore && homeRestoreState?.scrollY !== null && homeRestoreState?.scrollY !== undefined)) {
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
-  }, [view]);
+  }, [view, pendingHomeRestore, homeRestoreState]);
+
+  useEffect(() => {
+    if (view === 'home' && pendingHomeRestore) {
+      const id = requestAnimationFrame(() => {
+        setPendingHomeRestore(false);
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    return undefined;
+  }, [view, pendingHomeRestore]);
 
   useEffect(() => {
     let isMounted = true;
@@ -394,7 +470,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -439,7 +515,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -494,7 +570,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -520,7 +596,14 @@ function App() {
           <ProductDetailPage
             productId={selectedProductId}
             product={selectedProductData}
-            onBack={() => setView('home')}
+            onBack={() => {
+              const restoreState = window.history.state?.homeState || homeRestoreState;
+              if (restoreState) {
+                goHome({ restoreState });
+              } else {
+                goHome();
+              }
+            }}
             onAddToCartSuccess={handleCartUpdate}
             onViewCart={() => setView('cart')}
             onDirectOrder={(orderItem) => {
@@ -553,7 +636,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -602,7 +685,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -649,7 +732,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -716,7 +799,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -757,7 +840,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -797,7 +880,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -845,7 +928,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -896,7 +979,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -949,7 +1032,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -994,7 +1077,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1038,7 +1121,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1076,7 +1159,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1111,7 +1194,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1149,7 +1232,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1187,7 +1270,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1225,7 +1308,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1260,7 +1343,7 @@ function App() {
       <div className="app">
         <MainNavbar
           user={session?.user || null}
-          onNavigateHome={() => setView('home')}
+          onNavigateHome={() => goHome()}
           onMoveToLogin={() => setView('login')}
           onMoveToSignUp={() => setView('signup')}
           onMoveToCart={() => setView('cart')}
@@ -1336,7 +1419,11 @@ function App() {
           onMoveToLookbook={() => setView('lookbook')}
           onWishlistChange={handleWishlistUpdate}
           onViewProduct={handleViewProduct}
-          initialCategory={selectedCategory}
+          initialCategory={homeInitialCategory}
+          initialSearchQuery={homeInitialSearchQuery}
+          initialPage={homeInitialPage}
+          initialScrollY={homeInitialScrollY}
+          onCatalogStateChange={handleCatalogStateChange}
           onCategoryFiltered={() => setSelectedCategory(null)}
         />
       );

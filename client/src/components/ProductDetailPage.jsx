@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -285,6 +285,7 @@ function ProductDetailPage({
   const [inquirySearch, setInquirySearch] = useState('');
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [newInquiry, setNewInquiry] = useState({ question: '', isSecret: false });
+  const galleryTouchStartX = useRef(null);
   const [answeringInquiryId, setAnsweringInquiryId] = useState(null);
   const [answerText, setAnswerText] = useState('');
   const [editingInquiryId, setEditingInquiryId] = useState(null);
@@ -753,6 +754,29 @@ function ProductDetailPage({
     onDirectOrder(orderItem);
   };
 
+  const handleGalleryTouchStart = (event) => {
+    if (event.touches && event.touches.length > 0) {
+      galleryTouchStartX.current = event.touches[0].clientX;
+    }
+  };
+
+  const handleGalleryTouchEnd = (event) => {
+    if (!galleryTouchStartX.current || !event.changedTouches || event.changedTouches.length === 0) {
+      galleryTouchStartX.current = null;
+      return;
+    }
+    const deltaX = event.changedTouches[0].clientX - galleryTouchStartX.current;
+    const threshold = 40;
+    if (Math.abs(deltaX) >= threshold && product.gallery.length > 1) {
+      if (deltaX < 0) {
+        setActiveImage((prev) => (prev + 1) % product.gallery.length);
+      } else {
+        setActiveImage((prev) => (prev - 1 + product.gallery.length) % product.gallery.length);
+      }
+    }
+    galleryTouchStartX.current = null;
+  };
+
   return (
     <div className="product-page">
       <button type="button" className="product-page__back" onClick={onBack}>
@@ -811,7 +835,11 @@ function ProductDetailPage({
           )}
           <section className="product-hero">
             <div className="product-gallery">
-              <div className="product-gallery__main">
+              <div
+                className="product-gallery__main"
+                onTouchStart={handleGalleryTouchStart}
+                onTouchEnd={handleGalleryTouchEnd}
+              >
                 {product.gallery.length > 1 && (
                   <button
                     type="button"
@@ -824,7 +852,12 @@ function ProductDetailPage({
                   </button>
                 )}
                 {product.gallery.length > 0 && product.gallery[activeImage] && (
-                  <img src={product.gallery[activeImage]} alt={`${product.name} 이미지 ${activeImage + 1}`} />
+                  <img
+                    src={product.gallery[activeImage]}
+                    alt={`${product.name} 이미지 ${activeImage + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                  />
                 )}
                 {product.gallery.length > 1 && (
                   <button
@@ -848,7 +881,7 @@ function ProductDetailPage({
                       className={`product-gallery__thumbnail ${activeImage === index ? 'is-active' : ''}`}
                       onClick={() => setActiveImage(index)}
                     >
-                      <img src={image} alt={`${product.name} 썸네일 ${index + 1}`} />
+                      <img src={image} alt={`${product.name} 썸네일 ${index + 1}`} loading="lazy" decoding="async" />
                     </button>
                   ))}
                 </div>
@@ -1901,6 +1934,8 @@ function ProductDetailPage({
                       <img 
                         src={productData.gallery?.[0] || productData.image || 'https://via.placeholder.com/300'} 
                         alt={productData.name} 
+                        loading="lazy"
+                        decoding="async"
                         style={{ width: '100%', height: 'auto', display: 'block' }}
                       />
                       <div>

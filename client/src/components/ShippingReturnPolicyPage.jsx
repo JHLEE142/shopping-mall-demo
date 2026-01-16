@@ -50,6 +50,28 @@ function ShippingReturnPolicyPage({ onBack }) {
           </div>
         </section>
 
+        {/* 구매대행 구조 및 책임 안내 */}
+        <section className="shipping-return-policy-section">
+          <h2 className="shipping-return-policy-section__title">구매대행/책임 안내</h2>
+          <div className="shipping-return-policy-section__content">
+            <div className="shipping-return-policy-item">
+              <h3 className="shipping-return-policy-item__title">구매대행 구조</h3>
+              <ul className="shipping-return-policy-item__list">
+                <li>본 쇼핑몰은 해외/국내 상품에 대해 구매대행 형태로 운영됩니다.</li>
+                <li>주문이 접수되면 공급처 주문 및 검수 후 발송이 진행됩니다.</li>
+              </ul>
+            </div>
+            <div className="shipping-return-policy-item">
+              <h3 className="shipping-return-policy-item__title">배송/파손/환불 책임</h3>
+              <ul className="shipping-return-policy-item__list">
+                <li>배송 진행 상태 및 택배 수령 이슈는 쇼핑몰 고객센터가 안내합니다.</li>
+                <li>파손/오배송 발생 시 사진 증빙 확인 후 교환 또는 환불을 지원합니다.</li>
+                <li>환불은 반품 상품 검수 완료 후 결제 수단에 따라 순차 처리됩니다.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* 교환 안내 */}
         <section className="shipping-return-policy-section">
           <h2 className="shipping-return-policy-section__title">교환 안내</h2>

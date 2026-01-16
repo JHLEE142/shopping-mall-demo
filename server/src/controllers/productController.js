@@ -151,6 +151,27 @@ function getCategoryMultiplier(categoryPathText) {
   return 2.10;
 }
 
+function getPriceMultiplierByWholesale(wholesalePrice) {
+  if (wholesalePrice <= 10000) return 1.85;
+  if (wholesalePrice <= 30000) return 1.45;
+  if (wholesalePrice <= 50000) return 1.35;
+  return 1.30;
+}
+
+function roundUpToHundreds(value) {
+  return Math.ceil(value / 100) * 100;
+}
+
+function calculateSalePriceFromWholesale(wholesalePrice) {
+  const multiplier = getPriceMultiplierByWholesale(wholesalePrice);
+  const basePrice = roundUpToHundreds(wholesalePrice * multiplier);
+  const minimumPrice = roundUpToHundreds(wholesalePrice + 3500);
+  return {
+    price: Math.max(basePrice, minimumPrice),
+    multiplier,
+  };
+}
+
 // 재고 상태 계산 헬퍼 함수
 function calculateInventoryStatus(inventory) {
   if (!inventory) {
@@ -1191,11 +1212,11 @@ async function importExcel(req, res, next) {
     const existingSkus = new Set(existingProducts.map(p => p.sku.toUpperCase()));
     console.log(`📊 [EXCEL IMPORT] Found ${existingSkus.size} existing SKUs in database`);
 
-    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 500 valid unique products)...`);
+    console.log(`🔄 [EXCEL IMPORT] Starting row processing (target: 1000 valid unique products)...`);
     const previewData = [];
-    const targetValidProducts = 500;
+    const targetValidProducts = 1000;
     // 중복 제외를 고려하여 더 많은 행 읽기 (최대 1500개 행까지 읽어서 중복 제외 후 500개 채우기)
-    const maxRowsToCheck = Math.min(allRows.length, 1500);
+    const maxRowsToCheck = Math.min(allRows.length, 3000);
     
     // 엑셀 파일 내 중복 체크를 위한 SKU Map
     const fileSkuMap = new Map(); // SKU -> 첫 번째 발견된 rowIndex
@@ -1319,24 +1340,20 @@ async function importExcel(req, res, next) {
         categoryPathText = String(categoryPath).trim();
       }
 
-      // 가격: 우수회원5 컬럼 값에 카테고리별 multiplier 적용 후 10원 단위로 절삭
+      // 가격: 우수회원5 컬럼 값을 도매가로 보고 가격 구간 배수 적용
       if (vip5 !== null && vip5 !== undefined && vip5 !== '') {
         const vip5Num = Number(vip5);
         if (!isNaN(vip5Num) && vip5Num >= 0) {
-          // 카테고리별 multiplier 계산
-          const multiplier = categoryPathText ? getCategoryMultiplier(categoryPathText) : 2.10;
-          
-          // 우수회원5 값에 multiplier를 곱한 후 10원 단위로 절삭
-          const calculatedPrice = vip5Num * multiplier;
-          mapped.price = Math.floor(calculatedPrice / 10) * 10;
+          const { price } = calculateSalePriceFromWholesale(vip5Num);
+          mapped.price = price;
           
           // 할인율 랜덤 배정
           const discountRate = getRandomDiscountRate();
           mapped.discountRate = discountRate;
           
-          // 원래 가격 역산: 현재 가격 / (1 - 할인율/100), 100원 단위로 절삭
+          // 원래 가격 역산: 현재 가격 / (1 - 할인율/100), 100원 단위로 올림
           const originalPrice = mapped.price / (1 - discountRate / 100);
-          mapped.originalPrice = Math.floor(originalPrice / 100) * 100;
+          mapped.originalPrice = roundUpToHundreds(originalPrice);
         } else {
           validation.ok = false;
           validation.errors.push(`VIP5 price must be a valid number (got: ${vip5}, type: ${typeof vip5})`);
@@ -1480,7 +1497,7 @@ async function importExcel(req, res, next) {
   }
 }
 
-// 상품 등록 커밋 (최대 500개까지 처리)
+// 상품 등록 커밋 (최대 1000개까지 처리)
 async function commitImport(req, res, next) {
   try {
     const { preview } = req.body;
@@ -1489,8 +1506,8 @@ async function commitImport(req, res, next) {
       return res.status(400).json({ message: 'Preview data is required' });
     }
 
-    // 유효한 행만 필터링 (최대 500개)
-    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 500);
+    // 유효한 행만 필터링 (최대 1000개)
+    const validRows = preview.filter(item => item.validation && item.validation.ok).slice(0, 1000);
 
     if (validRows.length === 0) {
       return res.status(400).json({ message: 'No valid rows to import' });
