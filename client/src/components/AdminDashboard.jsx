@@ -320,9 +320,9 @@ function AdminDashboard({
   isLoggingOut = false,
 }) {
   const [activeNav, setActiveNav] = useState(initialNav);
-  const [activeRevenuePoint, setActiveRevenuePoint] = useState(REVENUE_TREND.at(-1));
-  const [activeCategory, setActiveCategory] = useState(CATEGORY_SALES[0]);
-  const [activeOrderStatus, setActiveOrderStatus] = useState(ORDER_STATUS[0]);
+  const [activeRevenuePoint, setActiveRevenuePoint] = useState(null);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeOrderStatus, setActiveOrderStatus] = useState(null);
   const [productList, setProductList] = useState([]);
   const [productsStatus, setProductsStatus] = useState('idle');
   const [productsError, setProductsError] = useState('');
@@ -595,7 +595,7 @@ function AdminDashboard({
     if (orderStatusDistribution.length > 0) {
       return orderStatusDistribution.reduce((sum, status) => sum + status.value, 0);
     }
-    return ORDER_STATUS.reduce((sum, status) => sum + status.value, 0);
+    return orderStatusDistribution.reduce((sum, status) => sum + (status.value || 0), 0);
   }, [orderStatusDistribution]);
 
   const loadProducts = useCallback(
@@ -1034,7 +1034,7 @@ function AdminDashboard({
     // 통계 카드 데이터 계산
     const statCards = useMemo(() => {
       if (!dashboardStats) {
-        return STAT_CARDS; // 기본값
+        return []; // 기본값
       }
 
       const revenueChange = dashboardStats.revenueChange || 0;
@@ -1107,15 +1107,15 @@ function AdminDashboard({
               <h2>Revenue Trend</h2>
               <p>Monthly revenue performance</p>
             </div>
-            <span className="admin-badge">{`${activeRevenuePoint.month} · ${formatCurrency(activeRevenuePoint.revenue)}`}</span>
+            <span className="admin-badge">{activeRevenuePoint ? `${activeRevenuePoint.month} · ${formatCurrency(activeRevenuePoint.revenue)}` : '-'}</span>
           </header>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart
-                data={revenueTrend.length > 0 ? revenueTrend : REVENUE_TREND}
+                data={revenueTrend.length > 0 ? revenueTrend : []}
                 onMouseLeave={() =>
                   setActiveRevenuePoint(
-                    revenueTrend.length > 0 ? revenueTrend[revenueTrend.length - 1] : REVENUE_TREND.at(-1)
+                    revenueTrend.length > 0 ? revenueTrend[revenueTrend.length - 1] : null
                   )
                 }
               >
@@ -1136,7 +1136,7 @@ function AdminDashboard({
                     r: 5,
                     onMouseEnter: (_, index) =>
                       setActiveRevenuePoint(
-                        revenueTrend.length > 0 ? revenueTrend[index] : REVENUE_TREND[index]
+                        revenueTrend.length > 0 ? revenueTrend[index] : null
                       ),
                   }}
                 />
@@ -1149,9 +1149,9 @@ function AdminDashboard({
               </AreaChart>
             </ResponsiveContainer>
             <div className="admin-chart-details">
-              <strong>{activeRevenuePoint.month}</strong>
-              <span>{`Revenue: ${formatCurrency(activeRevenuePoint.revenue)}`}</span>
-              <span>{`Orders: ${activeRevenuePoint.orders}`}</span>
+              <strong>{activeRevenuePoint?.month || '-'}</strong>
+              <span>{`Revenue: ${activeRevenuePoint ? formatCurrency(activeRevenuePoint.revenue) : '-'}`}</span>
+              <span>{`Orders: ${activeRevenuePoint?.orders || '-'}`}</span>
             </div>
           </div>
         </article>
@@ -1162,14 +1162,14 @@ function AdminDashboard({
               <h2>Sales by Category</h2>
               <p>Current month performance</p>
             </div>
-            <span className="admin-badge">{`${activeCategory.category} · ${formatCurrency(activeCategory.sales)}`}</span>
+            <span className="admin-badge">{activeCategory ? `${activeCategory.category} · ${formatCurrency(activeCategory.sales)}` : '-'}</span>
           </header>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={280}>
               <BarChart
-                data={categorySales.length > 0 ? categorySales : CATEGORY_SALES}
+                data={categorySales.length > 0 ? categorySales : []}
                 onMouseLeave={() =>
-                  setActiveCategory(categorySales.length > 0 ? categorySales[0] : CATEGORY_SALES[0])
+                  setActiveCategory(categorySales.length > 0 ? categorySales[0] : null)
                 }
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -1181,13 +1181,13 @@ function AdminDashboard({
                   formatter={(value) => [`$${value.toLocaleString()}`, 'Sales']}
                 />
                 <Bar dataKey="sales">
-                  {(categorySales.length > 0 ? categorySales : CATEGORY_SALES).map((entry, index) => (
+                  {(categorySales.length > 0 ? categorySales : []).map((entry, index) => (
                     <Cell
                       key={entry.category}
-                      fill={activeCategory.category === entry.category ? '#4f46e5' : '#111827'}
+                      fill={activeCategory?.category === entry.category ? '#4f46e5' : '#111827'}
                       onMouseEnter={() =>
                         setActiveCategory(
-                          categorySales.length > 0 ? categorySales[index] : CATEGORY_SALES[index]
+                          categorySales.length > 0 ? categorySales[index] : null
                         )
                       }
                     />
@@ -1197,8 +1197,8 @@ function AdminDashboard({
             </ResponsiveContainer>
           </div>
           <div className="admin-chart-details">
-            <strong>{activeCategory.category}</strong>
-            <span>{`Revenue: ${formatCurrency(activeCategory.sales)}`}</span>
+            <strong>{activeCategory?.category || '-'}</strong>
+            <span>{`Revenue: ${activeCategory ? formatCurrency(activeCategory.sales) : '-'}`}</span>
           </div>
         </article>
       </section>
@@ -1215,18 +1215,18 @@ function AdminDashboard({
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
                 <Pie
-                  data={orderStatusDistribution.length > 0 ? orderStatusDistribution : ORDER_STATUS}
+                  data={orderStatusDistribution.length > 0 ? orderStatusDistribution : []}
                   innerRadius={70}
                   outerRadius={100}
                   paddingAngle={4}
                   dataKey="value"
                   onMouseLeave={() =>
                     setActiveOrderStatus(
-                      orderStatusDistribution.length > 0 ? orderStatusDistribution[0] : ORDER_STATUS[0]
+                      orderStatusDistribution.length > 0 ? orderStatusDistribution[0] : null
                     )
                   }
                 >
-                  {(orderStatusDistribution.length > 0 ? orderStatusDistribution : ORDER_STATUS).map((entry) => (
+                  {(orderStatusDistribution.length > 0 ? orderStatusDistribution : []).map((entry) => (
                     <Cell key={entry.name} fill={entry.color} onMouseEnter={() => setActiveOrderStatus(entry)} />
                   ))}
                 </Pie>
@@ -1237,17 +1237,17 @@ function AdminDashboard({
               </PieChart>
             </ResponsiveContainer>
             <div className="admin-chart-donut__center">
-              <strong>{activeOrderStatus.name}</strong>
-              <span>{`${Math.round((activeOrderStatus.value / totalOrderEntries) * 100)}%`}</span>
-              <small>{`${activeOrderStatus.value} orders`}</small>
+              <strong>{activeOrderStatus?.name || '-'}</strong>
+              <span>{activeOrderStatus && totalOrderEntries > 0 ? `${Math.round((activeOrderStatus.value / totalOrderEntries) * 100)}%` : '-'}</span>
+              <small>{activeOrderStatus ? `${activeOrderStatus.value} orders` : '-'}</small>
             </div>
             <div className="admin-chart-donut__legend">
-              {(orderStatusDistribution.length > 0 ? orderStatusDistribution : ORDER_STATUS).map((status) => (
+              {(orderStatusDistribution.length > 0 ? orderStatusDistribution : []).map((status) => (
                 <button
                   key={status.name}
                   type="button"
                   className={`admin-chart-donut__legend-item ${
-                    activeOrderStatus.name === status.name ? 'is-active' : ''
+                    activeOrderStatus?.name === status.name ? 'is-active' : ''
                   }`}
                   onMouseEnter={() => setActiveOrderStatus(status)}
                 >
@@ -1273,7 +1273,7 @@ function AdminDashboard({
               <span>Revenue</span>
             </div>
             <div className="admin-table__body">
-              {(topProducts.length > 0 ? topProducts : TOP_PRODUCTS).map((product) => (
+              {(topProducts.length > 0 ? topProducts : []).map((product) => (
                 <div key={product.name} className="admin-table__row">
                   <span>{product.name}</span>
                   <span>{product.sales}</span>
@@ -2204,7 +2204,7 @@ function AdminDashboard({
     // Statistics 하이라이트 카드 데이터 계산
     const statisticsCards = useMemo(() => {
       if (!statisticsHighlights) {
-        return STATISTICS_HIGHLIGHTS; // 기본값
+        return []; // 기본값
       }
 
       return [
@@ -2276,7 +2276,7 @@ function AdminDashboard({
           </header>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={statisticsData?.monthlyStats || MONTHLY_STATS}>
+              <LineChart data={statisticsData?.monthlyStats || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#6b7280" />
                 <YAxis yAxisId="left" stroke="#6b7280" />
@@ -2299,7 +2299,7 @@ function AdminDashboard({
           </header>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={statisticsData?.acquisitionData || ACQUISITION_DATA}>
+              <BarChart data={statisticsData?.acquisitionData || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
@@ -2323,7 +2323,7 @@ function AdminDashboard({
           </header>
           <div className="admin-chart">
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={statisticsData?.monthlyStats || MONTHLY_STATS}>
+              <LineChart data={statisticsData?.monthlyStats || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" domain={[0, 6]} />
@@ -2350,7 +2350,7 @@ function AdminDashboard({
               <span>Performance</span>
             </div>
             <div className="admin-table__body">
-              {TRAFFIC_SOURCES.map((traffic) => (
+              {(statisticsData?.trafficSources || []).map((traffic) => (
                 <div key={traffic.source} className="admin-table__row">
                   <span>{traffic.source}</span>
                   <span>{traffic.visitors.toLocaleString()}</span>
@@ -2383,7 +2383,7 @@ function AdminDashboard({
               <span>Growth</span>
             </div>
             <div className="admin-table__body">
-              {(categoryPerformance.length > 0 ? categoryPerformance : CATEGORY_PERFORMANCE).map((category) => (
+              {(categoryPerformance.length > 0 ? categoryPerformance : []).map((category) => (
                 <div key={category.category} className="admin-table__row">
                   <span>{category.category}</span>
                   <span>{formatCurrency(category.revenue)}</span>
