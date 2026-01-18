@@ -270,6 +270,14 @@ const orderSchema = new Schema(
       deliveredAt: {
         type: Date,
       },
+      estimatedDays: {
+        type: Number,
+        default: 3,
+        min: [1, '예상 배송일은 최소 1일 이상이어야 합니다.'],
+      },
+      estimatedDelivery: {
+        type: Date,
+      },
     },
     sourceCart: {
       type: Schema.Types.ObjectId,

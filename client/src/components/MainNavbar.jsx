@@ -244,7 +244,8 @@ function MainNavbar({
       <nav className="home-nav">
         <div className="nav-left">
           <button type="button" className="nav-brand nav-brand--button" onClick={handleNavigateHome}>
-            <span className="nav-brand__text">Caurora</span>
+            <img src="/vail_icon_.png" alt="　　Vail" className="nav-brand__logo" />
+            <span className="nav-brand__text">Vail</span>
           </button>
         </div>
 

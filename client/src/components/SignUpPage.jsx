@@ -7,7 +7,7 @@ const INITIAL_FORM_DATA = {
   password: '',
   confirmPassword: '',
   address: '',
-  user_type: 'customer',
+  user_type: 'customer', // UI에서 제거되었지만 서버 전송 시 항상 'customer'로 고정
 };
 
 const INITIAL_AGREEMENTS = {
@@ -259,19 +259,6 @@ function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
             />
           </div>
 
-          <div className="field">
-            <label htmlFor="user_type">회원 유형</label>
-            <select
-              id="user_type"
-              name="user_type"
-              value={formData.user_type}
-              onChange={handleChange}
-              required
-            >
-              <option value="customer">일반 회원</option>
-              <option value="admin">관리자</option>
-            </select>
-          </div>
 
           <div className="field">
             <label htmlFor="address">주소 (선택)</label>

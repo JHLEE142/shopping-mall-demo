@@ -152,10 +152,10 @@ function getCategoryMultiplier(categoryPathText) {
 }
 
 function getPriceMultiplierByWholesale(wholesalePrice) {
-  if (wholesalePrice <= 10000) return 1.85;
-  if (wholesalePrice <= 30000) return 1.45;
-  if (wholesalePrice <= 50000) return 1.35;
-  return 1.30;
+  // 가격대별 차등 마진 적용
+  if (wholesalePrice <= 10000) return 1.35;  // 저가 상품: 역마진 방지, 유입 유지
+  if (wholesalePrice <= 30000) return 1.30;  // 중가 상품: 안정적 마진
+  return 1.25;  // 고가 상품: 현재 수준 유지
 }
 
 function roundUpToHundreds(value) {

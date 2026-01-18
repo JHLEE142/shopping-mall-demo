@@ -42,7 +42,7 @@ const SOLUTION_OPTIONS = [
   { id: 'exchange', label: '교환' },
 ];
 
-function ExchangeReturnPage({ order, orderItem, user, onBack, onSubmit }) {
+function ExchangeReturnPage({ order, orderItem, user, onBack, onSubmit, onNavigateToPolicy }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -185,6 +185,15 @@ function ExchangeReturnPage({ order, orderItem, user, onBack, onSubmit }) {
         {/* 헤더 */}
         <header className="exchange-return-page__header">
           <h1 className="exchange-return-page__title">교환, 반품 신청</h1>
+          {onNavigateToPolicy && (
+            <button
+              type="button"
+              className="exchange-return-page__policy-link"
+              onClick={onNavigateToPolicy}
+            >
+              반품/교환 안내 보기
+            </button>
+          )}
         </header>
 
         {/* 진행 단계 표시 */}

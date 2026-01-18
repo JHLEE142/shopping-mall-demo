@@ -3,7 +3,7 @@ import { Search, ChevronRight, Package, Truck, CheckCircle } from 'lucide-react'
 import { fetchOrders } from '../services/orderService';
 import './OrderListPage.css';
 
-function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExchangeReturn }) {
+function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExchangeReturn, onTrackOrder }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -231,7 +231,11 @@ function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExcha
                         <button
                           type="button"
                           className="order-list-page__action-button order-list-page__action-button--primary"
-                          onClick={() => {/* 배송 조회 */}}
+                          onClick={() => {
+                            if (onTrackOrder) {
+                              onTrackOrder(order);
+                            }
+                          }}
                         >
                           배송 조회
                         </button>

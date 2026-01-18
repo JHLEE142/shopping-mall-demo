@@ -13,18 +13,18 @@ const CUSTOMER_SUPPORT = {
 };
 
 const BANK_INFOS = [
-  { label: '예금주', value: '커멧랩스' },
+  { label: '예금주', value: '배일' },
   { label: '하나', value: '000-000000-00000' },
 ];
 
 const FOOTER_LINKS = ['이용안내', '이용약관', '개인정보취급방침', 'instagram'];
 
 const COMPANY_INFO = [
-  '커멧랩스',
+  '배일',
   '서울특별시 종로구 ㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇ  대표 : ㅇㅇㅇ  사업자등록번호 : 000-00-00000',
   '통신판매업 신고 : 0000-ㅇㅇㅇㅇ-0000호  팩스 : 02)000-0000  개인정보관리책임자 : ㅇㅇㅇ',
-  '반품주소 : 경기도 양주시 ㅇㅇㅇ 0000 ㅇㅇ빌딩 (ㅇㅇ동)',
-  'COPYRIGHT(C) 주식회사 코로라 ALL RIGHT RESERVED. / Hosting By 커멧랩스',
+  '반품주소 : 경기도 광주시 고불로 180-9',
+  'COPYRIGHT(C) 주식회사 배일 ALL RIGHT RESERVED. / Hosting By Vail',
 ];
 
 function SiteFooter() {

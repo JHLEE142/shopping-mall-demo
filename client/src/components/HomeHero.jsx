@@ -6,143 +6,6 @@ import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../serv
 import { subscribeToNewProducts, getSubscriptionStatus } from '../services/notificationService';
 import { loadSession } from '../utils/sessionStorage';
 
-const FALLBACK_CATALOG = [
-  {
-    id: null,
-    name: '패스트 앤 프리 하프 타이츠 8"',
-    rating: 4.9,
-    reviews: 64,
-    pricePrimary: '138,000원',
-    priceSecondary: null,
-    badge: null,
-    colors: [
-      { name: 'Black', value: '#1f1f21' },
-      { name: 'Moonlit', value: '#5d5e64' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LW9BQUS_0001_1?wid=1200&hei=1200',
-    detail: {
-      category: '러닝',
-      price: 138000,
-    },
-  },
-  {
-    id: null,
-    name: '패스트 앤 프리 라인드 러닝 쇼츠 5"',
-    rating: 4.8,
-    reviews: 78,
-    pricePrimary: '100,000원',
-    priceSecondary: '125,000원',
-    badge: '새로운 컬러',
-    colors: [
-      { name: 'Black', value: '#111111' },
-      { name: 'Graphite Grey', value: '#737680' },
-      { name: 'Silver', value: '#c8cbd3' },
-      { name: 'Fog', value: '#dee0e6' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LM3EKIS_0001_1?wid=1200&hei=1200',
-    detail: {
-      category: '남성 · 쇼츠',
-      price: 125000,
-      priceSale: 100000,
-    },
-  },
-  {
-    id: null,
-    name: '패스트 앤 프리 하이라이즈 파인브 포켓 타이츠 24"',
-    rating: 4.7,
-    reviews: 95,
-    pricePrimary: '129,000원',
-    priceSecondary: '184,000원',
-    badge: null,
-    colors: [
-      { name: 'Black', value: '#18181b' },
-      { name: 'Deep Plum', value: '#32213a' },
-      { name: 'Olive', value: '#6d6f58' },
-      { name: 'Slate Blue', value: '#5a6279' },
-      { name: 'Navy', value: '#1e2430' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LW5FOES_0001_1?wid=1200&hei=1200',
-    detail: {
-      category: '여성 · 타이츠',
-      price: 184000,
-      priceSale: 129000,
-    },
-  },
-  {
-    id: null,
-    name: '패스트 앤 프리 하이라이즈 쇼츠 6" 5 포켓',
-    rating: 4.6,
-    reviews: 43,
-    pricePrimary: '93,000원',
-    priceSecondary: null,
-    badge: null,
-    colors: [
-      { name: 'Black', value: '#151516' },
-      { name: 'Powder Grey', value: '#c7cad2' },
-      { name: 'Navy', value: '#1f2430' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LW7BW4S_0001_1?wid=1200&hei=1200',
-    detail: {
-      category: '여성 · 쇼츠',
-      price: 93000,
-    },
-  },
-  {
-    id: null,
-    name: '패스트 앤 프리 재킷',
-    rating: 4.8,
-    reviews: 128,
-    pricePrimary: '158,000원',
-    priceSecondary: '198,000원',
-    badge: null,
-    colors: [
-      { name: 'Bone', value: '#d6d1c8' },
-      { name: 'Grey', value: '#7e7f84' },
-      { name: 'Black', value: '#202124' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LM3EWQS_0001_1?wid=1200&hei=1200',
-    detail: {
-      category: '남성 · 아우터웨어',
-      price: 198000,
-      priceSale: 158000,
-    },
-  },
-  {
-    id: null,
-    name: '패스트 앤 프리 하이라이즈 타이츠 25" 5 포켓',
-    rating: 4.7,
-    reviews: 66,
-    pricePrimary: '129,000원',
-    priceSecondary: '184,000원',
-    badge: null,
-    colors: [
-      { name: 'Olive', value: '#7b8160' },
-      { name: 'Slate', value: '#6b7280' },
-      { name: 'Deep Navy', value: '#0f172a' },
-      { name: 'Black', value: '#111827' },
-    ],
-    image:
-      'https://images.lululemon.com/is/image/lululemon/LW5FOFS_028932_1?wid=1200&hei=1200',
-    detail: {
-      category: '여성 · 타이츠',
-      price: 184000,
-      priceSale: 129000,
-    },
-  },
-];
-
-const COLOR_PRESETS = [
-  ['#111827', '#4b5563', '#d1d5db', '#e2e8f0'],
-  ['#1f2937', '#7c3aed', '#f4d35e', '#ee964b'],
-  ['#0f172a', '#ec4899', '#fde68a', '#f97316'],
-  ['#111827', '#475569', '#94a3b8', '#f8fafc'],
-];
-
 // 슬라이드 데이터 (10개)
 const SLIDE_DATA = [
   {
@@ -216,10 +79,6 @@ const SLIDE_DATA = [
     buttonText: '세일 보기',
   },
 ];
-
-function pickColorPalette(index = 0) {
-  return COLOR_PRESETS[index % COLOR_PRESETS.length];
-}
 
 function mapProductsToCatalog(products = []) {
   const formatter = new Intl.NumberFormat('ko-KR');
@@ -599,6 +458,63 @@ function HomeHero({
     return mapProductsToCatalog(filteredProducts);
   }, [products, categoryFilter, submittedSearchQuery]);
 
+  // 테마별 상품 선택 로직 (검색/필터가 없을 때만 사용)
+  const themedProducts = useMemo(() => {
+    if (submittedSearchQuery || categoryFilter || products.length === 0) {
+      return { todayProducts: [], shoppingSuggestions: [], recommendedProducts: [] };
+    }
+
+    const allCatalogProducts = mapProductsToCatalog(products);
+    
+    // 오늘의 상품: 최신순 또는 인기순 (최근 등록된 상품 우선, 리뷰 많은 순)
+    const todayProducts = [...allCatalogProducts]
+      .sort((a, b) => {
+        // 리뷰 수가 같으면 최신순, 아니면 리뷰 많은 순
+        if (b.reviews === a.reviews) {
+          return Math.random() - 0.5; // 동일한 경우 랜덤
+        }
+        return b.reviews - a.reviews;
+      })
+      .slice(0, 8);
+
+    // 오늘의 쇼핑 제안: 할인 상품 또는 가격대별 추천
+    const shoppingSuggestions = [...allCatalogProducts]
+      .filter((p) => p.badge || p.priceSecondary) // 할인 상품 우선
+      .sort((a, b) => {
+        const aHasDiscount = a.badge || a.priceSecondary ? 1 : 0;
+        const bHasDiscount = b.badge || b.priceSecondary ? 1 : 0;
+        if (aHasDiscount !== bHasDiscount) {
+          return bHasDiscount - aHasDiscount;
+        }
+        // 동일한 경우 랜덤
+        return Math.random() - 0.5;
+      })
+      .slice(0, 8);
+
+    // 이 상품은 어떠세요?: 카테고리별 다양하게 또는 랜덤
+    // 이미 다른 섹션에 포함된 상품 제외
+    const todayIds = new Set(todayProducts.map(p => p.id));
+    const suggestionIds = new Set(shoppingSuggestions.map(p => p.id));
+    const recommendedProducts = [...allCatalogProducts]
+      .filter((p) => !todayIds.has(p.id) && !suggestionIds.has(p.id))
+      .sort(() => Math.random() - 0.5) // 랜덤 섞기
+      .slice(0, 8);
+
+    // 만약 기준이 동일하여 상품이 부족하면 랜덤으로 보충
+    if (todayProducts.length === shoppingSuggestions.length && 
+        todayProducts.length > 0 && 
+        new Set([...todayProducts.map(p => p.id), ...shoppingSuggestions.map(p => p.id)]).size === todayProducts.length) {
+      // 모든 상품이 동일하면 랜덤으로 재배치
+      return {
+        todayProducts: [...allCatalogProducts].sort(() => Math.random() - 0.5).slice(0, 8),
+        shoppingSuggestions: [...allCatalogProducts].sort(() => Math.random() - 0.5).slice(8, 16),
+        recommendedProducts: [...allCatalogProducts].sort(() => Math.random() - 0.5).slice(16, 24),
+      };
+    }
+
+    return { todayProducts, shoppingSuggestions, recommendedProducts };
+  }, [products, submittedSearchQuery, categoryFilter]);
+
   // 카테고리 필터가 적용되면 표시
   useEffect(() => {
     if (categoryFilter && onCategoryFiltered) {
@@ -830,7 +746,247 @@ function HomeHero({
         </div>
       </section>
 
-      <div className="catalog-page">
+      {/* 테마별 섹션 (검색/필터가 없을 때만 표시) */}
+      {!submittedSearchQuery && !categoryFilter ? (
+        <div className="mobile-frame">
+          <div className="mobile-frame__container">
+            {/* 오늘의 상품 */}
+            {themedProducts.todayProducts.length > 0 && (
+              <section className="product-theme-section">
+                <h2 className="product-theme-section__title">오늘의 상품</h2>
+                <div className="product-theme-section__grid">
+                  {themedProducts.todayProducts.map((product) => (
+                    <article key={`${product.id || product.name}`} className="catalog-card">
+                      <div className="catalog-card__media" onClick={() => onViewProduct(product.detail)} role="button" tabIndex={0} onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          onViewProduct(product.detail);
+                        }
+                      }}>
+                        <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        <button
+                          type="button"
+                          className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
+                          aria-label={wishlistedItems.has(product.id) ? '찜하기 해제' : '찜하기 추가'}
+                          onClick={(e) => handleToggleWishlist(e, product)}
+                          disabled={togglingWishlist.has(product.id)}
+                        >
+                          <Heart 
+                            size={14} 
+                            strokeWidth={wishlistedItems.has(product.id) ? 0 : 2.5} 
+                            fill={wishlistedItems.has(product.id) ? '#ef4444' : 'none'}
+                            color={wishlistedItems.has(product.id) ? '#ef4444' : '#000000'}
+                            style={{
+                              transition: 'all 0.3s ease',
+                            }}
+                          />
+                        </button>
+                      </div>
+                      <div className="catalog-card__body">
+                        {product.colors && product.colors.length > 0 && (
+                          <div className="catalog-card__colors">
+                            {product.colors.map((color) => (
+                              <span
+                                key={`${product.name}-${color.value}`}
+                                className="catalog-card__color-dot"
+                                style={{ backgroundColor: color.value }}
+                                title={color.name}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <h3 className="catalog-card__title">{product.name}</h3>
+                        <div className="catalog-card__rating">
+                          <Star size={16} fill="#111" strokeWidth={0} />
+                          <span>
+                            {product.rating.toFixed(1)} <small>({product.reviews})</small>
+                          </span>
+                        </div>
+                        <div className="catalog-card__prices">
+                          {product.badge && (
+                            <span className="catalog-card__discount-badge">{product.badge}</span>
+                          )}
+                          {product.priceSecondary && (
+                            <span className="catalog-card__price catalog-card__price--compare">
+                              {product.priceSecondary}
+                            </span>
+                          )}
+                          <span className="catalog-card__price">{product.pricePrimary}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="catalog-card__cta"
+                          onClick={() => onViewProduct(product.detail)}
+                        >
+                          <ShoppingBag size={16} />
+                          바로 구매하기
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 오늘의 쇼핑 제안 */}
+            {themedProducts.shoppingSuggestions.length > 0 && (
+              <section className="product-theme-section">
+                <h2 className="product-theme-section__title">오늘의 쇼핑 제안</h2>
+                <div className="product-theme-section__grid">
+                  {themedProducts.shoppingSuggestions.map((product) => (
+                    <article key={`${product.id || product.name}`} className="catalog-card">
+                      <div className="catalog-card__media" onClick={() => onViewProduct(product.detail)} role="button" tabIndex={0} onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          onViewProduct(product.detail);
+                        }
+                      }}>
+                        <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        <button
+                          type="button"
+                          className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
+                          aria-label={wishlistedItems.has(product.id) ? '찜하기 해제' : '찜하기 추가'}
+                          onClick={(e) => handleToggleWishlist(e, product)}
+                          disabled={togglingWishlist.has(product.id)}
+                        >
+                          <Heart 
+                            size={14} 
+                            strokeWidth={wishlistedItems.has(product.id) ? 0 : 2.5} 
+                            fill={wishlistedItems.has(product.id) ? '#ef4444' : 'none'}
+                            color={wishlistedItems.has(product.id) ? '#ef4444' : '#000000'}
+                            style={{
+                              transition: 'all 0.3s ease',
+                            }}
+                          />
+                        </button>
+                      </div>
+                      <div className="catalog-card__body">
+                        {product.colors && product.colors.length > 0 && (
+                          <div className="catalog-card__colors">
+                            {product.colors.map((color) => (
+                              <span
+                                key={`${product.name}-${color.value}`}
+                                className="catalog-card__color-dot"
+                                style={{ backgroundColor: color.value }}
+                                title={color.name}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <h3 className="catalog-card__title">{product.name}</h3>
+                        <div className="catalog-card__rating">
+                          <Star size={16} fill="#111" strokeWidth={0} />
+                          <span>
+                            {product.rating.toFixed(1)} <small>({product.reviews})</small>
+                          </span>
+                        </div>
+                        <div className="catalog-card__prices">
+                          {product.badge && (
+                            <span className="catalog-card__discount-badge">{product.badge}</span>
+                          )}
+                          {product.priceSecondary && (
+                            <span className="catalog-card__price catalog-card__price--compare">
+                              {product.priceSecondary}
+                            </span>
+                          )}
+                          <span className="catalog-card__price">{product.pricePrimary}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="catalog-card__cta"
+                          onClick={() => onViewProduct(product.detail)}
+                        >
+                          <ShoppingBag size={16} />
+                          바로 구매하기
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 이 상품은 어떠세요? */}
+            {themedProducts.recommendedProducts.length > 0 && (
+              <section className="product-theme-section">
+                <h2 className="product-theme-section__title">이 상품은 어떠세요?</h2>
+                <div className="product-theme-section__grid">
+                  {themedProducts.recommendedProducts.map((product) => (
+                    <article key={`${product.id || product.name}`} className="catalog-card">
+                      <div className="catalog-card__media" onClick={() => onViewProduct(product.detail)} role="button" tabIndex={0} onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          onViewProduct(product.detail);
+                        }
+                      }}>
+                        <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        <button
+                          type="button"
+                          className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
+                          aria-label={wishlistedItems.has(product.id) ? '찜하기 해제' : '찜하기 추가'}
+                          onClick={(e) => handleToggleWishlist(e, product)}
+                          disabled={togglingWishlist.has(product.id)}
+                        >
+                          <Heart 
+                            size={14} 
+                            strokeWidth={wishlistedItems.has(product.id) ? 0 : 2.5} 
+                            fill={wishlistedItems.has(product.id) ? '#ef4444' : 'none'}
+                            color={wishlistedItems.has(product.id) ? '#ef4444' : '#000000'}
+                            style={{
+                              transition: 'all 0.3s ease',
+                            }}
+                          />
+                        </button>
+                      </div>
+                      <div className="catalog-card__body">
+                        {product.colors && product.colors.length > 0 && (
+                          <div className="catalog-card__colors">
+                            {product.colors.map((color) => (
+                              <span
+                                key={`${product.name}-${color.value}`}
+                                className="catalog-card__color-dot"
+                                style={{ backgroundColor: color.value }}
+                                title={color.name}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <h3 className="catalog-card__title">{product.name}</h3>
+                        <div className="catalog-card__rating">
+                          <Star size={16} fill="#111" strokeWidth={0} />
+                          <span>
+                            {product.rating.toFixed(1)} <small>({product.reviews})</small>
+                          </span>
+                        </div>
+                        <div className="catalog-card__prices">
+                          {product.badge && (
+                            <span className="catalog-card__discount-badge">{product.badge}</span>
+                          )}
+                          {product.priceSecondary && (
+                            <span className="catalog-card__price catalog-card__price--compare">
+                              {product.priceSecondary}
+                            </span>
+                          )}
+                          <span className="catalog-card__price">{product.pricePrimary}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="catalog-card__cta"
+                          onClick={() => onViewProduct(product.detail)}
+                        >
+                          <ShoppingBag size={16} />
+                          바로 구매하기
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* 검색/필터가 있을 때는 기존 방식 */
+        <div className="mobile-frame">
+          <div className="mobile-frame__container">
+            <div className="catalog-page">
 
       <div className="catalog-toolbar" ref={catalogToolbarRef}>
         <div className="catalog-toolbar__left">
@@ -896,7 +1052,7 @@ function HomeHero({
         <span>
           {submittedSearchQuery ? (
             <>
-              "<strong>{submittedSearchQuery}</strong>" 검색 결과: {totalItems || catalogProducts.length}개 제품
+              "<strong>{submittedSearchQuery}</strong>" 검색 결과: {totalItems || catalogProducts.length}개 제품 ({(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems || catalogProducts.length)}번째 표시 중)
               <button
                 type="button"
                 onClick={() => {
@@ -1036,6 +1192,19 @@ function HomeHero({
           </button>
           
           <div className="catalog-pagination__pages">
+            {currentPage > 3 && totalPages > 5 && (
+              <>
+                <button
+                  type="button"
+                  className="catalog-pagination__page"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={productsStatus === 'loading'}
+                >
+                  1
+                </button>
+                {currentPage > 4 && <span className="catalog-pagination__ellipsis">...</span>}
+              </>
+            )}
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
               if (totalPages <= 5) {
@@ -1062,6 +1231,19 @@ function HomeHero({
                 </button>
               );
             })}
+            {currentPage < totalPages - 2 && totalPages > 5 && (
+              <>
+                {currentPage < totalPages - 3 && <span className="catalog-pagination__ellipsis">...</span>}
+                <button
+                  type="button"
+                  className="catalog-pagination__page"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={productsStatus === 'loading'}
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
           </div>
 
           <button
@@ -1077,6 +1259,9 @@ function HomeHero({
         </div>
       )}
       </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1,0 +1,266 @@
+.tracking-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 2rem 1rem;
+  color: #111827;
+}
+
+.tracking-page__container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.tracking-page__back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 4px;
+  color: #111827;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tracking-page__back-button:hover {
+  background: #f3f4f6;
+  border-color: #111827;
+}
+
+.tracking-page__header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #000000;
+}
+
+.tracking-page__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+}
+
+.tracking-page__order-info {
+  margin-top: 0.5rem;
+}
+
+.tracking-page__order-number {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+.tracking-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.tracking-page__status-section {
+  background: #ffffff;
+  border: 2px solid #000000;
+  padding: 2rem;
+  text-align: center;
+}
+
+.tracking-page__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tracking-page__status-icon {
+  width: 64px;
+  height: 64px;
+  stroke-width: 2;
+}
+
+.tracking-page__status-icon--pending {
+  color: #9ca3af;
+}
+
+.tracking-page__status-icon--preparing {
+  color: #6b7280;
+}
+
+.tracking-page__status-icon--shipping {
+  color: #111827;
+}
+
+.tracking-page__status-icon--delivered {
+  color: #111827;
+}
+
+.tracking-page__status-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.tracking-page__date-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1rem;
+}
+
+.tracking-page__date-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.tracking-page__date-value {
+  font-size: 0.9rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+.tracking-page__info-section,
+.tracking-page__address-section {
+  background: #ffffff;
+  border: 2px solid #000000;
+  padding: 2rem;
+}
+
+.tracking-page__section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #000000;
+}
+
+.tracking-page__info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tracking-page__info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tracking-page__info-item:last-child {
+  border-bottom: none;
+}
+
+.tracking-page__info-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.tracking-page__info-value {
+  font-size: 0.9rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+.tracking-page__info-value--mono {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.tracking-page__link-section {
+  margin-top: 1rem;
+}
+
+.tracking-page__tracking-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: #111827;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: 2px solid #111827;
+}
+
+.tracking-page__tracking-link:hover {
+  background: #ffffff;
+  color: #111827;
+}
+
+.tracking-page__info-note {
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  color: #374151;
+  line-height: 1.8;
+}
+
+.tracking-page__info-note p {
+  margin: 0 0 0.5rem 0;
+}
+
+.tracking-page__info-note p:last-child {
+  margin-bottom: 0;
+}
+
+.tracking-page__info-note--small {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 0.5rem !important;
+}
+
+.tracking-page__address {
+  line-height: 1.8;
+}
+
+.tracking-page__address-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+}
+
+.tracking-page__address-phone {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.tracking-page__address-full {
+  font-size: 0.9rem;
+  color: #374151;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.tracking-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .tracking-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .tracking-page__status-section,
+  .tracking-page__info-section,
+  .tracking-page__address-section {
+    padding: 1.5rem;
+  }
+
+  .tracking-page__title {
+    font-size: 1.5rem;
+  }
+}
+

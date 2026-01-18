@@ -23,6 +23,7 @@ import MyPage from './components/MyPage';
 import OrderListPage from './components/OrderListPage';
 import ExchangeReturnPage from './components/ExchangeReturnPage';
 import ShippingReturnPolicyPage from './components/ShippingReturnPolicyPage';
+import TrackingPage from './components/TrackingPage';
 import ChatWidget from './components/ChatWidget';
 import CancelReturnExchangeHistoryPage from './components/CancelReturnExchangeHistoryPage';
 import EventBenefitPage from './components/EventBenefitPage';
@@ -38,7 +39,7 @@ function App() {
     const path = window.location.pathname;
     if (path === '/' || path === '') return 'home';
     const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
-    const validViews = ['home', 'login', 'signup', 'admin', 'product-create', 'product-edit', 'product-detail', 'lookbook', 'style-note', 'cart', 'order', 'order-list', 'wishlist', 'settings', 'points', 'mypage', 'shipping-return-policy', 'cancel-return-exchange-history', 'event-benefit', 'feedback', 'inquiry-history', 'product-inquiry-history', 'notice', 'recently-viewed-products'];
+    const validViews = ['home', 'login', 'signup', 'admin', 'product-create', 'product-edit', 'product-detail', 'lookbook', 'style-note', 'cart', 'order', 'order-list', 'tracking', 'wishlist', 'settings', 'points', 'mypage', 'shipping-return-policy', 'cancel-return-exchange-history', 'event-benefit', 'feedback', 'inquiry-history', 'product-inquiry-history', 'notice', 'recently-viewed-products'];
     return validViews.includes(view) ? view : 'home';
   };
 
@@ -1020,6 +1021,50 @@ function App() {
               setSelectedOrderItem(orderItem);
               setView('exchange-return');
             }}
+            onTrackOrder={(order) => {
+              setSelectedOrder(order);
+              setView('tracking');
+            }}
+          />
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  if (view === 'tracking') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => goHome()}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <TrackingPage
+            order={selectedOrder}
+            trackingNumber={selectedOrder?.shipping?.trackingNumber}
+            carrier={selectedOrder?.shipping?.carrier}
+            onBack={() => setView('order-list')}
           />
         </main>
         <SiteFooter />
@@ -1064,6 +1109,10 @@ function App() {
               console.log('교환/반품 신청 데이터:', data);
               alert('교환/반품 신청이 완료되었습니다.');
               setView('order-list');
+            }}
+            onNavigateToPolicy={() => {
+              window.history.pushState({ view: 'shipping-return-policy' }, '', '/shipping-return-policy?from=exchange-return');
+              setView('shipping-return-policy');
             }}
           />
         </main>

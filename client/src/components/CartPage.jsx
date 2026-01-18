@@ -94,7 +94,7 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {}, onM
     return cart.summary.subtotal || 0;
   }, [cart]);
 
-  const shippingFee = subtotal >= 100000 ? 0 : 3000;
+  const shippingFee = subtotal >= 20000 ? 0 : 3000;
   const total = subtotal + shippingFee;
   const currencyCode = cart?.summary?.currency || 'KRW';
 

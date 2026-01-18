@@ -194,7 +194,7 @@ function OrderPage({
         return 0;
       }
     }
-    return subtotal >= 100000 ? 0 : 3000;
+    return subtotal >= 20000 ? 0 : 3000;
   }, [cart, selectedCoupon, subtotal]);
 
   const total = useMemo(() => {
@@ -280,7 +280,7 @@ function OrderPage({
     const orderTitle =
       cart.items.length === 1
         ? cart.items[0].product.name
-        : `LMN 주문 (${cart.items.length}건)`;
+        : `주문 (${cart.items.length}건)`;
 
     const amount = Number(total || 0);
     const amountToCharge = amount > 0 ? amount : 1;

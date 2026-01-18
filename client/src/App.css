@@ -557,6 +557,7 @@ body {
   border: none;
   cursor: pointer;
   padding: 0;
+  margin: 0;
   display: flex;
   align-items: center;
 }
@@ -1398,8 +1399,50 @@ body {
   right: clamp(1rem, 4vw, 2.5rem);
 }
 
+/* 모바일 프레임 스타일 */
+.mobile-frame {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 2rem);
+  background: #f5f7fb;
+}
+
+.mobile-frame__container {
+  max-width: min(1080px, 100%);
+  width: 100%;
+  background: #ffffff;
+  border-radius: clamp(24px, 4vw, 32px);
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+/* 테마별 섹션 스타일 */
+.product-theme-section {
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 1.5rem);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.product-theme-section:last-child {
+  border-bottom: none;
+}
+
+.product-theme-section__title {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 700;
+  margin: 0 0 clamp(1rem, 2.5vw, 1.5rem) 0;
+  color: #111827;
+}
+
+.product-theme-section__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 15vw, 180px), 1fr));
+  gap: clamp(0.75rem, 2vw, 1rem);
+}
+
 .catalog-page {
   width: 100%;
+  padding: clamp(1rem, 3vw, 1.5rem);
 }
 
 /* Trendy & Free Collection 카드 */
@@ -1783,7 +1826,7 @@ body {
 
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 15vw, 180px), 1fr));
   gap: clamp(0.5rem, 1.5vw, 1rem);
   margin-bottom: clamp(2rem, 5vw, 4rem);
 }
@@ -2050,9 +2093,19 @@ body {
   color: #ffffff;
 }
 
+.catalog-pagination__ellipsis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(28px, 4.5vw, 36px);
+  height: clamp(28px, 4.5vw, 36px);
+  color: #6b7280;
+  font-size: clamp(0.8125rem, 1.75vw, 0.875rem);
+}
+
 @media (max-width: 768px) {
   .catalog-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(100px, 12vw, 150px), 1fr));
     gap: 0.75rem;
   }
 
@@ -7088,7 +7141,7 @@ body {
   }
 
   .catalog-grid {
-    grid-template-columns: repeat(auto-fill, minmax(clamp(2.9296875rem, 5.625vw, 3.28125rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(clamp(100px, 12vw, 150px), 1fr));
     gap: 1.25rem;
   }
 
@@ -7105,7 +7158,7 @@ body {
   }
 
   .catalog-grid {
-    grid-template-columns: repeat(auto-fill, minmax(clamp(2.9296875rem, 5.625vw, 3.28125rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(clamp(100px, 12vw, 150px), 1fr));
     gap: 1.5rem;
   }
 
@@ -7133,7 +7186,7 @@ body {
   }
 
   .catalog-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 15vw, 180px), 1fr));
     gap: 1.75rem;
   }
 
@@ -7158,7 +7211,7 @@ body {
 /* Extra Large Devices (large desktops, 1025px and up) */
 @media (min-width: 1025px) {
   .catalog-grid {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 15vw, 180px), 1fr));
   }
 
   .hero-section {

@@ -5,6 +5,7 @@ const User = require('../models/user');
 const PointHistory = require('../models/point');
 const Product = require('../models/product');
 const InventoryHistory = require('../models/inventoryHistory');
+const Notification = require('../models/notification');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 
@@ -479,7 +480,27 @@ async function createOrder(req, res, next) {
           Number(payment?.amount ?? computedSummary.grandTotal)
         );
       } catch (verificationError) {
-        return next(verificationError);
+        // 결제 실패 시 명확한 에러 메시지 반환 및 주문 상태 정보 포함
+        const errorMessage = verificationError.message || '결제 검증에 실패했습니다.';
+        const errorStatus = verificationError.status || 400;
+        
+        // 결제 실패 원인별 메시지 구분
+        let userFriendlyMessage = '결제 처리에 실패했습니다.';
+        if (errorMessage.includes('결제가 완료되지 않았습니다')) {
+          userFriendlyMessage = '결제가 완료되지 않았습니다. 결제를 다시 시도해주세요.';
+        } else if (errorMessage.includes('결제 금액이 일치하지 않습니다')) {
+          userFriendlyMessage = '결제 금액이 일치하지 않습니다. 주문 정보를 확인해주세요.';
+        } else if (errorMessage.includes('결제 정보를 찾을 수 없습니다')) {
+          userFriendlyMessage = '결제 정보를 찾을 수 없습니다. 결제를 다시 시도해주세요.';
+        }
+        
+        return res.status(errorStatus).json({
+          message: userFriendlyMessage,
+          error: errorMessage,
+          code: 'PAYMENT_VERIFICATION_FAILED',
+          // 재시도 가능 여부 표시
+          retryable: !errorMessage.includes('금액이 일치하지 않습니다'),
+        });
       }
     }
 
@@ -909,6 +930,31 @@ async function updateOrder(req, res, next) {
             message: '배송 시작',
             actor: req.user ? req.user._id : undefined,
           });
+          
+          // 배송 예상일 계산 (배송 시작일 + 예상 소요일)
+          const estimatedDays = shipping.estimatedDays || 3; // 기본값 3일
+          if (newDispatchedAt) {
+            const estimatedDelivery = new Date(newDispatchedAt);
+            estimatedDelivery.setDate(estimatedDelivery.getDate() + estimatedDays);
+            order.shipping.estimatedDelivery = estimatedDelivery;
+          }
+          
+          // 배송 시작 알림 생성
+          if (order.user) {
+            try {
+              await Notification.create({
+                user: order.user,
+                type: 'order_status',
+                title: '배송이 시작되었습니다',
+                message: `주문번호 ${order.orderNumber}의 배송이 시작되었습니다. 운송장 번호: ${newTrackingNumber || '등록 예정'}`,
+                relatedOrder: order._id,
+                isRead: false,
+              });
+            } catch (notificationError) {
+              console.error('배송 시작 알림 생성 실패:', notificationError);
+              // 알림 생성 실패가 주문 업데이트에 영향을 주지 않도록 에러 무시
+            }
+          }
         }
       }
 
@@ -921,6 +967,23 @@ async function updateOrder(req, res, next) {
             message: '배송 완료',
             actor: req.user ? req.user._id : undefined,
           });
+        }
+        
+        // 배송 완료 알림 생성
+        if (order.user) {
+          try {
+            await Notification.create({
+              user: order.user,
+              type: 'order_status',
+              title: '배송이 완료되었습니다',
+              message: `주문번호 ${order.orderNumber}의 배송이 완료되었습니다.`,
+              relatedOrder: order._id,
+              isRead: false,
+            });
+          } catch (notificationError) {
+            console.error('배송 완료 알림 생성 실패:', notificationError);
+            // 알림 생성 실패가 주문 업데이트에 영향을 주지 않도록 에러 무시
+          }
         }
       }
     }
