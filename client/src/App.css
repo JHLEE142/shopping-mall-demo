@@ -1197,9 +1197,9 @@ body {
 .hero-slider__container {
   position: relative;
   width: 100%;
-  height: clamp(40vh, 75vh, 75vh);
-  min-height: clamp(250px, 40vh, 550px);
-  max-height: clamp(500px, 75vh, 900px);
+  height: clamp(20vh, 37.5vh, 37.5vh);
+  min-height: clamp(125px, 20vh, 275px);
+  max-height: clamp(250px, 37.5vh, 450px);
   overflow: hidden;
 }
 
@@ -1446,14 +1446,14 @@ body {
 /* Trendy & Free Collection 카드 */
 .collection-card {
   max-width: min(1400px, 100%);
-  margin: clamp(2rem, 5vw, 4rem) auto;
-  padding: 0 clamp(1rem, 3vw, 2rem);
+  margin: clamp(1rem, 2.5vw, 2rem) auto;
+  padding: 0 clamp(0.75rem, 1.5vw, 1rem);
 }
 
 .collection-card__content {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(255, 255, 255, 1) 50%, rgba(248, 250, 252, 1) 100%);
   border-radius: clamp(24px, 4vw, 32px);
-  padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
+  padding: clamp(1rem, 2.5vw, 2rem) clamp(1rem, 2vw, 1.5rem);
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.1);
   position: relative;
@@ -1712,8 +1712,8 @@ body {
   }
 
   .hero-slider__container {
-    height: clamp(50vh, 55vh, 55vh);
-    min-height: clamp(350px, 50vh, 450px);
+    height: clamp(25vh, 27.5vh, 27.5vh);
+    min-height: clamp(175px, 25vh, 225px);
   }
 
   .hero-slider__title {
@@ -1758,12 +1758,12 @@ body {
   }
 
   .collection-card {
-    margin: 3rem auto;
-    padding: 0 1rem;
+    margin: 1.5rem auto;
+    padding: 0 0.5rem;
   }
 
   .collection-card__content {
-    padding: 2.5rem 2rem;
+    padding: 1.25rem 1rem;
     border-radius: 24px;
   }
 
@@ -1773,7 +1773,7 @@ body {
 
   .collection-card__description {
     font-size: 1.125rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
   }
 
   .collection-card__button {
@@ -7114,8 +7114,8 @@ body {
   }
 
   .hero-slider__container {
-    height: 50vh;
-    min-height: 350px;
+    height: 25vh;
+    min-height: 175px;
   }
 
   .hero-slider__title {
@@ -7283,8 +7283,8 @@ body {
 /* Landscape Orientation Adjustments */
 @media (orientation: landscape) and (max-height: 600px) {
   .hero-slider__container {
-    height: 60vh;
-    min-height: 400px;
+    height: 30vh;
+    min-height: 200px;
   }
 
   .app-main--auth {
