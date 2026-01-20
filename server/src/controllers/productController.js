@@ -1658,12 +1658,30 @@ async function commitImport(req, res, next) {
           } catch (imageError) {
             console.error(`❌ [EXCEL COMMIT] Row ${item.rowIndex}: Image fetch error:`, imageError.message);
             console.error(`❌ [EXCEL COMMIT] Row ${item.rowIndex}: Image fetch error stack:`, imageError.stack);
-            // 이미지 추출 실패해도 상품 등록은 계속 진행
+            results.failCount++;
+            results.failItems.push({
+              rowIndex: item.rowIndex,
+              sku: mapped.sku,
+              name: mapped.name,
+              reason: `상품 URL 이미지 추출 실패: ${imageError.message || '이미지 추출 실패'}`,
+            });
+            continue;
           }
         } else {
           if (index < 5) { // 처음 5개만 로그
             console.log(`⚠️ [EXCEL COMMIT] Row ${item.rowIndex}: No product URL provided - SKU: ${sku}, raw: ${item.raw ? 'exists' : 'missing'}, productUrl: ${productUrl || 'empty'}`);
           }
+        }
+
+        if (!mainImage && detailImages.length === 0) {
+          results.failCount++;
+          results.failItems.push({
+            rowIndex: item.rowIndex,
+            sku: mapped.sku,
+            name: mapped.name,
+            reason: '상품 URL에서 대표/상세 이미지가 없어 등록하지 않습니다.',
+          });
+          continue;
         }
 
         // 기존 상품인 경우 업데이트, 신규 상품인 경우 생성

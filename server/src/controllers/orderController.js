@@ -6,10 +6,12 @@ const PointHistory = require('../models/point');
 const Product = require('../models/product');
 const InventoryHistory = require('../models/inventoryHistory');
 const Notification = require('../models/notification');
+const AdminSetting = require('../models/adminSetting');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 
 const PORTONE_API_BASE_URL = 'https://api.iamport.kr';
+const DEFAULT_ORDER_PAUSE_MESSAGE = '현재 주문이 일시적으로 중단되었습니다. 잠시 후 다시 시도해주세요.';
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -294,6 +296,14 @@ function canAccessGuestOrder(order, guestSessionId, accessToken, email, phone) {
 
 async function createOrder(req, res, next) {
   try {
+    const orderPauseSetting = await AdminSetting.findOne({ key: 'orderPause' }).lean();
+    if (orderPauseSetting?.orderPause?.isPaused) {
+      return res.status(423).json({
+        message: orderPauseSetting.orderPause.message || DEFAULT_ORDER_PAUSE_MESSAGE,
+        code: 'ORDER_PAUSED',
+      });
+    }
+
     const {
       items = [],
       summary = {},

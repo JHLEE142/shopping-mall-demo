@@ -68,9 +68,11 @@ import {
 } from '../services/statisticsService';
 import { getAllInquiries as getAllOneOnOneInquiries, answerInquiry as answerOneOnOneInquiry } from '../services/inquiryService';
 import { getAllInquiries as getAllProductInquiries, answerInquiry as answerProductInquiry } from '../services/productInquiryService';
+import { fetchOrderPauseSettings, updateOrderPauseSettings } from '../services/adminSettingsService';
 
 const NAV_ITEMS = ['Dashboard', 'Sales', 'Inventory', 'Customers', 'Statistics', 'Products', 'Categories', 'Coupons', 'Inquiries'];
 const PRODUCTS_PAGE_SIZE = 10;
+const DEFAULT_ORDER_PAUSE_MESSAGE = '현재 주문이 일시적으로 중단되었습니다. 잠시 후 다시 시도해주세요.';
 
 // Inventory Row Component
 function InventoryRow({ product, onUpdate }) {
@@ -344,6 +346,13 @@ function AdminDashboard({
     dateRange: 'all',
     payment: 'all',
   });
+  const [orderPauseStatus, setOrderPauseStatus] = useState({
+    isPaused: false,
+    message: DEFAULT_ORDER_PAUSE_MESSAGE,
+  });
+  const [orderPauseState, setOrderPauseState] = useState('idle');
+  const [orderPauseError, setOrderPauseError] = useState('');
+  const [orderPauseSaving, setOrderPauseSaving] = useState(false);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
   const [selectedSalesOrderStatus, setSelectedSalesOrderStatus] = useState('idle');
@@ -784,6 +793,51 @@ function AdminDashboard({
       setSelectedSalesOrder(null);
     }
   }, [activeNav]);
+
+  const loadOrderPauseSettings = useCallback(async () => {
+    try {
+      setOrderPauseState('loading');
+      setOrderPauseError('');
+      const data = await fetchOrderPauseSettings();
+      setOrderPauseStatus({
+        isPaused: Boolean(data?.isPaused),
+        message: data?.message || DEFAULT_ORDER_PAUSE_MESSAGE,
+      });
+      setOrderPauseState('success');
+    } catch (error) {
+      setOrderPauseState('error');
+      setOrderPauseError(error.message || '주문 일시 정지 상태를 불러오지 못했습니다.');
+    }
+  }, []);
+
+  const handleToggleOrderPause = useCallback(async () => {
+    if (orderPauseSaving) {
+      return;
+    }
+    const nextPaused = !orderPauseStatus.isPaused;
+    setOrderPauseSaving(true);
+    setOrderPauseError('');
+    try {
+      const data = await updateOrderPauseSettings({
+        isPaused: nextPaused,
+        message: orderPauseStatus.message || DEFAULT_ORDER_PAUSE_MESSAGE,
+      });
+      setOrderPauseStatus({
+        isPaused: Boolean(data?.isPaused),
+        message: data?.message || DEFAULT_ORDER_PAUSE_MESSAGE,
+      });
+    } catch (error) {
+      setOrderPauseError(error.message || '주문 일시 정지 상태를 변경하지 못했습니다.');
+    } finally {
+      setOrderPauseSaving(false);
+    }
+  }, [orderPauseSaving, orderPauseStatus]);
+
+  useEffect(() => {
+    if (activeNav === 'Sales' || activeNav === 'Dashboard') {
+      loadOrderPauseSettings();
+    }
+  }, [activeNav, loadOrderPauseSettings]);
 
   // Dashboard 데이터 로드
   const loadDashboardData = useCallback(async () => {
@@ -1708,6 +1762,21 @@ function AdminDashboard({
             <Search className="admin-search__icon" />
             <input className="admin-search__input" type="text" placeholder="Search orders..." />
           </div>
+          <div className="admin-order-pause">
+            <span className="admin-order-pause__label">주문 접수 상태</span>
+            <span className={`admin-status ${orderPauseStatus.isPaused ? 'admin-status--danger' : 'admin-status--success'}`}>
+              {orderPauseStatus.isPaused ? '일시 정지' : '정상'}
+            </span>
+            <button
+              type="button"
+              className={`admin-filter-button ${orderPauseStatus.isPaused ? 'admin-filter-button--danger' : 'admin-filter-button--primary'}`}
+              onClick={handleToggleOrderPause}
+              disabled={orderPauseSaving || orderPauseState === 'loading'}
+            >
+              <AlertTriangle className="admin-icon" />
+              {orderPauseStatus.isPaused ? '주문 재개' : '주문 일시정지'}
+            </button>
+          </div>
           <button type="button" className="admin-filter-button" onClick={() => setIsSalesFilterOpen(true)}>
             <Filter className="admin-icon" />
             Filter
@@ -1716,6 +1785,15 @@ function AdminDashboard({
       </section>
 
       <section className="admin-section">
+        {orderPauseError && (
+          <div className="admin-alert admin-alert--error">
+            <AlertCircle className="admin-icon" />
+            <div>
+              <strong>주문 접수 상태를 불러오지 못했습니다.</strong>
+              <p>{orderPauseError}</p>
+            </div>
+          </div>
+        )}
         <header className="admin-section__header admin-section__header--inline">
           <div className="admin-section__title">
             <TrendingUp className="admin-icon" />

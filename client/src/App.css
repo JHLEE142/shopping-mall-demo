@@ -1059,10 +1059,9 @@ body {
 .hero-search-input {
   width: 100%;
   padding: clamp(0.875rem, 2vw, 1.125rem) clamp(3rem, 6vw, 4rem) clamp(0.875rem, 2vw, 1.125rem) clamp(1rem, 2.5vw, 1.5rem);
-  border: none;
-  border-bottom: 1px solid #000000;
-  border-radius: 0;
-  background: transparent;
+  border: 1.5px solid #111827;
+  border-radius: 14px;
+  background: #ffffff;
   font-size: clamp(0.9375rem, 2vw, 1.125rem);
   color: #000000;
   transition: all 0.2s ease;
@@ -1070,8 +1069,8 @@ body {
 
 .hero-search-input:focus {
   outline: none;
-  border-bottom-color: #000000;
-  border-bottom-width: 2px;
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.12);
 }
 
 .hero-search-input::placeholder {
@@ -1139,10 +1138,9 @@ body {
 .hero-search-input {
   width: 100%;
   padding: clamp(0.875rem, 2vw, 1.125rem) clamp(3rem, 6vw, 4rem) clamp(0.875rem, 2vw, 1.125rem) clamp(1rem, 2.5vw, 1.5rem);
-  border: none;
-  border-bottom: 1px solid #000000;
-  border-radius: 0;
-  background: transparent;
+  border: 1.5px solid #111827;
+  border-radius: 14px;
+  background: #ffffff;
   font-size: clamp(0.9375rem, 2vw, 1.125rem);
   color: #111827;
   transition: all 0.2s ease;
@@ -1150,8 +1148,8 @@ body {
 
 .hero-search-input:focus {
   outline: none;
-  border-bottom-color: #000000;
-  border-bottom-width: 2px;
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.12);
 }
 
 .hero-search-input::placeholder {
@@ -5491,6 +5489,22 @@ body {
   align-items: center;
 }
 
+.admin-order-pause {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.admin-order-pause__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
 .admin-search {
   position: relative;
   flex: 1;
@@ -5546,6 +5560,18 @@ body {
 .admin-filter-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.admin-filter-button--danger {
+  background: #991b1b;
+  border-color: #991b1b;
+  color: #ffffff;
+}
+
+.admin-filter-button--danger:hover:not(:disabled) {
+  background: #7f1d1d;
+  border-color: #7f1d1d;
+  color: #ffffff;
 }
 
 .admin-alert {
