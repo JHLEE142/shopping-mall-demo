@@ -718,35 +718,6 @@ function HomeHero({
         </button>
       </section>
 
-      {/* Trendy & Free Collection 카드 */}
-      <section className="collection-card">
-        <div className="collection-card__content">
-          <div className="collection-card__header">
-            <h2 className="collection-card__title">Trendy & Free Collection</h2>
-            <p className="collection-card__breadcrumb">For Everyone &gt; Collection &gt; New Season</p>
-          </div>
-          <p className="collection-card__description">
-          쓰임은 단순하게, 무드는 깊게.
-          </p>
-          <p className="collection-card__description">
-          일상을 위한 생활용품.
-          </p>
-          <div className="collection-card__actions">
-            <button type="button" className="collection-card__button collection-card__button--primary" onClick={onMoveToLookbook}>
-              룩북 보기
-            </button>
-            <button
-              type="button"
-              className="collection-card__button collection-card__button--secondary"
-              onClick={handleSubscribeToNewProducts}
-              disabled={subscribing || isSubscribed}
-            >
-              {subscribing ? '구독 중...' : isSubscribed ? '알림 구독 완료' : '신상품 알림받기'}
-            </button>
-          </div>
-        </div>
-      </section>
-
       {/* 테마별 섹션 (검색/필터가 없을 때만 표시) */}
       {!submittedSearchQuery && !categoryFilter ? (
         <div className="mobile-frame">
@@ -1259,6 +1230,35 @@ function HomeHero({
           </button>
         </div>
       )}
+
+      {/* Trendy & Free Collection 카드 */}
+      <section className="collection-card">
+        <div className="collection-card__content">
+          <div className="collection-card__header">
+            <h2 className="collection-card__title">Trendy & Free Collection</h2>
+            <p className="collection-card__breadcrumb">For Everyone &gt; Collection &gt; New Season</p>
+          </div>
+          <p className="collection-card__description">
+          쓰임은 단순하게, 무드는 깊게.
+          </p>
+          <p className="collection-card__description">
+          일상을 위한 생활용품.
+          </p>
+          <div className="collection-card__actions">
+            <button type="button" className="collection-card__button collection-card__button--primary" onClick={onMoveToLookbook}>
+              룩북 보기
+            </button>
+            <button
+              type="button"
+              className="collection-card__button collection-card__button--secondary"
+              onClick={handleSubscribeToNewProducts}
+              disabled={subscribing || isSubscribed}
+            >
+              {subscribing ? '구독 중...' : isSubscribed ? '알림 구독 완료' : '신상품 알림받기'}
+            </button>
+          </div>
+        </div>
+      </section>
       </div>
           </div>
         </div>
