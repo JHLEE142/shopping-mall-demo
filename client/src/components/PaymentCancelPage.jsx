@@ -1,6 +1,14 @@
 import './MonochromePage.css';
 
-function PaymentCancelPage({ onBack }) {
+function PaymentCancelPage({ onBack, isLoggedIn = false }) {
+  const handleWrite = () => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    alert('결제 문의 작성 화면으로 이동합니다.');
+  };
+
   return (
     <div className="mono-page">
       <div className="mono-page__container">
@@ -19,6 +27,15 @@ function PaymentCancelPage({ onBack }) {
             <li className="mono-list__item">주문 취소는 마이페이지 &gt; 주문 내역에서 가능합니다.</li>
             <li className="mono-list__item">결제 오류가 발생하면 고객센터로 문의해주세요.</li>
           </ul>
+        </section>
+        <section className="mono-section">
+          <h2 className="mono-section__title">결제 문의</h2>
+          <p className="mono-muted">결제 관련 문의를 남겨주세요.</p>
+          <div className="mono-actions">
+            <button type="button" className="mono-button" onClick={handleWrite}>
+              문의 작성
+            </button>
+          </div>
         </section>
       </div>
     </div>

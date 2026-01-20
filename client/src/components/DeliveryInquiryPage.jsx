@@ -1,6 +1,14 @@
 import './MonochromePage.css';
 
-function DeliveryInquiryPage({ onBack }) {
+function DeliveryInquiryPage({ onBack, isLoggedIn = false }) {
+  const handleSubmit = () => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    alert('문의가 접수되었습니다.');
+  };
+
   return (
     <div className="mono-page">
       <div className="mono-page__container">
@@ -24,7 +32,7 @@ function DeliveryInquiryPage({ onBack }) {
               <textarea className="mono-textarea" placeholder="배송 지연, 주소 변경 등 내용을 적어주세요." />
             </div>
             <div className="mono-actions">
-              <button type="button" className="mono-button">
+              <button type="button" className="mono-button" onClick={handleSubmit}>
                 문의 접수
               </button>
               <button type="button" className="mono-button mono-button--ghost">

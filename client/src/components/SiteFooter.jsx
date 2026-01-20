@@ -28,32 +28,11 @@ const COMPANY_INFO = [
 ];
 
 function SiteFooter({
-  onNavigateBoard = null,
-  onNavigateFooter = null,
+  onNavigateBoard = () => {},
+  onNavigateFooter = () => {},
 }) {
-  const boardRoutes = {
-    '카카오톡 상담': '/kakao-support',
-    '자주 묻는 질문': '/faq',
-    '반품/교환': '/shipping-return-policy',
-    '구매후기': '/review-board',
-    '배송문의': '/delivery-inquiry',
-    '입금/결제/취소': '/payment-cancel',
-  };
-  const footerRoutes = {
-    '이용안내': '/faq',
-    '이용약관': '/terms',
-    '개인정보취급방침': '/privacy',
-  };
-
   const handleBoardClick = (label) => {
-    if (onNavigateBoard) {
-      onNavigateBoard(label);
-      return;
-    }
-    const route = boardRoutes[label];
-    if (route) {
-      window.location.href = route;
-    }
+    onNavigateBoard(label);
   };
 
   const handleFooterClick = (label) => {
@@ -61,14 +40,7 @@ function SiteFooter({
       window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
       return;
     }
-    if (onNavigateFooter) {
-      onNavigateFooter(label);
-      return;
-    }
-    const route = footerRoutes[label];
-    if (route) {
-      window.location.href = route;
-    }
+    onNavigateFooter(label);
   };
   return (
     <footer className="site-footer">

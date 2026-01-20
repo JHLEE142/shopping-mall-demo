@@ -125,6 +125,7 @@ function App() {
   const [homeRestoreState, setHomeRestoreState] = useState(null);
   const [pendingHomeRestore, setPendingHomeRestore] = useState(false);
   const lastHomeStateRef = useRef(null);
+  const isLoggedIn = Boolean(session?.user);
   const handleCartUpdate = (nextCount) => {
     setCartCount(Math.max(0, Number(nextCount) || 0));
   };
@@ -159,6 +160,34 @@ function App() {
     }
     
     setViewState(newView);
+  };
+
+  const footerBoardViewMap = {
+    '카카오톡 상담': 'kakao-support',
+    '자주 묻는 질문': 'faq',
+    '반품/교환': 'shipping-return-policy',
+    '구매후기': 'review-board',
+    '배송문의': 'delivery-inquiry',
+    '입금/결제/취소': 'payment-cancel',
+  };
+  const footerLinkViewMap = {
+    '이용안내': 'faq',
+    '이용약관': 'terms',
+    '개인정보취급방침': 'privacy',
+  };
+
+  const handleFooterBoardNavigate = (label) => {
+    const targetView = footerBoardViewMap[label];
+    if (targetView) {
+      setView(targetView);
+    }
+  };
+
+  const handleFooterLinkNavigate = (label) => {
+    const targetView = footerLinkViewMap[label];
+    if (targetView) {
+      setView(targetView);
+    }
   };
 
   const areCatalogStatesEqual = (left, right) => {
@@ -564,7 +593,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -611,7 +640,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -677,7 +706,7 @@ function App() {
             onViewProduct={handleViewProduct}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -726,7 +755,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -774,7 +803,7 @@ function App() {
             onViewProduct={handleViewProduct}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -841,7 +870,7 @@ function App() {
             directOrderItem={directOrderItem}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -889,7 +918,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -930,7 +959,7 @@ function App() {
             onWishlistChange={handleWishlistUpdate}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -969,7 +998,7 @@ function App() {
             onLogout={handleLogout}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1033,7 +1062,7 @@ function App() {
             onMoveToRecentlyViewedProducts={() => setView('recently-viewed-products')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1090,7 +1119,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1130,7 +1159,7 @@ function App() {
             onBack={() => setView('order-list')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1180,7 +1209,7 @@ function App() {
             onChangePickupLocation={() => setView('profile-edit')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1222,9 +1251,10 @@ function App() {
                 setView('home');
               }
             }}
+            isLoggedIn={isLoggedIn}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1262,7 +1292,7 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1297,7 +1327,7 @@ function App() {
         <main className="app-main app-main--default">
           <EventBenefitPage onBack={() => setView('mypage')} />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1335,7 +1365,7 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1373,7 +1403,7 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1411,7 +1441,7 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1446,7 +1476,7 @@ function App() {
         <main className="app-main app-main--default">
           <NoticePage onBack={() => setView('mypage')} />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1490,7 +1520,7 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1541,16 +1571,16 @@ function App() {
       content = <AboutPage onBack={() => setView('home')} />;
       break;
     case 'faq':
-      content = <FaqPage onBack={() => setView('home')} />;
+      content = <FaqPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
       break;
     case 'review-board':
-      content = <ReviewBoardPage onBack={() => setView('home')} />;
+      content = <ReviewBoardPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
       break;
     case 'delivery-inquiry':
-      content = <DeliveryInquiryPage onBack={() => setView('home')} />;
+      content = <DeliveryInquiryPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
       break;
     case 'payment-cancel':
-      content = <PaymentCancelPage onBack={() => setView('home')} />;
+      content = <PaymentCancelPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
       break;
     case 'kakao-support':
       content = <KakaoSupportPage onBack={() => setView('home')} />;
@@ -1634,7 +1664,7 @@ function App() {
       <main className={`app-main ${isAuthView ? 'app-main--auth' : 'app-main--default'}`}>
         {content}
       </main>
-      <SiteFooter />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       <ChatWidget 
         user={session?.user || null}
         onMoveToLogin={() => setView('login')}

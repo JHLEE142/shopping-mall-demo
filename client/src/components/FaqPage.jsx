@@ -15,7 +15,15 @@ const FAQS = [
   },
 ];
 
-function FaqPage({ onBack }) {
+function FaqPage({ onBack, isLoggedIn = false }) {
+  const handleWrite = () => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    alert('문의 작성 화면으로 이동합니다.');
+  };
+
   return (
     <div className="mono-page">
       <div className="mono-page__container">
@@ -37,6 +45,15 @@ function FaqPage({ onBack }) {
               </li>
             ))}
           </ul>
+        </section>
+        <section className="mono-section">
+          <h2 className="mono-section__title">추가 문의</h2>
+          <p className="mono-muted">원하는 답변이 없다면 문의를 남겨주세요.</p>
+          <div className="mono-actions">
+            <button type="button" className="mono-button" onClick={handleWrite}>
+              문의 작성
+            </button>
+          </div>
         </section>
       </div>
     </div>

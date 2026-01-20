@@ -1,7 +1,15 @@
 import { ArrowLeft } from 'lucide-react';
 import './ShippingReturnPolicyPage.css';
 
-function ShippingReturnPolicyPage({ onBack }) {
+function ShippingReturnPolicyPage({ onBack, isLoggedIn = false }) {
+  const handleWrite = () => {
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    alert('반품/교환 문의 작성 화면으로 이동합니다.');
+  };
+
   return (
     <div className="shipping-return-policy-page">
       <div className="shipping-return-policy-page__header">
@@ -17,6 +25,24 @@ function ShippingReturnPolicyPage({ onBack }) {
       </div>
 
       <div className="shipping-return-policy-page__content">
+        <section className="shipping-return-policy-section">
+          <h2 className="shipping-return-policy-section__title">반품/교환 문의</h2>
+          <div className="shipping-return-policy-section__content">
+            <div className="shipping-return-policy-item">
+              <div className="shipping-return-policy-item__content">
+                <p>반품/교환 관련 문의는 로그인 후 작성할 수 있습니다.</p>
+                <button
+                  type="button"
+                  className="shipping-return-policy-page__action-button"
+                  onClick={handleWrite}
+                >
+                  문의 작성
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* 배송 안내 */}
         <section className="shipping-return-policy-section">
           <h2 className="shipping-return-policy-section__title">배송 안내</h2>

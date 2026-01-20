@@ -2226,6 +2226,22 @@ body {
   font-size: 0.9rem;
 }
 
+.site-footer__link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.site-footer__link-button:hover {
+  color: #111827;
+}
+
 .site-footer__links span {
   color: #6b7280;
   cursor: pointer;

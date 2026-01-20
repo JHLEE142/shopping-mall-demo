@@ -39,6 +39,23 @@
   border-bottom: 3px solid #000000;
 }
 
+.shipping-return-policy-page__action-button {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #111827;
+  background: #111827;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shipping-return-policy-page__action-button:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
 .shipping-return-policy-page__content {
   display: flex;
   flex-direction: column;
