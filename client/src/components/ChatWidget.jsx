@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { sendChatMessage } from '../services/chatService';
+import { addItemToCart } from '../services/cartService';
 import './ChatWidget.css';
 
 function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home', onViewProduct = null, onAddToCart = null }) {

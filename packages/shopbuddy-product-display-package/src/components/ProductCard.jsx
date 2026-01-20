@@ -11,6 +11,30 @@ function ProductCard({ product, onSwipe, isGridItem = false, isCircle = false, s
     setLikeCount(prev => isLiked ? prev - 1 : prev + 1)
   }
 
+  const handleComment = (e) => {
+    e.stopPropagation()
+    window.alert('댓글 기능은 준비 중입니다.')
+  }
+
+  const handleShare = async (e) => {
+    e.stopPropagation()
+    const shareUrl = window.location.href
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, url: shareUrl })
+      } catch {
+        // ignore
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      window.alert('링크가 복사되었습니다.')
+    } catch {
+      window.alert('공유에 실패했습니다.')
+    }
+  }
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('ko-KR').format(price) + '원'
   }
@@ -103,14 +127,14 @@ function ProductCard({ product, onSwipe, isGridItem = false, isCircle = false, s
           <span>{likeCount > 0 ? formatCount(likeCount) : ''}</span>
         </button>
         
-        <button className="action-button comment-button" aria-label="Comment">
+        <button className="action-button comment-button" aria-label="Comment" onClick={handleComment}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
           <span>{product.commentCount || 0}</span>
         </button>
         
-        <button className="action-button share-button" aria-label="Share">
+        <button className="action-button share-button" aria-label="Share" onClick={handleShare}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
             <polyline points="16 6 12 2 8 6"></polyline>

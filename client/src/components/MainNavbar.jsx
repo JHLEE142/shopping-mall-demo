@@ -14,6 +14,8 @@ function MainNavbar({
   onMoveToAdmin = () => {},
   onMoveToCart = () => {},
   onMoveToLookbook = () => {},
+  onMoveToNew = null,
+  onMoveToAbout = null,
   onNavigateToCategory = () => {},
   onMoveToWishlist = () => {},
   onMoveToSettings = () => {},
@@ -230,6 +232,26 @@ function MainNavbar({
     onMoveToLookbook();
   };
 
+  const handleMoveToNew = () => {
+    closeMenu();
+    closeUserMenu();
+    if (onMoveToNew) {
+      onMoveToNew();
+    } else {
+      window.location.href = '/new';
+    }
+  };
+
+  const handleMoveToAbout = () => {
+    closeMenu();
+    closeUserMenu();
+    if (onMoveToAbout) {
+      onMoveToAbout();
+    } else {
+      window.location.href = '/about';
+    }
+  };
+
   const handleNavigateToCategory = (category) => {
     closeMenu();
     closeUserMenu();
@@ -259,6 +281,30 @@ function MainNavbar({
                     type="button"
                     className="nav-link-button"
                     onClick={handleMoveToLookbook}
+                  >
+                    {link}
+                  </button>
+                );
+              }
+              if (link === 'New') {
+                return (
+                  <button
+                    key={link}
+                    type="button"
+                    className="nav-link-button"
+                    onClick={handleMoveToNew}
+                  >
+                    {link}
+                  </button>
+                );
+              }
+              if (link === 'About') {
+                return (
+                  <button
+                    key={link}
+                    type="button"
+                    className="nav-link-button"
+                    onClick={handleMoveToAbout}
                   >
                     {link}
                   </button>

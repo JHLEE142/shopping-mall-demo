@@ -18,7 +18,13 @@ const INITIAL_AGREEMENTS = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
+function SignUpPage({
+  onBack,
+  onNavigateToLogin = () => {},
+  onViewTerms = () => {},
+  onViewPrivacy = () => {},
+  onViewMarketing = () => {},
+}) {
   // localStorage에서 저장된 회원가입 정보 불러오기
   const loadStoredFormData = () => {
     try {
@@ -296,7 +302,7 @@ function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
                 />
                 이용약관 동의 (필수)
               </label>
-              <button type="button" className="link-button">
+              <button type="button" className="link-button" onClick={onViewTerms}>
                 보기
               </button>
             </div>
@@ -312,7 +318,7 @@ function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
                 />
                 개인정보처리방침 동의 (필수)
               </label>
-              <button type="button" className="link-button">
+              <button type="button" className="link-button" onClick={onViewPrivacy}>
                 보기
               </button>
             </div>
@@ -327,7 +333,7 @@ function SignUpPage({ onBack, onNavigateToLogin = () => {} }) {
                 />
                 마케팅 정보 수신 동의 (선택)
               </label>
-              <button type="button" className="link-button">
+              <button type="button" className="link-button" onClick={onViewMarketing}>
                 보기
               </button>
             </div>

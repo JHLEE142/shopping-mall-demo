@@ -27,7 +27,49 @@ const COMPANY_INFO = [
   'COPYRIGHT(C) 주식회사 배일 ALL RIGHT RESERVED. / Hosting By Vail',
 ];
 
-function SiteFooter() {
+function SiteFooter({
+  onNavigateBoard = null,
+  onNavigateFooter = null,
+}) {
+  const boardRoutes = {
+    '카카오톡 상담': '/kakao-support',
+    '자주 묻는 질문': '/faq',
+    '반품/교환': '/shipping-return-policy',
+    '구매후기': '/review-board',
+    '배송문의': '/delivery-inquiry',
+    '입금/결제/취소': '/payment-cancel',
+  };
+  const footerRoutes = {
+    '이용안내': '/faq',
+    '이용약관': '/terms',
+    '개인정보취급방침': '/privacy',
+  };
+
+  const handleBoardClick = (label) => {
+    if (onNavigateBoard) {
+      onNavigateBoard(label);
+      return;
+    }
+    const route = boardRoutes[label];
+    if (route) {
+      window.location.href = route;
+    }
+  };
+
+  const handleFooterClick = (label) => {
+    if (label === 'instagram') {
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (onNavigateFooter) {
+      onNavigateFooter(label);
+      return;
+    }
+    const route = footerRoutes[label];
+    if (route) {
+      window.location.href = route;
+    }
+  };
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
@@ -39,6 +81,7 @@ function SiteFooter() {
                 key={item.label}
                 type="button"
                 className={`site-footer__board-button ${item.highlight ? 'is-primary' : ''}`}
+                onClick={() => handleBoardClick(item.label)}
               >
                 {item.label}
               </button>
@@ -71,10 +114,15 @@ function SiteFooter() {
         <div className="site-footer__column site-footer__column--company">
           <nav className="site-footer__links">
             {FOOTER_LINKS.map((link, index) => (
-              <span key={link}>
+              <button
+                key={link}
+                type="button"
+                className="site-footer__link-button"
+                onClick={() => handleFooterClick(link)}
+              >
                 {link}
                 {index !== FOOTER_LINKS.length - 1 && <span className="site-footer__divider">|</span>}
-              </span>
+              </button>
             ))}
           </nav>
           <div className="site-footer__company-info">

@@ -1,0 +1,142 @@
+.mono-page {
+  background: #ffffff;
+  color: #111111;
+  min-height: 70vh;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.mono-page__container {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.mono-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.mono-back {
+  background: none;
+  border: none;
+  color: #111111;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mono-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.mono-subtitle {
+  color: #4b4b4b;
+  margin: 0;
+}
+
+.mono-section {
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.mono-section__title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.mono-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mono-list__item {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e4e4e4;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.mono-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.mono-card {
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #ffffff;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mono-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #111111;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mono-button {
+  background: #111111;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mono-button--ghost {
+  background: transparent;
+  border: 1px solid #111111;
+  color: #111111;
+}
+
+.mono-input,
+.mono-select,
+.mono-textarea {
+  width: 100%;
+  border: 1px solid #d1d1d1;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.mono-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.mono-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mono-divider {
+  border-top: 1px solid #e4e4e4;
+  margin: 1.5rem 0;
+}
+
+.mono-muted {
+  color: #6f6f6f;
+}

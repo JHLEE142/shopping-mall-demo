@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { fetchProductById, fetchSimilarProducts } from '../services/productService';
 import { addItemToCart } from '../services/cartService';
+import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../services/wishlistService';
 import { getReviewsByProduct, getReviewStats, createReview } from '../services/reviewService';
 import { 
   getInquiriesByProduct, 
@@ -269,6 +270,8 @@ function ProductDetailPage({
   const [addError, setAddError] = useState('');
   const [addMessage, setAddMessage] = useState('');
   const [showCartModal, setShowCartModal] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistUpdating, setWishlistUpdating] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -277,6 +280,12 @@ function ProductDetailPage({
   const [quantityOptions] = useState([1, 2, 4, 6]); // 수량 옵션
   const [activeDetailTab, setActiveDetailTab] = useState('detail'); // 'detail', 'reviews', 'inquiry', 'shipping'
   const [showMoreRequiredInfo, setShowMoreRequiredInfo] = useState(false);
+  const [showOptionModal, setShowOptionModal] = useState(false);
+  const [selectedReviewImage, setSelectedReviewImage] = useState(null);
+  const [reviewSearchTerm, setReviewSearchTerm] = useState('');
+  const [reviewSort, setReviewSort] = useState('평점');
+  const [reviewGender, setReviewGender] = useState('성별');
+  const [newsletterEmail, setNewsletterEmail] = useState('');
   
   // 상품 문의 관련 상태
   const [inquiries, setInquiries] = useState([]);
@@ -308,6 +317,7 @@ function ProductDetailPage({
   // 추천 상품 관련 상태
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const detailTabsRef = useRef(null);
 
   useEffect(() => {
     const normalized = buildProductData(initialProduct);
@@ -545,6 +555,11 @@ function ProductDetailPage({
     async function loadProduct() {
       // productId가 없으면 URL에서 읽어오기 시도
       let targetProductId = productId;
+      if (initialProduct?.isStatic) {
+        setStatus('success');
+        return;
+      }
+
       if (!targetProductId) {
         const urlParams = new URLSearchParams(window.location.search);
         targetProductId = urlParams.get('productId');
@@ -594,6 +609,23 @@ function ProductDetailPage({
   }, [productId, initialProduct]);
 
   useEffect(() => {
+    const session = loadSession();
+    const resolvedProductId = product?._id || product?.id || productId || initialProduct?._id || initialProduct?.id;
+    if (!session?.user || !resolvedProductId) {
+      setIsWishlisted(false);
+      return;
+    }
+
+    checkWishlistItems([resolvedProductId])
+      .then((data) => {
+        setIsWishlisted((data.wishlistedItems || []).includes(resolvedProductId));
+      })
+      .catch(() => {
+        setIsWishlisted(false);
+      });
+  }, [product?._id, product?.id, productId, initialProduct?._id, initialProduct?.id]);
+
+  useEffect(() => {
     if (activeDetailTab === 'inquiry') {
       const targetProductId = productId || (initialProduct?._id) || product._id;
       if (targetProductId) {
@@ -601,6 +633,32 @@ function ProductDetailPage({
       }
     }
   }, [activeDetailTab, productId, initialProduct, inquirySearch]);
+
+  const handleToggleWishlist = async () => {
+    const session = loadSession();
+    if (!session?.user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    const resolvedProductId = product?._id || product?.id || productId || initialProduct?._id || initialProduct?.id;
+    if (!resolvedProductId || wishlistUpdating) {
+      return;
+    }
+    setWishlistUpdating(true);
+    try {
+      if (isWishlisted) {
+        await removeWishlistItem(resolvedProductId);
+        setIsWishlisted(false);
+      } else {
+        await addWishlistItem(resolvedProductId);
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      alert(err.message || '찜하기 처리에 실패했습니다.');
+    } finally {
+      setWishlistUpdating(false);
+    }
+  };
 
   const formattedPrice = useMemo(() => {
     const formatter = new Intl.NumberFormat('ko-KR');
@@ -868,8 +926,14 @@ function ProductDetailPage({
                     <ChevronRight size={20} />
                   </button>
                 )}
-                <button type="button" className="product-gallery__wishlist" aria-label="관심상품 추가">
-                  <Heart size={18} />
+                <button
+                  type="button"
+                  className="product-gallery__wishlist"
+                  aria-label={isWishlisted ? '관심상품 해제' : '관심상품 추가'}
+                  onClick={handleToggleWishlist}
+                  disabled={wishlistUpdating}
+                >
+                  <Heart size={18} fill={isWishlisted ? '#111' : 'none'} />
                 </button>
               </div>
               {product.gallery.length > 1 && (
@@ -897,7 +961,14 @@ function ProductDetailPage({
                   {reviewStats?.averageRating?.toFixed(1) || '0.0'} ({reviewStats?.totalReviews || 0} 상품평)
                 </span>
                 {reviewStats?.totalReviews > 0 && (
-                  <button type="button" className="product-info__rating-link">
+                  <button
+                    type="button"
+                    className="product-info__rating-link"
+                    onClick={() => {
+                      setActiveDetailTab('reviews');
+                      detailTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                  >
                     상품평 보기
                   </button>
                 )}
@@ -981,6 +1052,7 @@ function ProductDetailPage({
                 <div style={{ marginTop: '1rem', textAlign: 'right' }}>
                   <button
                     type="button"
+                    onClick={() => setShowOptionModal(true)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -1171,7 +1243,7 @@ function ProductDetailPage({
           </section>
 
           {/* 상품 상세 정보 탭 섹션 */}
-          <section style={{ maxWidth: '1200px', margin: '3rem auto', padding: '0 1rem' }}>
+          <section ref={detailTabsRef} style={{ maxWidth: '1200px', margin: '3rem auto', padding: '0 1rem' }}>
             {/* 탭 메뉴 */}
             <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '2rem' }}>
               <button
@@ -1400,6 +1472,7 @@ function ProductDetailPage({
                           <button
                             key={`${image}-${index}`}
                             type="button"
+                            onClick={() => setSelectedReviewImage(image)}
                             style={{
                               padding: 0,
                               border: '1px solid #e5e7eb',
@@ -1424,6 +1497,8 @@ function ProductDetailPage({
                       <input 
                         type="search" 
                         placeholder="주제 및 상품평 검색"
+                        value={reviewSearchTerm}
+                        onChange={(e) => setReviewSearchTerm(e.target.value)}
                         style={{
                           flex: 1,
                           minWidth: '200px',
@@ -1434,7 +1509,8 @@ function ProductDetailPage({
                         }}
                       />
                       <select 
-                        defaultValue="평점"
+                        value={reviewSort}
+                        onChange={(e) => setReviewSort(e.target.value)}
                         style={{
                           padding: '0.5rem 0.75rem',
                           border: '1px solid #e5e7eb',
@@ -1446,7 +1522,8 @@ function ProductDetailPage({
                         <option value="최신순">최신순</option>
                       </select>
                       <select 
-                        defaultValue="성별"
+                        value={reviewGender}
+                        onChange={(e) => setReviewGender(e.target.value)}
                         style={{
                           padding: '0.5rem 0.75rem',
                           border: '1px solid #e5e7eb',
@@ -1460,6 +1537,11 @@ function ProductDetailPage({
                       </select>
                       <button 
                         type="button"
+                        onClick={() => {
+                          setReviewSearchTerm('');
+                          setReviewSort('평점');
+                          setReviewGender('성별');
+                        }}
                         style={{
                           padding: '0.5rem 1rem',
                           border: '1px solid #e5e7eb',
@@ -1968,9 +2050,24 @@ function ProductDetailPage({
             <div className="product-newsletter__content">
           <h2>코로라 뉴스레터 구독 신청</h2>
           <p>코로라 신제품, 스웻라이프 컨텐츠 및 이벤트 소식을 제일 먼저 받아보세요. 구독은 언제든지 취소할 수 있어요.</p>
-              <form>
-                <input type="email" placeholder="이메일 주소를 입력하세요" />
-                <button type="button">구독 신청하기</button>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newsletterEmail.trim()) {
+                    alert('이메일을 입력해주세요.');
+                    return;
+                  }
+                  alert('뉴스레터 구독이 접수되었습니다.');
+                  setNewsletterEmail('');
+                }}
+              >
+                <input
+                  type="email"
+                  placeholder="이메일 주소를 입력하세요"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                />
+                <button type="submit">구독 신청하기</button>
               </form>
           </div>
           </section>
@@ -2268,6 +2365,93 @@ function ProductDetailPage({
                   {reviewSubmitting ? '등록 중...' : '등록하기'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {selectedReviewImage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            padding: '1rem',
+          }}
+          onClick={() => setSelectedReviewImage(null)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '8px',
+              maxWidth: '720px',
+              width: '100%',
+              padding: '1rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={selectedReviewImage}
+              alt="리뷰 이미지 상세"
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
+          </div>
+        </div>
+      )}
+      {showOptionModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10002,
+            padding: '1rem',
+          }}
+          onClick={() => setShowOptionModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '560px',
+              padding: '1.5rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>옵션 안내</h3>
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>컬러 옵션</strong>
+              <div style={{ marginTop: '0.5rem', color: '#555' }}>
+                {product.colors && product.colors.length > 0
+                  ? product.colors.map((color) => color.name).join(', ')
+                  : '옵션 없음'}
+              </div>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>사이즈 옵션</strong>
+              <div style={{ marginTop: '0.5rem', color: '#555' }}>
+                {product.sizes && product.sizes.length > 0
+                  ? product.sizes.map((size) => size.label).join(', ')
+                  : '옵션 없음'}
+              </div>
+            </div>
+            <div className="product-cart-modal__actions" style={{ marginTop: '1.5rem' }}>
+              <button type="button" className="product-cart-modal__secondary" onClick={() => setShowOptionModal(false)}>
+                닫기
+              </button>
             </div>
           </div>
         </div>

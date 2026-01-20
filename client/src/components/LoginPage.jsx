@@ -10,7 +10,12 @@ const INITIAL_FORM = {
   remember: false,
 };
 
-function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () => {} }) {
+function LoginPage({
+  onBack,
+  onNavigateToSignup = () => {},
+  onLoginSuccess = () => {},
+  onViewPasswordReset = () => {},
+}) {
   // localStorage에서 저장된 로그인 정보 불러오기
   const loadStoredFormData = () => {
     try {
@@ -237,7 +242,7 @@ function LoginPage({ onBack, onNavigateToSignup = () => {}, onLoginSuccess = () 
               />
               이 기기에서 자동 로그인 유지
             </label>
-            <button type="button" className="link-button">
+            <button type="button" className="link-button" onClick={onViewPasswordReset}>
               비밀번호 찾기
             </button>
           </div>

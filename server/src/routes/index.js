@@ -22,6 +22,8 @@ const inquiryRouter = require('./inquiries');
 const feedbackRouter = require('./feedbacks');
 const noticeRouter = require('./notices');
 const recentlyViewedProductRouter = require('./recentlyViewedProducts');
+const passwordResetRouter = require('./passwordResets');
+const newsletterRouter = require('./newsletters');
 const { getCurrentUser, logoutUser } = require('../controllers/userController');
 
 const router = Router();
@@ -71,6 +73,8 @@ router.use('/inquiries', inquiryRouter);
 router.use('/feedbacks', feedbackRouter);
 router.use('/notices', noticeRouter);
 router.use('/recently-viewed-products', recentlyViewedProductRouter);
+router.use('/auth/password-reset', passwordResetRouter);
+router.use('/newsletters', newsletterRouter);
 const aiRouter = require('./ai');
 router.use('/ai', aiRouter);
 router.get('/auth/session', authenticate, getCurrentUser);

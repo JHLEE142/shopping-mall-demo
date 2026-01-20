@@ -386,7 +386,11 @@ function GenericStyleNote({ note, onBack }) {
               <p>벨트 끝에 리플렉티브 라인이 있어 밤에도 안전하게 스타일을 유지해요.</p>
             </div>
           </div>
-          <button type="button" className="style-note__cta">
+          <button
+            type="button"
+            className="style-note__cta"
+            onClick={() => window.open('https://www.youtube.com/', '_blank', 'noopener,noreferrer')}
+          >
             스타일링 숏폼 보기
             <MoveRight size={16} />
           </button>

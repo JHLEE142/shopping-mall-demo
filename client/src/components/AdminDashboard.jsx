@@ -338,6 +338,12 @@ function AdminDashboard({
   const [salesOrders, setSalesOrders] = useState([]);
   const [salesStatus, setSalesStatus] = useState('idle');
   const [salesError, setSalesError] = useState('');
+  const [isSalesFilterOpen, setIsSalesFilterOpen] = useState(false);
+  const [salesFilter, setSalesFilter] = useState({
+    status: 'all',
+    dateRange: 'all',
+    payment: 'all',
+  });
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
   const [selectedSalesOrderStatus, setSelectedSalesOrderStatus] = useState('idle');
@@ -1702,7 +1708,7 @@ function AdminDashboard({
             <Search className="admin-search__icon" />
             <input className="admin-search__input" type="text" placeholder="Search orders..." />
           </div>
-          <button type="button" className="admin-filter-button">
+          <button type="button" className="admin-filter-button" onClick={() => setIsSalesFilterOpen(true)}>
             <Filter className="admin-icon" />
             Filter
           </button>
@@ -1858,6 +1864,71 @@ function AdminDashboard({
           </div>
         )}
       </section>
+      {isSalesFilterOpen && (
+        <div className="admin-modal-overlay" onClick={() => setIsSalesFilterOpen(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-modal__header">
+              <h3>주문 필터</h3>
+              <button type="button" className="admin-modal__close" onClick={() => setIsSalesFilterOpen(false)}>
+                <X size={18} />
+              </button>
+            </header>
+            <div className="admin-modal__body">
+              <label className="admin-modal__field">
+                상태
+                <select
+                  value={salesFilter.status}
+                  onChange={(e) => setSalesFilter((prev) => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="all">전체</option>
+                  <option value="paid">결제완료</option>
+                  <option value="fulfilled">배송중/완료</option>
+                  <option value="cancelled">취소</option>
+                  <option value="refunded">환불</option>
+                </select>
+              </label>
+              <label className="admin-modal__field">
+                기간
+                <select
+                  value={salesFilter.dateRange}
+                  onChange={(e) => setSalesFilter((prev) => ({ ...prev, dateRange: e.target.value }))}
+                >
+                  <option value="all">전체</option>
+                  <option value="7d">최근 7일</option>
+                  <option value="30d">최근 30일</option>
+                  <option value="90d">최근 90일</option>
+                </select>
+              </label>
+              <label className="admin-modal__field">
+                결제 수단
+                <select
+                  value={salesFilter.payment}
+                  onChange={(e) => setSalesFilter((prev) => ({ ...prev, payment: e.target.value }))}
+                >
+                  <option value="all">전체</option>
+                  <option value="card">카드</option>
+                  <option value="transfer">계좌이체</option>
+                </select>
+              </label>
+            </div>
+            <footer className="admin-modal__actions">
+              <button type="button" className="admin-filter-button" onClick={() => setIsSalesFilterOpen(false)}>
+                닫기
+              </button>
+              <button
+                type="button"
+                className="admin-filter-button admin-filter-button--primary"
+                onClick={() => {
+                  setIsSalesFilterOpen(false);
+                  handleReloadSales();
+                }}
+              >
+                적용하기
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {renderSalesOrderDetail()}
     </>

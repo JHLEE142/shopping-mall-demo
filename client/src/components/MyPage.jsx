@@ -7,11 +7,15 @@ function MyPage({
   user, 
   onBack, 
   onMoveToSettings, 
+  onMoveToNotifications,
+  onMoveToProfileEdit,
   onMoveToPoints, 
   onMoveToOrder, 
   onMoveToWishlist, 
   onLogout, 
   pointsBalance = 0,
+  onMoveToMoneyTopup,
+  onMoveToCoupons,
   onMoveToCancelReturnExchange,
   onMoveToEventBenefit,
   onMoveToFeedback,
@@ -56,7 +60,12 @@ function MyPage({
         <header className="my-page__header">
           <h1 className="my-page__title">마이페이지</h1>
           <div className="my-page__header-actions">
-            <button type="button" className="my-page__icon-button" aria-label="알림">
+            <button
+              type="button"
+              className="my-page__icon-button"
+              aria-label="알림"
+              onClick={onMoveToNotifications}
+            >
               <Bell size={20} />
             </button>
             <button 
@@ -80,7 +89,7 @@ function MyPage({
               <button 
                 type="button"
                 className="my-page__profile-name"
-                onClick={() => {/* 프로필 편집 페이지로 이동 */}}
+                onClick={onMoveToProfileEdit}
               >
                 {user?.name || user?.email || '사용자'} <ChevronRight size={16} />
               </button>
@@ -98,12 +107,12 @@ function MyPage({
             <div className="my-page__balance-value">{pointsBalance.toLocaleString()}원</div>
             <ChevronRight size={16} className="my-page__balance-arrow" />
           </div>
-          <div className="my-page__balance-item">
+          <div className="my-page__balance-item" onClick={onMoveToMoneyTopup}>
             <div className="my-page__balance-label">머니</div>
             <div className="my-page__balance-action">충전하기</div>
             <ChevronRight size={16} className="my-page__balance-arrow" />
           </div>
-          <div className="my-page__balance-item">
+          <div className="my-page__balance-item" onClick={onMoveToCoupons}>
             <div className="my-page__balance-label">쿠폰</div>
             <div className="my-page__balance-value">0장</div>
             <ChevronRight size={16} className="my-page__balance-arrow" />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, ChevronRight, Package, Truck, CheckCircle } from 'lucide-react';
 import { fetchOrders } from '../services/orderService';
+import { addItemToCart } from '../services/cartService';
 import './OrderListPage.css';
 
 function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExchangeReturn, onTrackOrder }) {
@@ -9,6 +10,7 @@ function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExcha
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState('최근 6개월');
+  const [addingToCartItemId, setAddingToCartItemId] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -114,6 +116,23 @@ function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExcha
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('ko-KR').format(price || 0);
+  };
+
+  const handleAddToCart = async (item) => {
+    const productId = item.product?._id || item.product?.id;
+    if (!productId) {
+      alert('상품 정보를 찾을 수 없습니다.');
+      return;
+    }
+    try {
+      setAddingToCartItemId(productId);
+      await addItemToCart(productId, 1);
+      alert('장바구니에 담았습니다.');
+    } catch (err) {
+      alert(err.message || '장바구니 담기에 실패했습니다.');
+    } finally {
+      setAddingToCartItemId(null);
+    }
   };
 
   const yearFilters = ['최근 6개월', '2025', '2024', '2023', '2022', '2021', '2020'];
@@ -264,9 +283,10 @@ function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExcha
                         <button
                           type="button"
                           className="order-list-page__action-button"
-                          onClick={() => {/* 장바구니 담기 */}}
+                          onClick={() => handleAddToCart(item)}
+                          disabled={addingToCartItemId === (item.product?._id || item.product?.id)}
                         >
-                          장바구니 담기
+                          {addingToCartItemId === (item.product?._id || item.product?.id) ? '담는 중...' : '장바구니 담기'}
                         </button>
                       </div>
                     </div>

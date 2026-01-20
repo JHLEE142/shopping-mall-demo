@@ -42,7 +42,15 @@ const SOLUTION_OPTIONS = [
   { id: 'exchange', label: '교환' },
 ];
 
-function ExchangeReturnPage({ order, orderItem, user, onBack, onSubmit, onNavigateToPolicy }) {
+function ExchangeReturnPage({
+  order,
+  orderItem,
+  user,
+  onBack,
+  onSubmit,
+  onNavigateToPolicy,
+  onChangePickupLocation,
+}) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -353,7 +361,11 @@ function ExchangeReturnPage({ order, orderItem, user, onBack, onSubmit, onNaviga
               <div className="exchange-return-page__collection-section">
                 <div className="exchange-return-page__collection-header">
                   <h3 className="exchange-return-page__section-title">상품 회수지</h3>
-                  <button type="button" className="exchange-return-page__change-button">
+                  <button
+                    type="button"
+                    className="exchange-return-page__change-button"
+                    onClick={onChangePickupLocation}
+                  >
                     변경하기 <ChevronRight size={16} />
                   </button>
                 </div>

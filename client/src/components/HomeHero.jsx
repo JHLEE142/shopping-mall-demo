@@ -149,6 +149,7 @@ function HomeHero({
   onMoveToSignUp,
   onMoveToLogin,
   onMoveToLookbook = () => {},
+  onMoveToNew = () => {},
   onViewProduct = () => {},
   onWishlistChange = () => {},
   initialCategory = null,
@@ -673,10 +674,10 @@ function HomeHero({
                       type="button"
                       className="hero-slider__button"
                       onClick={() => {
-                        if (slide.buttonText.includes('신상품')) {
-                          setFilterOption('new');
-                        } else if (slide.buttonText.includes('아우터')) {
-                          // 아우터 필터링 로직 추가 가능
+                        if (slide.buttonText.includes('컬렉션') || slide.buttonText.includes('룩')) {
+                          onMoveToLookbook();
+                        } else {
+                          onMoveToNew();
                         }
                       }}
                     >

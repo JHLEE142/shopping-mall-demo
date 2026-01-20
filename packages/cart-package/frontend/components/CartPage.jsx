@@ -52,7 +52,12 @@ function formatCurrency(value, currency = 'KRW') {
   }).format(value || 0);
 }
 
-function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
+function CartPage({
+  onCartChange = () => {},
+  onProceedToCheckout = () => {},
+  onSaveForLater = () => {},
+  onViewProduct = () => {},
+}) {
   const [cart, setCart] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
@@ -142,8 +147,18 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
     }
   };
 
-  const handleSaveForLater = () => {
-    setNotice({ type: 'info', message: '나중에 담아두기 기능은 준비 중입니다.' });
+  const handleSaveForLater = async (item) => {
+    const product = item?.product;
+    if (!product?._id) {
+      setNotice({ type: 'error', message: '상품 정보를 찾을 수 없습니다.' });
+      return;
+    }
+    try {
+      await onSaveForLater(product);
+      setNotice({ type: 'success', message: '보관함에 저장했습니다.' });
+    } catch (err) {
+      setNotice({ type: 'error', message: err?.message || '보관함 저장에 실패했습니다.' });
+    }
   };
 
   const renderOption = (item, key) => {
@@ -251,7 +266,7 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
                         </div>
 
                         <div className="cart-item-card__actions">
-                          <button type="button" onClick={handleSaveForLater}>
+                          <button type="button" onClick={() => handleSaveForLater(item)}>
                             <Heart size={16} />
                             Save for later
                           </button>
@@ -324,7 +339,20 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {} }) {
                   <div className="cart-recommend__info">
                     <h3>{product.title}</h3>
                     <p>{formatCurrency(product.price, currencyCode)}</p>
-                    <button type="button">View Details</button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onViewProduct({
+                          id: product.id,
+                          name: product.title,
+                          price: product.price,
+                          image: product.image,
+                          isStatic: true,
+                        })
+                      }
+                    >
+                      View Details
+                    </button>
                   </div>
                 </article>
               ))}

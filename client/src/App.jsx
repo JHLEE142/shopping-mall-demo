@@ -32,6 +32,22 @@ import InquiryHistoryPage from './components/InquiryHistoryPage';
 import ProductInquiryHistoryPage from './components/ProductInquiryHistoryPage';
 import NoticePage from './components/NoticePage';
 import RecentlyViewedProductsPage from './components/RecentlyViewedProductsPage';
+import NewArrivalsPage from './components/NewArrivalsPage';
+import AboutPage from './components/AboutPage';
+import FaqPage from './components/FaqPage';
+import ReviewBoardPage from './components/ReviewBoardPage';
+import DeliveryInquiryPage from './components/DeliveryInquiryPage';
+import PaymentCancelPage from './components/PaymentCancelPage';
+import KakaoSupportPage from './components/KakaoSupportPage';
+import TermsPage from './components/TermsPage';
+import PrivacyPage from './components/PrivacyPage';
+import MarketingPolicyPage from './components/MarketingPolicyPage';
+import NotificationCenterPage from './components/NotificationCenterPage';
+import ProfileEditPage from './components/ProfileEditPage';
+import MoneyTopupPage from './components/MoneyTopupPage';
+import CouponPage from './components/CouponPage';
+import OrderDetailPage from './components/OrderDetailPage';
+import PasswordResetPage from './components/PasswordResetPage';
 
 function App() {
   // URL에서 초기 view 읽기
@@ -39,7 +55,49 @@ function App() {
     const path = window.location.pathname;
     if (path === '/' || path === '') return 'home';
     const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
-    const validViews = ['home', 'login', 'signup', 'admin', 'product-create', 'product-edit', 'product-detail', 'lookbook', 'style-note', 'cart', 'order', 'order-list', 'tracking', 'wishlist', 'settings', 'points', 'mypage', 'shipping-return-policy', 'cancel-return-exchange-history', 'event-benefit', 'feedback', 'inquiry-history', 'product-inquiry-history', 'notice', 'recently-viewed-products'];
+    const validViews = [
+      'home',
+      'login',
+      'signup',
+      'password-reset',
+      'admin',
+      'product-create',
+      'product-edit',
+      'product-detail',
+      'lookbook',
+      'style-note',
+      'cart',
+      'order',
+      'order-list',
+      'order-detail',
+      'tracking',
+      'wishlist',
+      'settings',
+      'points',
+      'mypage',
+      'notifications',
+      'profile-edit',
+      'money-topup',
+      'coupon',
+      'shipping-return-policy',
+      'cancel-return-exchange-history',
+      'event-benefit',
+      'feedback',
+      'inquiry-history',
+      'product-inquiry-history',
+      'notice',
+      'recently-viewed-products',
+      'new',
+      'about',
+      'faq',
+      'review-board',
+      'delivery-inquiry',
+      'payment-cancel',
+      'kakao-support',
+      'terms',
+      'privacy',
+      'marketing',
+    ];
     return validViews.includes(view) ? view : 'home';
   };
 
@@ -713,6 +771,7 @@ function App() {
             onCartChange={handleCartUpdate}
             onProceedToCheckout={() => setView('order')}
             onMoveToWishlist={() => setView('wishlist')}
+            onViewProduct={handleViewProduct}
           />
         </main>
         <SiteFooter />
@@ -956,11 +1015,15 @@ function App() {
             user={session?.user || null}
             onBack={() => setView('home')}
             onMoveToSettings={() => setView('settings')}
+            onMoveToNotifications={() => setView('notifications')}
+            onMoveToProfileEdit={() => setView('profile-edit')}
             onMoveToPoints={() => setView('points')}
             onMoveToOrder={() => setView('order-list')}
             onMoveToWishlist={() => setView('wishlist')}
             onLogout={handleLogout}
             pointsBalance={pointsBalance}
+            onMoveToMoneyTopup={() => setView('money-topup')}
+            onMoveToCoupons={() => setView('coupon')}
             onMoveToCancelReturnExchange={() => setView('cancel-return-exchange-history')}
             onMoveToEventBenefit={() => setView('event-benefit')}
             onMoveToFeedback={() => setView('feedback')}
@@ -1007,8 +1070,8 @@ function App() {
             user={session?.user || null}
             onBack={() => setView('mypage')}
             onViewOrderDetail={(order) => {
-              // 주문 상세 페이지로 이동 (추후 구현 가능)
-              console.log('주문 상세:', order);
+              setSelectedOrder(order);
+              setView('order-detail');
             }}
             onViewProduct={(product) => {
               if (product._id || product.id) {
@@ -1114,6 +1177,7 @@ function App() {
               window.history.pushState({ view: 'shipping-return-policy' }, '', '/shipping-return-policy?from=exchange-return');
               setView('shipping-return-policy');
             }}
+            onChangePickupLocation={() => setView('profile-edit')}
           />
         </main>
         <SiteFooter />
@@ -1431,7 +1495,7 @@ function App() {
     );
   }
 
-  const isAuthView = view === 'login' || view === 'signup';
+  const isAuthView = view === 'login' || view === 'signup' || view === 'password-reset';
   const appClassName = view === 'home' ? 'app app--home' : 'app';
   const user = session?.user || null;
 
@@ -1444,6 +1508,9 @@ function App() {
           <SignUpPage
             onBack={() => setView('home')}
             onNavigateToLogin={() => setView('login')}
+            onViewTerms={() => setView('terms')}
+            onViewPrivacy={() => setView('privacy')}
+            onViewMarketing={() => setView('marketing')}
           />
         </div>
       );
@@ -1455,9 +1522,62 @@ function App() {
             onBack={() => setView('home')}
             onNavigateToSignup={() => setView('signup')}
             onLoginSuccess={handleLoginSuccess}
+            onViewPasswordReset={() => setView('password-reset')}
           />
         </div>
       );
+      break;
+    case 'password-reset':
+      content = (
+        <div className="auth-layout">
+          <PasswordResetPage onBack={() => setView('login')} />
+        </div>
+      );
+      break;
+    case 'new':
+      content = <NewArrivalsPage onBack={() => setView('home')} />;
+      break;
+    case 'about':
+      content = <AboutPage onBack={() => setView('home')} />;
+      break;
+    case 'faq':
+      content = <FaqPage onBack={() => setView('home')} />;
+      break;
+    case 'review-board':
+      content = <ReviewBoardPage onBack={() => setView('home')} />;
+      break;
+    case 'delivery-inquiry':
+      content = <DeliveryInquiryPage onBack={() => setView('home')} />;
+      break;
+    case 'payment-cancel':
+      content = <PaymentCancelPage onBack={() => setView('home')} />;
+      break;
+    case 'kakao-support':
+      content = <KakaoSupportPage onBack={() => setView('home')} />;
+      break;
+    case 'terms':
+      content = <TermsPage onBack={() => setView('signup')} />;
+      break;
+    case 'privacy':
+      content = <PrivacyPage onBack={() => setView('signup')} />;
+      break;
+    case 'marketing':
+      content = <MarketingPolicyPage onBack={() => setView('signup')} />;
+      break;
+    case 'notifications':
+      content = <NotificationCenterPage onBack={() => setView('mypage')} />;
+      break;
+    case 'profile-edit':
+      content = <ProfileEditPage user={user} onBack={() => setView('mypage')} />;
+      break;
+    case 'money-topup':
+      content = <MoneyTopupPage onBack={() => setView('mypage')} />;
+      break;
+    case 'coupon':
+      content = <CouponPage onBack={() => setView('mypage')} />;
+      break;
+    case 'order-detail':
+      content = <OrderDetailPage order={selectedOrder} onBack={() => setView('order-list')} />;
       break;
     case 'home':
     default:
@@ -1466,6 +1586,7 @@ function App() {
           onMoveToSignUp={() => setView('signup')}
           onMoveToLogin={() => setView('login')}
           onMoveToLookbook={() => setView('lookbook')}
+          onMoveToNew={() => setView('new')}
           onWishlistChange={handleWishlistUpdate}
           onViewProduct={handleViewProduct}
           initialCategory={homeInitialCategory}
@@ -1491,6 +1612,8 @@ function App() {
         onMoveToSignUp={() => setView('signup')}
         onMoveToCart={() => setView('cart')}
         onMoveToLookbook={() => setView('lookbook')}
+        onMoveToNew={() => setView('new')}
+        onMoveToAbout={() => setView('about')}
         onNavigateToCategory={(category) => {
           setSelectedCategory(category);
           setView('home');

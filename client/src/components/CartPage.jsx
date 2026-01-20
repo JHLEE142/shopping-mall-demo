@@ -53,7 +53,12 @@ function formatCurrency(value, currency = 'KRW') {
   }).format(value || 0);
 }
 
-function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {}, onMoveToWishlist = () => {} }) {
+function CartPage({
+  onCartChange = () => {},
+  onProceedToCheckout = () => {},
+  onMoveToWishlist = () => {},
+  onViewProduct = () => {},
+}) {
   const [cart, setCart] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
@@ -350,7 +355,20 @@ function CartPage({ onCartChange = () => {}, onProceedToCheckout = () => {}, onM
                   <div className="cart-recommend__info">
                     <h3>{product.title}</h3>
                     <p>{formatCurrency(product.price, currencyCode)}</p>
-                    <button type="button">View Details</button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onViewProduct({
+                          id: product.id,
+                          name: product.title,
+                          price: product.price,
+                          image: product.image,
+                            isStatic: true,
+                        })
+                      }
+                    >
+                      View Details
+                    </button>
                   </div>
                 </article>
               ))}
