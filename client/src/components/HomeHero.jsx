@@ -11,71 +11,71 @@ const SLIDE_DATA = [
   {
     id: 1,
     image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&h=800&fit=crop',
-    title: 'New Season Collection',
-    subtitle: '트렌디한 스타일을 만나보세요',
+    title: '오늘의 생활 필수템',
+    subtitle: '주방부터 욕실까지 깔끔하게 채워보세요',
     buttonText: '신상품 보기',
   },
   {
     id: 2,
     image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&h=800&fit=crop',
-    title: 'Premium Outerwear',
-    subtitle: '프리미엄 아우터 컬렉션',
-    buttonText: '아우터 보기',
+    title: '주방 정리 컬렉션',
+    subtitle: '정돈된 싱크대, 하루가 가벼워져요',
+    buttonText: '컬렉션 보기',
   },
   {
     id: 3,
     image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&h=800&fit=crop',
-    title: 'Street Style',
-    subtitle: '스트릿 패션의 새로운 해석',
-    buttonText: '컬렉션 보기',
+    title: '욕실&세탁 베스트',
+    subtitle: '위생과 편안함을 동시에',
+    buttonText: '베스트 보기',
   },
   {
     id: 4,
     image: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1920&h=800&fit=crop',
-    title: 'Minimalist Design',
-    subtitle: '미니멀리즘의 정수',
-    buttonText: '미니멀 컬렉션',
+    title: '심플 보관 솔루션',
+    subtitle: '공간을 넓게 쓰는 정리 습관',
+    buttonText: '보관 보기',
   },
   {
     id: 5,
     image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1920&h=800&fit=crop',
-    title: 'Casual Essentials',
-    subtitle: '일상의 편안함을 위한 필수템',
-    buttonText: '캐주얼 보기',
+    title: '데일리 청소템',
+    subtitle: '작은 수고로 큰 깔끔함',
+    buttonText: '청소 보기',
   },
   {
     id: 6,
     image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=1920&h=800&fit=crop',
-    title: 'Luxury Collection',
-    subtitle: '럭셔리한 품격의 아이템',
-    buttonText: '럭셔리 보기',
+    title: '리빙 데코 포인트',
+    subtitle: '집안 분위기를 바꾸는 한 끗',
+    buttonText: '데코 보기',
   },
   {
     id: 7,
     image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1920&h=800&fit=crop',
-    title: 'Urban Fashion',
-    subtitle: '도시를 위한 패션',
-    buttonText: '도시 컬렉션',
+    title: '아이와 함께 쓰는 용품',
+    subtitle: '안심 소재로 고르는 생활템',
+    buttonText: '패밀리 보기',
   },
   {
     id: 8,
     image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&h=800&fit=crop',
-    title: 'Athletic Style',
-    subtitle: '스포티한 라이프스타일',
-    buttonText: '스포츠웨어',
+    title: '베스트 리뷰 모음',
+    subtitle: '후기가 증명하는 생활 아이템',
+    buttonText: '리뷰 보기',
   },
   {
     id: 9,
     image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1920&h=800&fit=crop',
-    title: 'Winter Collection',
-    subtitle: '따뜻한 겨울을 위한 컬렉션',
-    buttonText: '겨울 컬렉션',
+    title: '계절맞이 준비',
+    subtitle: '지금 필요한 생활템만 모았어요',
+    buttonText: '시즌 보기',
   },
   {
     id: 10,
     image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&h=800&fit=crop',
-    title: 'Special Sale',
-    subtitle: '특별 할인 이벤트',
+    title: '특가 할인',
+    subtitle: '합리적인 가격으로 생활을 채우세요',
     buttonText: '세일 보기',
   },
 ];
@@ -172,6 +172,7 @@ function HomeHero({
   const [currentPage, setCurrentPage] = useState(initialPage || 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const itemsPerPage = 40;
   const [currentSlide, setCurrentSlide] = useState(0);
   const catalogToolbarRef = useRef(null);
@@ -718,8 +719,8 @@ function HomeHero({
         </button>
       </section>
 
-      {/* 테마별 섹션 (검색/필터가 없을 때만 표시) */}
-      {!submittedSearchQuery && !categoryFilter ? (
+      {/* 테마별 섹션 (검색/필터가 없고 전체상품 모드가 아닐 때만 표시) */}
+      {!submittedSearchQuery && !categoryFilter && !showAllProducts ? (
         <div className="mobile-frame">
           <div className="mobile-frame__container">
             {/* 오늘의 상품 */}
@@ -954,6 +955,7 @@ function HomeHero({
             )}
           </div>
         </div>
+
       ) : (
         /* 검색/필터가 있을 때는 기존 방식 */
         <div className="mobile-frame">
@@ -1238,12 +1240,8 @@ function HomeHero({
             <h2 className="collection-card__title">Trendy & Free Collection</h2>
             <p className="collection-card__breadcrumb">For Everyone &gt; Collection &gt; New Season</p>
           </div>
-          <p className="collection-card__description">
-          쓰임은 단순하게, 무드는 깊게.
-          </p>
-          <p className="collection-card__description">
-          일상을 위한 생활용품.
-          </p>
+          <p className="collection-card__description">쓰임은 단순하게, 무드는 깊게.</p>
+          <p className="collection-card__description">일상을 위한 생활용품.</p>
           <div className="collection-card__actions">
             <button type="button" className="collection-card__button collection-card__button--primary" onClick={onMoveToLookbook}>
               룩북 보기
@@ -1259,6 +1257,28 @@ function HomeHero({
           </div>
         </div>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0 4rem' }}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => {
+            setSearchQuery('');
+            setSubmittedSearchQuery('');
+            setCategoryFilter(null);
+            setCurrentPage(1);
+            setShowAllProducts(true);
+            requestAnimationFrame(() => {
+              if (catalogToolbarRef.current) {
+                const top = catalogToolbarRef.current.getBoundingClientRect().top + window.pageYOffset;
+                window.scrollTo({ top: top - 20, behavior: 'smooth' });
+              }
+            });
+          }}
+        >
+          전체 상품 보기
+        </button>
+      </div>
       </div>
           </div>
         </div>
