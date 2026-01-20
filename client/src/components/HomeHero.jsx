@@ -1233,6 +1233,11 @@ function HomeHero({
         </div>
       )}
 
+      </div>
+          </div>
+        </div>
+      )}
+
       {/* Trendy & Free Collection 카드 */}
       <section className="collection-card">
         <div className="collection-card__content">
@@ -1258,29 +1263,27 @@ function HomeHero({
         </div>
       </section>
 
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0 4rem' }}>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => {
-            setSearchQuery('');
-            setSubmittedSearchQuery('');
-            setCategoryFilter(null);
-            setCurrentPage(1);
-            setShowAllProducts(true);
-            requestAnimationFrame(() => {
-              if (catalogToolbarRef.current) {
-                const top = catalogToolbarRef.current.getBoundingClientRect().top + window.pageYOffset;
-                window.scrollTo({ top: top - 20, behavior: 'smooth' });
-              }
-            });
-          }}
-        >
-          전체 상품 보기
-        </button>
-      </div>
-      </div>
-          </div>
+      {!submittedSearchQuery && !categoryFilter && !showAllProducts && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0 4rem' }}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              setSearchQuery('');
+              setSubmittedSearchQuery('');
+              setCategoryFilter(null);
+              setCurrentPage(1);
+              setShowAllProducts(true);
+              requestAnimationFrame(() => {
+                if (catalogToolbarRef.current) {
+                  const top = catalogToolbarRef.current.getBoundingClientRect().top + window.pageYOffset;
+                  window.scrollTo({ top: top - 20, behavior: 'smooth' });
+                }
+              });
+            }}
+          >
+            전체 상품 보기
+          </button>
         </div>
       )}
     </>
