@@ -25,6 +25,7 @@ import ExchangeReturnPage from './components/ExchangeReturnPage';
 import ShippingReturnPolicyPage from './components/ShippingReturnPolicyPage';
 import TrackingPage from './components/TrackingPage';
 import ChatWidget from './components/ChatWidget';
+import FloatingHomeButton from './components/FloatingHomeButton';
 import CancelReturnExchangeHistoryPage from './components/CancelReturnExchangeHistoryPage';
 import EventBenefitPage from './components/EventBenefitPage';
 import FeedbackPage from './components/FeedbackPage';
@@ -593,7 +594,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -640,7 +643,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -706,7 +711,9 @@ function App() {
             onViewProduct={handleViewProduct}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -755,7 +762,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -803,7 +812,9 @@ function App() {
             onViewProduct={handleViewProduct}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -870,7 +881,9 @@ function App() {
             directOrderItem={directOrderItem}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
         <ChatWidget 
           user={session?.user || null}
           onMoveToLogin={() => setView('login')}
@@ -918,7 +931,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -959,7 +974,9 @@ function App() {
             onWishlistChange={handleWishlistUpdate}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -998,7 +1015,9 @@ function App() {
             onLogout={handleLogout}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1062,7 +1081,9 @@ function App() {
             onMoveToRecentlyViewedProducts={() => setView('recently-viewed-products')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1119,7 +1140,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1159,7 +1182,9 @@ function App() {
             onBack={() => setView('order-list')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1209,7 +1234,9 @@ function App() {
             onChangePickupLocation={() => setView('profile-edit')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1254,7 +1281,9 @@ function App() {
             isLoggedIn={isLoggedIn}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1292,7 +1321,9 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1327,7 +1358,9 @@ function App() {
         <main className="app-main app-main--default">
           <EventBenefitPage onBack={() => setView('mypage')} />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1365,7 +1398,9 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1403,7 +1438,9 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1441,7 +1478,9 @@ function App() {
             onBack={() => setView('mypage')}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1476,7 +1515,9 @@ function App() {
         <main className="app-main app-main--default">
           <NoticePage onBack={() => setView('mypage')} />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1520,7 +1561,9 @@ function App() {
             }}
           />
         </main>
-        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+        <FloatingHomeButton onClick={() => goHome()} />
+        <FloatingHomeButton onClick={() => goHome()} />
+      <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }
@@ -1664,6 +1707,7 @@ function App() {
       <main className={`app-main ${isAuthView ? 'app-main--auth' : 'app-main--default'}`}>
         {content}
       </main>
+      <FloatingHomeButton onClick={() => goHome()} />
       <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       <ChatWidget 
         user={session?.user || null}
