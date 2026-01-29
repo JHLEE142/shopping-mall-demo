@@ -6,76 +6,76 @@ import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../serv
 import { subscribeToNewProducts, getSubscriptionStatus } from '../services/notificationService';
 import { loadSession } from '../utils/sessionStorage';
 
-// 슬라이드 데이터 (10개)
+// 슬라이드 데이터 (10개) - 귀여운 고귀몰 테마
 const SLIDE_DATA = [
   {
     id: 1,
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&h=800&fit=crop',
-    title: '오늘의 생활 필수템',
-    subtitle: '주방부터 욕실까지 깔끔하게 채워보세요',
+    image: 'https://images.unsplash.com/photo-1608848461950-0fe51dfc41cb?w=1920&h=800&fit=crop',
+    title: '🐱 고귀한 하루의 시작',
+    subtitle: '귀여운 캐릭터와 함께하는 특별한 쇼핑',
     buttonText: '신상품 보기',
   },
   {
     id: 2,
-    image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&h=800&fit=crop',
-    title: '주방 정리 컬렉션',
-    subtitle: '정돈된 싱크대, 하루가 가벼워져요',
+    image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1920&h=800&fit=crop',
+    title: '👑 왕관을 쓴 특별한 아이템',
+    subtitle: '고귀몰만의 프리미엄 컬렉션',
     buttonText: '컬렉션 보기',
   },
   {
     id: 3,
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&h=800&fit=crop',
-    title: '욕실&세탁 베스트',
-    subtitle: '위생과 편안함을 동시에',
+    image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=1920&h=800&fit=crop',
+    title: '✨ 귀여운 일상의 발견',
+    subtitle: '매일매일 특별한 순간을 만들어요',
     buttonText: '베스트 보기',
   },
   {
     id: 4,
-    image: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1920&h=800&fit=crop',
-    title: '심플 보관 솔루션',
-    subtitle: '공간을 넓게 쓰는 정리 습관',
-    buttonText: '보관 보기',
+    image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1920&h=800&fit=crop',
+    title: '💝 사랑스러운 선물 아이디어',
+    subtitle: '소중한 사람에게 전하는 마음',
+    buttonText: '선물 보기',
   },
   {
     id: 5,
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1920&h=800&fit=crop',
-    title: '데일리 청소템',
-    subtitle: '작은 수고로 큰 깔끔함',
-    buttonText: '청소 보기',
+    image: 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?w=1920&h=800&fit=crop',
+    title: '🎀 달콤한 라이프스타일',
+    subtitle: '귀여움 가득한 생활용품 모음',
+    buttonText: '라이프 보기',
   },
   {
     id: 6,
-    image: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=1920&h=800&fit=crop',
-    title: '리빙 데코 포인트',
-    subtitle: '집안 분위기를 바꾸는 한 끗',
-    buttonText: '데코 보기',
+    image: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=1920&h=800&fit=crop',
+    title: '🌟 특별한 날을 위한 준비',
+    subtitle: '기념일에 어울리는 아이템들',
+    buttonText: '기념일 보기',
   },
   {
     id: 7,
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1920&h=800&fit=crop',
-    title: '아이와 함께 쓰는 용품',
-    subtitle: '안심 소재로 고르는 생활템',
-    buttonText: '패밀리 보기',
+    image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1920&h=800&fit=crop',
+    title: '💖 따뜻한 감성 아이템',
+    subtitle: '마음을 따뜻하게 만드는 상품들',
+    buttonText: '감성 보기',
   },
   {
     id: 8,
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&h=800&fit=crop',
-    title: '베스트 리뷰 모음',
-    subtitle: '후기가 증명하는 생활 아이템',
-    buttonText: '리뷰 보기',
+    image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=1920&h=800&fit=crop',
+    title: '🎁 행복한 쇼핑의 시작',
+    subtitle: '고귀몰과 함께하는 즐거운 하루',
+    buttonText: '쇼핑 시작하기',
   },
   {
     id: 9,
-    image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1920&h=800&fit=crop',
-    title: '계절맞이 준비',
-    subtitle: '지금 필요한 생활템만 모았어요',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=800&fit=crop',
+    title: '🌸 봄날의 특별한 선물',
+    subtitle: '계절에 맞는 귀여운 아이템',
     buttonText: '시즌 보기',
   },
   {
     id: 10,
-    image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&h=800&fit=crop',
-    title: '특가 할인',
-    subtitle: '합리적인 가격으로 생활을 채우세요',
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1920&h=800&fit=crop',
+    title: '💎 프리미엄 특가 세일',
+    subtitle: '합리적인 가격의 고품질 상품',
     buttonText: '세일 보기',
   },
 ];
@@ -722,145 +722,232 @@ function HomeHero({
         </button>
       </section>
 
-      {/* 좌측 사이드바 (카테고리 & 로열관) */}
-      <div className="home-sidebar">
-        <div className="home-sidebar__container">
-          {/* 카테고리 드롭다운 */}
-          <div className="home-sidebar__dropdown">
-            <button
-              type="button"
-              className="home-sidebar__dropdown-button"
-              onClick={() => {
-                setCategoryDropdownOpen(!categoryDropdownOpen);
-                setLoyaltyDropdownOpen(false);
-              }}
-              aria-expanded={categoryDropdownOpen}
-            >
-              <span>카테고리</span>
-              <ChevronDown 
-                size={16} 
-                style={{ 
-                  transform: categoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
-                  transition: 'transform 0.2s' 
-                }} 
-              />
-            </button>
-            {categoryDropdownOpen && (
-              <div className="home-sidebar__dropdown-menu">
-                {categoriesLoading ? (
-                  <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loading">
-                    로딩 중...
-                  </div>
-                ) : categories.length > 0 ? (
-                  categories.map((category) => (
-                    <button
-                      key={category._id || category.code}
-                      type="button"
-                      className="home-sidebar__dropdown-item"
-                      onClick={() => {
-                        setCategoryFilter(category.name);
-                        setCategoryDropdownOpen(false);
-                        setCurrentPage(1);
-                      }}
-                    >
-                      {category.name}
-                      {category.productCount !== undefined && category.productCount > 0 && (
-                        <span className="home-sidebar__dropdown-count">({category.productCount})</span>
-                      )}
-                    </button>
-                  ))
-                ) : (
-                  <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--empty">
-                    카테고리가 없습니다
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+      {/* 메인 콘텐츠 영역 (사이드바 + 테마 섹션) */}
+      <div className="home-main-layout">
+        {/* 좌측 사이드바 */}
+        <aside className="home-sidebar">
+          <div className="home-sidebar__content">
+            {/* 스토어 이름 */}
+            <div className="home-sidebar__store-name">
+              <div className="home-sidebar__divider"></div>
+              <h1 className="home-sidebar__title">Our - mind Store</h1>
+              <div className="home-sidebar__divider"></div>
+            </div>
 
-          {/* 로열관 드롭다운 */}
-          <div className="home-sidebar__dropdown home-sidebar__dropdown--loyalty">
-            <button
-              type="button"
-              className="home-sidebar__dropdown-button home-sidebar__dropdown-button--loyalty"
-              onClick={() => {
-                setLoyaltyDropdownOpen(!loyaltyDropdownOpen);
-                setCategoryDropdownOpen(false);
-              }}
-              aria-expanded={loyaltyDropdownOpen}
-            >
-              <span>로열관</span>
-              <ChevronDown 
-                size={16} 
-                style={{ 
-                  transform: loyaltyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
-                  transition: 'transform 0.2s' 
-                }} 
-              />
-            </button>
-            {loyaltyDropdownOpen && (
-              <div className="home-sidebar__dropdown-menu home-sidebar__dropdown-menu--loyalty">
-                <button
-                  type="button"
-                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                  onClick={() => {
-                    setLoyaltyDropdownOpen(false);
-                    onMoveToLoyaltyHall();
-                  }}
-                >
-                  로열관 입고 예정 상품
-                </button>
-                <div className="home-sidebar__dropdown-divider"></div>
-                <button
-                  type="button"
-                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                  onClick={() => {
-                    setLoyaltyDropdownOpen(false);
-                    // 일반 회원 필터링 로직 (필요시 추가)
-                  }}
-                >
-                  일반 (LV.1)
-                </button>
-                <button
-                  type="button"
-                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                  onClick={() => {
-                    setLoyaltyDropdownOpen(false);
-                    // 프렌즈 필터링 로직 (필요시 추가)
-                  }}
-                >
-                  프렌즈 (LV.2)
-                </button>
-                <button
-                  type="button"
-                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                  onClick={() => {
-                    setLoyaltyDropdownOpen(false);
-                    // VIP 필터링 로직 (필요시 추가)
-                  }}
-                >
-                  VIP (LV.3)
-                </button>
-                <button
-                  type="button"
-                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                  onClick={() => {
-                    setLoyaltyDropdownOpen(false);
-                    // 로열 필터링 로직 (필요시 추가)
-                  }}
-                >
-                  로열 (LV.4)
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+            {/* 네비게이션 링크 */}
+            <nav className="home-sidebar__nav">
+              <button
+                type="button"
+                className="home-sidebar__nav-link"
+                onClick={() => {
+                  setCategoryFilter(null);
+                  setSearchQuery('');
+                  setSubmittedSearchQuery('');
+                  setCurrentPage(1);
+                }}
+              >
+                ALL PRODUCT
+              </button>
+              <button
+                type="button"
+                className="home-sidebar__nav-link"
+                onClick={() => {
+                  // 공지사항 페이지로 이동 (필요시 구현)
+                }}
+              >
+                NOTICE
+              </button>
+              <button
+                type="button"
+                className="home-sidebar__nav-link"
+                onClick={() => {
+                  // FAQ 페이지로 이동 (필요시 구현)
+                }}
+              >
+                FAQ
+              </button>
+              <button
+                type="button"
+                className="home-sidebar__nav-link"
+                onClick={() => {
+                  // 문의 페이지로 이동 (필요시 구현)
+                }}
+              >
+                CONTACT
+              </button>
+            </nav>
 
-      {/* 테마별 섹션 (검색/필터가 없고 전체상품 모드가 아닐 때만 표시) */}
-      {!submittedSearchQuery && !categoryFilter && !showAllProducts ? (
-        <div className="mobile-frame">
-          <div className="mobile-frame__container">
+            {/* 카테고리 섹션 */}
+            <div className="home-sidebar__section">
+              <button
+                type="button"
+                className="home-sidebar__section-button"
+                onClick={() => {
+                  setCategoryDropdownOpen(!categoryDropdownOpen);
+                  setLoyaltyDropdownOpen(false);
+                }}
+                aria-expanded={categoryDropdownOpen}
+              >
+                <span>카테고리</span>
+                <ChevronDown 
+                  size={16} 
+                  style={{ 
+                    transform: categoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+                    transition: 'transform 0.2s' 
+                  }} 
+                />
+              </button>
+              {categoryDropdownOpen && (
+                <div className="home-sidebar__dropdown-menu">
+                  {categoriesLoading ? (
+                    <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loading">
+                      로딩 중...
+                    </div>
+                  ) : categories.length > 0 ? (
+                    categories.map((category) => (
+                      <button
+                        key={category._id || category.code}
+                        type="button"
+                        className="home-sidebar__dropdown-item"
+                        onClick={() => {
+                          setCategoryFilter(category.name);
+                          setCategoryDropdownOpen(false);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {category.name}
+                        {category.productCount !== undefined && category.productCount > 0 && (
+                          <span className="home-sidebar__dropdown-count">({category.productCount})</span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--empty">
+                      카테고리가 없습니다
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 로열관 섹션 */}
+            <div className="home-sidebar__section">
+              <button
+                type="button"
+                className="home-sidebar__section-button home-sidebar__section-button--loyalty"
+                onClick={() => {
+                  setLoyaltyDropdownOpen(!loyaltyDropdownOpen);
+                  setCategoryDropdownOpen(false);
+                }}
+                aria-expanded={loyaltyDropdownOpen}
+              >
+                <span>로열관</span>
+                <ChevronDown 
+                  size={16} 
+                  style={{ 
+                    transform: loyaltyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+                    transition: 'transform 0.2s' 
+                  }} 
+                />
+              </button>
+              {loyaltyDropdownOpen && (
+                <div className="home-sidebar__dropdown-menu home-sidebar__dropdown-menu--loyalty">
+                  <button
+                    type="button"
+                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    onClick={() => {
+                      setLoyaltyDropdownOpen(false);
+                      onMoveToLoyaltyHall();
+                    }}
+                  >
+                    로열관 입고 예정 상품
+                  </button>
+                  <div className="home-sidebar__dropdown-divider"></div>
+                  <button
+                    type="button"
+                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    onClick={() => {
+                      setLoyaltyDropdownOpen(false);
+                    }}
+                  >
+                    일반 (LV.1)
+                  </button>
+                  <button
+                    type="button"
+                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    onClick={() => {
+                      setLoyaltyDropdownOpen(false);
+                    }}
+                  >
+                    프렌즈 (LV.2)
+                  </button>
+                  <button
+                    type="button"
+                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    onClick={() => {
+                      setLoyaltyDropdownOpen(false);
+                    }}
+                  >
+                    VIP (LV.3)
+                  </button>
+                  <button
+                    type="button"
+                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    onClick={() => {
+                      setLoyaltyDropdownOpen(false);
+                    }}
+                  >
+                    로열 (LV.4)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 소셜 미디어 */}
+            <div className="home-sidebar__social">
+              <a href="https://instagram.com/our-mind" target="_blank" rel="noopener noreferrer" className="home-sidebar__social-link">
+                @our-mind
+              </a>
+            </div>
+
+            {/* 인스타그램 썸네일 그리드 */}
+            <div className="home-sidebar__instagram">
+              <div className="home-sidebar__instagram-grid">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="home-sidebar__instagram-item">
+                    <img 
+                      src={`https://images.unsplash.com/photo-${1500000000000 + i}?w=150&h=150&fit=crop`} 
+                      alt={`Instagram ${i}`}
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 검색 바 */}
+            <div className="home-sidebar__search">
+              <form className="home-sidebar__search-form" onSubmit={handleSearch}>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  className="home-sidebar__search-input"
+                  placeholder="Search"
+                  defaultValue={initialSearchQuery || ''}
+                  onChange={handleSearchChange}
+                />
+                <button type="submit" className="home-sidebar__search-button" aria-label="검색">
+                  <Search size={16} />
+                </button>
+              </form>
+            </div>
+          </div>
+        </aside>
+
+        {/* 우측 테마별 섹션 */}
+        {!submittedSearchQuery && !categoryFilter && !showAllProducts ? (
+          <div className="home-theme-content">
+            <div className="home-theme-content__container">
             {/* 오늘의 상품 */}
             {themedProducts.todayProducts.length > 0 && (
               <section className="product-theme-section">
@@ -1091,14 +1178,15 @@ function HomeHero({
                 </div>
               </section>
             )}
+            </div>
           </div>
-        </div>
-
-      ) : (
+        ) : (
         /* 검색/필터가 있을 때는 기존 방식 */
-        <div className="mobile-frame">
-          <div className="mobile-frame__container">
-            <div className="catalog-page">
+        <div className="home-theme-content">
+          <div className="home-theme-content__container">
+            <div className="mobile-frame">
+              <div className="mobile-frame__container">
+                <div className="catalog-page">
 
       <div className="catalog-toolbar" ref={catalogToolbarRef}>
         <div className="catalog-toolbar__left">
@@ -1371,13 +1459,16 @@ function HomeHero({
         </div>
       )}
 
-      </div>
+              </div>
+            </div>
           </div>
         </div>
+        </div>
       )}
+      </div>
 
       {/* Trendy & Free Collection 카드 */}
-      <section className="collection-card">
+      {/*<section className="collection-card">
         <div className="collection-card__content">
           <div className="collection-card__header">
             <h2 className="collection-card__title">Trendy & Free Collection</h2>
@@ -1399,7 +1490,7 @@ function HomeHero({
             </button>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {!submittedSearchQuery && !categoryFilter && !showAllProducts && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0 4rem' }}>

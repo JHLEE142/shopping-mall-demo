@@ -53,3 +53,4 @@ async function deleteAllCategories() {
 // 스크립트 실행
 deleteAllCategories();
 
+

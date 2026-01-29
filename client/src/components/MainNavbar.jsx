@@ -3,6 +3,7 @@ import { LogOut, UserRound, ChevronDown, Bell, Heart, Settings } from 'lucide-re
 import SessionTimer from './SessionTimer';
 import { fetchCategoryHierarchy } from '../services/categoryService';
 import { getUnreviewedProducts } from '../services/reviewService';
+import LogoImage from '../assets/고귀몰_로고_이미지.png';
 
 const NAV_LINKS = ['New', 'Collections', 'Categories', 'About'];
 
@@ -266,8 +267,7 @@ function MainNavbar({
       <nav className="home-nav">
         <div className="nav-left">
           <button type="button" className="nav-brand nav-brand--button" onClick={handleNavigateHome}>
-            <img src="/vail_icon_.png" alt="　　Vail" className="nav-brand__logo" />
-            <span className="nav-brand__text">Vail</span>
+            <img src={LogoImage} alt="고귀몰" className="nav-brand__logo" />
           </button>
         </div>
 
