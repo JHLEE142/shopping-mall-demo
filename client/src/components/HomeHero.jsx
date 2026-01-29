@@ -729,11 +729,11 @@ function HomeHero({
           <div className="home-sidebar__content">
             
 
-            {/* 네비게이션 링크 */}
+            {/* 네비게이션 링크 - 리스트뷰 스타일 */}
             <nav className="home-sidebar__nav">
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item"
                 onClick={() => {
                   setCategoryFilter(null);
                   setSearchQuery('');
@@ -745,7 +745,7 @@ function HomeHero({
               </button>
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item"
                 onClick={() => {
                   // 공지사항 페이지로 이동 (필요시 구현)
                 }}
@@ -754,7 +754,7 @@ function HomeHero({
               </button>
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item"
                 onClick={() => {
                   // FAQ 페이지로 이동 (필요시 구현)
                 }}
@@ -763,7 +763,7 @@ function HomeHero({
               </button>
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item"
                 onClick={() => {
                   // 문의 페이지로 이동 (필요시 구현)
                 }}
@@ -776,21 +776,17 @@ function HomeHero({
             <div className="home-sidebar__section">
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item home-sidebar__nav-item--expandable"
                 onClick={() => {
                   setCategoryDropdownOpen(!categoryDropdownOpen);
                   setLoyaltyDropdownOpen(false);
                 }}
                 aria-expanded={categoryDropdownOpen}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
               >
                 <span>CATEGORY</span>
                 <ChevronDown 
                   size={16} 
-                  style={{ 
-                    transform: categoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
-                    transition: 'transform 0.2s' 
-                  }} 
+                  className={`home-sidebar__chevron ${categoryDropdownOpen ? 'home-sidebar__chevron--open' : ''}`}
                 />
               </button>
               {categoryDropdownOpen && (
@@ -830,21 +826,17 @@ function HomeHero({
             <div className="home-sidebar__section">
               <button
                 type="button"
-                className="home-sidebar__nav-link"
+                className="home-sidebar__nav-item home-sidebar__nav-item--expandable home-sidebar__nav-item--loyalty"
                 onClick={() => {
                   setLoyaltyDropdownOpen(!loyaltyDropdownOpen);
                   setCategoryDropdownOpen(false);
                 }}
                 aria-expanded={loyaltyDropdownOpen}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
               >
                 <span>ROYAL</span>
                 <ChevronDown 
                   size={16} 
-                  style={{ 
-                    transform: loyaltyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
-                    transition: 'transform 0.2s' 
-                  }} 
+                  className={`home-sidebar__chevron ${loyaltyDropdownOpen ? 'home-sidebar__chevron--open' : ''}`}
                 />
               </button>
               {loyaltyDropdownOpen && (
