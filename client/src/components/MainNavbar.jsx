@@ -3,7 +3,7 @@ import { LogOut, UserRound, ChevronDown, Bell, Heart, Settings } from 'lucide-re
 import SessionTimer from './SessionTimer';
 import { fetchCategoryHierarchy } from '../services/categoryService';
 import { getUnreviewedProducts } from '../services/reviewService';
-import LogoImage from '../assets/고귀몰_로고_이미지.png';
+import LogoImage from '../assets/고귀몰_로고_홈버튼_수정.png';
 
 const NAV_LINKS = ['New', 'Collections', 'Categories', 'About'];
 

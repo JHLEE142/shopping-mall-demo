@@ -11,70 +11,70 @@ const SLIDE_DATA = [
   {
     id: 1,
     image: 'https://images.unsplash.com/photo-1608848461950-0fe51dfc41cb?w=1920&h=800&fit=crop',
-    title: '🐱 고귀한 하루의 시작',
+    title: '고귀한 하루의 시작',
     subtitle: '귀여운 캐릭터와 함께하는 특별한 쇼핑',
     buttonText: '신상품 보기',
   },
   {
     id: 2,
     image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1920&h=800&fit=crop',
-    title: '👑 왕관을 쓴 특별한 아이템',
+    title: '왕관을 쓴 특별한 아이템',
     subtitle: '고귀몰만의 프리미엄 컬렉션',
     buttonText: '컬렉션 보기',
   },
   {
     id: 3,
     image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=1920&h=800&fit=crop',
-    title: '✨ 귀여운 일상의 발견',
+    title: '귀여운 일상의 발견',
     subtitle: '매일매일 특별한 순간을 만들어요',
     buttonText: '베스트 보기',
   },
   {
     id: 4,
     image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1920&h=800&fit=crop',
-    title: '💝 사랑스러운 선물 아이디어',
+    title: '사랑스러운 선물 아이디어',
     subtitle: '소중한 사람에게 전하는 마음',
     buttonText: '선물 보기',
   },
   {
     id: 5,
     image: 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?w=1920&h=800&fit=crop',
-    title: '🎀 달콤한 라이프스타일',
+    title: '달콤한 라이프스타일',
     subtitle: '귀여움 가득한 생활용품 모음',
     buttonText: '라이프 보기',
   },
   {
     id: 6,
     image: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=1920&h=800&fit=crop',
-    title: '🌟 특별한 날을 위한 준비',
+    title: '특별한 날을 위한 준비',
     subtitle: '기념일에 어울리는 아이템들',
     buttonText: '기념일 보기',
   },
   {
     id: 7,
     image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1920&h=800&fit=crop',
-    title: '💖 따뜻한 감성 아이템',
+    title: '따뜻한 감성 아이템',
     subtitle: '마음을 따뜻하게 만드는 상품들',
     buttonText: '감성 보기',
   },
   {
     id: 8,
     image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=1920&h=800&fit=crop',
-    title: '🎁 행복한 쇼핑의 시작',
+    title: '행복한 쇼핑의 시작',
     subtitle: '고귀몰과 함께하는 즐거운 하루',
     buttonText: '쇼핑 시작하기',
   },
   {
     id: 9,
     image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=800&fit=crop',
-    title: '🌸 봄날의 특별한 선물',
+    title: '봄날의 특별한 선물',
     subtitle: '계절에 맞는 귀여운 아이템',
     buttonText: '시즌 보기',
   },
   {
     id: 10,
     image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1920&h=800&fit=crop',
-    title: '💎 프리미엄 특가 세일',
+    title: '프리미엄 특가 세일',
     subtitle: '합리적인 가격의 고품질 상품',
     buttonText: '세일 보기',
   },
@@ -730,7 +730,6 @@ function HomeHero({
             {/* 스토어 이름 */}
             <div className="home-sidebar__store-name">
               <div className="home-sidebar__divider"></div>
-              <h1 className="home-sidebar__title">Our - mind Store</h1>
               <div className="home-sidebar__divider"></div>
             </div>
 
@@ -863,42 +862,6 @@ function HomeHero({
                     로열관 입고 예정 상품
                   </button>
                   <div className="home-sidebar__dropdown-divider"></div>
-                  <button
-                    type="button"
-                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                    onClick={() => {
-                      setLoyaltyDropdownOpen(false);
-                    }}
-                  >
-                    일반 (LV.1)
-                  </button>
-                  <button
-                    type="button"
-                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                    onClick={() => {
-                      setLoyaltyDropdownOpen(false);
-                    }}
-                  >
-                    프렌즈 (LV.2)
-                  </button>
-                  <button
-                    type="button"
-                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                    onClick={() => {
-                      setLoyaltyDropdownOpen(false);
-                    }}
-                  >
-                    VIP (LV.3)
-                  </button>
-                  <button
-                    type="button"
-                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
-                    onClick={() => {
-                      setLoyaltyDropdownOpen(false);
-                    }}
-                  >
-                    로열 (LV.4)
-                  </button>
                 </div>
               )}
             </div>
@@ -906,11 +869,11 @@ function HomeHero({
             {/* 소셜 미디어 */}
             <div className="home-sidebar__social">
               <a href="https://instagram.com/our-mind" target="_blank" rel="noopener noreferrer" className="home-sidebar__social-link">
-                @our-mind
+                @neko-noble
               </a>
             </div>
 
-            {/* 인스타그램 썸네일 그리드 */}
+            {/* 인스타그램 썸네일 그리드 
             <div className="home-sidebar__instagram">
               <div className="home-sidebar__instagram-grid">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -923,9 +886,9 @@ function HomeHero({
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
 
-            {/* 검색 바 */}
+            {/* 검색 바 
             <div className="home-sidebar__search">
               <form className="home-sidebar__search-form" onSubmit={handleSearch}>
                 <input
@@ -940,7 +903,7 @@ function HomeHero({
                   <Search size={16} />
                 </button>
               </form>
-            </div>
+            </div>*/}
           </div>
         </aside>
 
