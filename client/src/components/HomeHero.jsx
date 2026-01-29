@@ -727,11 +727,7 @@ function HomeHero({
         {/* 좌측 사이드바 */}
         <aside className="home-sidebar">
           <div className="home-sidebar__content">
-            {/* 스토어 이름 */}
-            <div className="home-sidebar__store-name">
-              <div className="home-sidebar__divider"></div>
-              <div className="home-sidebar__divider"></div>
-            </div>
+            
 
             {/* 네비게이션 링크 */}
             <nav className="home-sidebar__nav">
@@ -780,14 +776,15 @@ function HomeHero({
             <div className="home-sidebar__section">
               <button
                 type="button"
-                className="home-sidebar__section-button"
+                className="home-sidebar__nav-link"
                 onClick={() => {
                   setCategoryDropdownOpen(!categoryDropdownOpen);
                   setLoyaltyDropdownOpen(false);
                 }}
                 aria-expanded={categoryDropdownOpen}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
               >
-                <span>카테고리</span>
+                <span>CATEGORY</span>
                 <ChevronDown 
                   size={16} 
                   style={{ 
@@ -833,14 +830,15 @@ function HomeHero({
             <div className="home-sidebar__section">
               <button
                 type="button"
-                className="home-sidebar__section-button home-sidebar__section-button--loyalty"
+                className="home-sidebar__nav-link"
                 onClick={() => {
                   setLoyaltyDropdownOpen(!loyaltyDropdownOpen);
                   setCategoryDropdownOpen(false);
                 }}
                 aria-expanded={loyaltyDropdownOpen}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
               >
-                <span>로열관</span>
+                <span>ROYAL</span>
                 <ChevronDown 
                   size={16} 
                   style={{ 
