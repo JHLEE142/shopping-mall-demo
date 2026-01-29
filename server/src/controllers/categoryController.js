@@ -3,37 +3,47 @@ const Product = require('../models/product');
 const { successResponse, errorResponse, paginatedResponse } = require('../utils/response');
 const { calculatePagination } = require('../utils/helpers');
 
-// 카테고리 목록 조회
+// 카테고리 목록 조회 (상품 데이터 기반 동적 생성)
 const getCategories = async (req, res) => {
   try {
     const { parentId, includeProductCount } = req.query;
-    const query = { isActive: true };
     
-    if (parentId) {
-      query.parentId = parentId;
-    } else {
-      query.parentId = null; // 최상위 카테고리
-    }
+    // 상품 데이터에서 고유한 카테고리 추출
+    // categoryMain (대분류) 기준으로 카테고리 목록 생성
+    const distinctCategories = await Product.distinct('categoryMain', {
+      categoryMain: { $exists: true, $ne: null, $ne: '' }
+    });
 
-    const categories = await Category.find(query)
-      .sort({ order: 1, createdAt: 1 });
+    // 각 카테고리별로 상품 수 계산 및 카테고리 객체 생성
+    const categories = await Promise.all(
+      distinctCategories.map(async (categoryName) => {
+        const productCount = await Product.countDocuments({ 
+          categoryMain: categoryName
+        });
 
-    // 상품 수 포함 여부
-    if (includeProductCount === 'true') {
-      for (const category of categories) {
-        try {
-          // category 필드가 문자열인 경우 (카테고리 이름으로 매칭)
-          const productCount = await Product.countDocuments({ 
-            category: category.name
-          });
-          category.productCount = productCount;
-        } catch (countError) {
-          // 상품 수 계산 실패 시 0으로 설정
-          console.error(`카테고리 ${category.name}의 상품 수 계산 실패:`, countError);
-          category.productCount = 0;
-        }
-      }
-    }
+        // 카테고리 코드 생성 (이름 기반)
+        const code = categoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-가-힣]/g, '');
+        const slug = code;
+
+        return {
+          _id: code, // 임시 ID로 code 사용
+          name: categoryName,
+          slug: slug,
+          code: code,
+          level: 1,
+          productCount: includeProductCount === 'true' ? productCount : undefined,
+          isActive: true,
+          order: 0,
+        };
+      })
+    );
+
+    // 상품 수가 많은 순으로 정렬
+    categories.sort((a, b) => {
+      const countA = a.productCount || 0;
+      const countB = b.productCount || 0;
+      return countB - countA;
+    });
 
     successResponse(res, { categories }, '카테고리 목록 조회 성공');
   } catch (error) {
@@ -340,82 +350,105 @@ const updateAllCategoryProductCounts = async (req, res) => {
   }
 };
 
-// 계층 구조 조회 (대분류 > 중분류 > 소분류)
+// 계층 구조 조회 (대분류 > 중분류 > 소분류) - 상품 데이터 기반
 const getCategoryHierarchy = async (req, res) => {
   try {
     const { includeProductCount } = req.query;
 
-    // 모든 활성 카테고리 조회
-    const allCategories = await Category.find({ 
-      isActive: { $ne: false }
-    }).sort({ order: 1, createdAt: 1 });
-
-    // level 필드가 없는 경우 parentId를 기준으로 level 자동 설정
-    const categoriesWithLevel = allCategories.map(cat => {
-      const catObj = cat.toObject();
-      if (!catObj.level) {
-        // parentId가 null이면 대분류 (level 1)
-        if (!catObj.parentId) {
-          catObj.level = 1;
-        } else {
-          // parentId가 있으면 부모의 level + 1
-          const parent = allCategories.find(c => c._id.toString() === catObj.parentId?.toString());
-          if (parent) {
-            const parentLevel = parent.level || (!parent.parentId ? 1 : 2);
-            catObj.level = Math.min(parentLevel + 1, 3); // 최대 3단계
-          } else {
-            catObj.level = 2; // 부모를 찾을 수 없으면 중분류로 간주
-          }
-        }
-      }
-      return catObj;
+    // 상품 데이터에서 고유한 카테고리 추출
+    // 대분류 (categoryMain) 추출
+    const mainCategories = await Product.distinct('categoryMain', {
+      categoryMain: { $exists: true, $ne: null, $ne: '' }
     });
 
-    // level별로 분류
-    const mainCategories = categoriesWithLevel.filter(cat => cat.level === 1);
-    const midCategories = categoriesWithLevel.filter(cat => cat.level === 2);
-    const subCategories = categoriesWithLevel.filter(cat => cat.level === 3);
-
-    // 상품 수 포함 여부
-    if (includeProductCount === 'true') {
-      for (const category of [...mainCategories, ...midCategories, ...subCategories]) {
-        try {
-          const productCount = await Product.countDocuments({ 
-            category: category.name
-          });
-          category.productCount = productCount;
-        } catch (countError) {
-          console.error(`카테고리 ${category.name}의 상품 수 계산 실패:`, countError);
-          category.productCount = 0;
-        }
-      }
-    }
-
-    // 계층 구조로 구성 (children 사용)
-    const hierarchy = mainCategories.map(mainCat => {
-      const mainIdStr = mainCat._id?.toString() || mainCat._id;
-      const midCats = midCategories
-        .filter(midCat => {
-          const parentId = midCat.parentId?.toString() || midCat.parentId;
-          return parentId === mainIdStr;
-        })
-        .map(midCat => {
-          const midIdStr = midCat._id?.toString() || midCat._id;
-          const subCats = subCategories
-            .filter(subCat => {
-              const parentId = subCat.parentId?.toString() || subCat.parentId;
-              return parentId === midIdStr;
-            });
-          return {
-            ...midCat,
-            children: subCats  // subCategories -> children으로 변경
-          };
+    // 계층 구조 생성
+    const hierarchy = await Promise.all(
+      mainCategories.map(async (mainName) => {
+        // 중분류 (categoryMid) 추출
+        const midCategories = await Product.distinct('categoryMid', {
+          categoryMain: mainName,
+          categoryMid: { $exists: true, $ne: null, $ne: '' }
         });
 
-      return {
-        ...mainCat,
-        children: midCats  // midCategories -> children으로 변경
-      };
+        const midCats = await Promise.all(
+          midCategories.map(async (midName) => {
+            // 소분류 (categorySub) 추출
+            const subCategories = await Product.distinct('categorySub', {
+              categoryMain: mainName,
+              categoryMid: midName,
+              categorySub: { $exists: true, $ne: null, $ne: '' }
+            });
+
+            const subCats = await Promise.all(
+              subCategories.map(async (subName) => {
+                const productCount = includeProductCount === 'true'
+                  ? await Product.countDocuments({
+                      categoryMain: mainName,
+                      categoryMid: midName,
+                      categorySub: subName
+                    })
+                  : undefined;
+
+                const code = `${mainName}-${midName}-${subName}`.toLowerCase()
+                  .replace(/\s+/g, '-').replace(/[^a-z0-9-가-힣]/g, '');
+
+                return {
+                  _id: code,
+                  name: subName,
+                  code: code,
+                  level: 3,
+                  productCount: productCount,
+                  isActive: true,
+                };
+              })
+            );
+
+            const midProductCount = includeProductCount === 'true'
+              ? await Product.countDocuments({
+                  categoryMain: mainName,
+                  categoryMid: midName
+                })
+              : undefined;
+
+            const midCode = `${mainName}-${midName}`.toLowerCase()
+              .replace(/\s+/g, '-').replace(/[^a-z0-9-가-힣]/g, '');
+
+            return {
+              _id: midCode,
+              name: midName,
+              code: midCode,
+              level: 2,
+              productCount: midProductCount,
+              isActive: true,
+              children: subCats,
+            };
+          })
+        );
+
+        const mainProductCount = includeProductCount === 'true'
+          ? await Product.countDocuments({ categoryMain: mainName })
+          : undefined;
+
+        const mainCode = mainName.toLowerCase()
+          .replace(/\s+/g, '-').replace(/[^a-z0-9-가-힣]/g, '');
+
+        return {
+          _id: mainCode,
+          name: mainName,
+          code: mainCode,
+          level: 1,
+          productCount: mainProductCount,
+          isActive: true,
+          children: midCats,
+        };
+      })
+    );
+
+    // 상품 수가 많은 순으로 정렬
+    hierarchy.sort((a, b) => {
+      const countA = a.productCount || 0;
+      const countB = b.productCount || 0;
+      return countB - countA;
     });
 
     successResponse(res, { hierarchy }, '계층 구조 카테고리 조회 성공');

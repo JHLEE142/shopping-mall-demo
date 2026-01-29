@@ -221,57 +221,14 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
         // 검색 중 메시지 제거 (검색 결과가 도착했으므로)
         const filteredPrev = prev.filter(msg => !msg.isSearching);
         
-        // TOOL_CALL 파싱 및 실행
-        const toolCallPatterns = [
-          /\*\*TOOL_CALL\*\*:\s*(\w+)\s*\(([^)]*)\)/i,
-          /TOOL_CALL:\s*(\w+)\s*\(([^)]*)\)/i,
-          /\[TOOL_CALL\]\s*(\w+)\s*\(([^)]*)\)/i,
-        ];
-        
-        let toolCallMatch = null;
-        for (const pattern of toolCallPatterns) {
-          toolCallMatch = botResponse.match(pattern);
-          if (toolCallMatch) break;
-        }
-        
-        if (toolCallMatch) {
-          const toolName = toolCallMatch[1].toLowerCase();
-          const toolParams = toolCallMatch[2];
-          
-          if (toolName === '로그인' || toolName === 'login') {
-            // 로그인 TOOL_CALL 파싱: 로그인 (email, password)
-            // 파라미터 추출 (쉼표로 구분, 따옴표 제거)
-            const params = toolParams
-              .split(',')
-              .map(p => p.trim().replace(/^["'`]|["'`]$/g, ''))
-              .filter(p => p.length > 0);
-            
-            if (params.length >= 2) {
-              const loginData = {
-                email: params[0].trim(),
-                password: params[1].trim(),
-              };
-              
-              // 이메일 형식 검증
-              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-              if (emailRegex.test(loginData.email) && loginData.password.length > 0) {
-                localStorage.setItem('loginFormData', JSON.stringify(loginData));
-                localStorage.setItem('autoLoginTrigger', 'true');
-                
-                // 로그인 페이지로 이동하거나 자동 로그인 실행
-                if (currentView === 'login') {
-                  // 이미 로그인 페이지에 있으므로 자동 로그인 트리거만 설정
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('autoLoginTrigger'));
-                  }, 100);
-                } else if (onMoveToLogin) {
-                  onMoveToLogin();
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('autoLoginTrigger'));
-                  }, 500);
-                }
-              }
-            }
+        // 액션 처리 (서버에서 반환된 action 파라미터 확인)
+        if (response.action === 'navigate') {
+          if (response.actionParams && response.actionParams.page === 'login' && onMoveToLogin) {
+            onMoveToLogin();
+            setIsOpen(false);
+          } else if (response.actionParams && response.actionParams.page === 'signup' && onMoveToSignUp) {
+            onMoveToSignUp();
+            setIsOpen(false);
           }
         }
         
@@ -286,31 +243,8 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
         };
         const newMessages = [...filteredPrev, botMessage];
         
-        // 사용자 메시지에서 장바구니 추가 의도 파악
-        if (isLoggedIn && currentInput && productCards && productCards.length > 0) {
-          const addToCartPatterns = [
-            /(.+?)\s*(?:장바구니|장바구니에|담아|담아줘|담기|추가|추가해줘)/i,
-            /(?:장바구니|장바구니에|담아|담아줘|담기|추가|추가해줘)\s*(.+?)/i,
-          ];
-          
-          for (const pattern of addToCartPatterns) {
-            const match = currentInput.match(pattern);
-            if (match && match[1]) {
-              const productName = match[1].trim();
-              // 상품 카드에서 해당 상품 찾기
-              const matchedProduct = productCards.find(p => 
-                p.name && p.name.toLowerCase().includes(productName.toLowerCase())
-              );
-              if (matchedProduct) {
-                // 장바구니에 추가
-                setTimeout(() => {
-                  handleAddToCart(matchedProduct.id || matchedProduct._id);
-                }, 500);
-                break;
-              }
-            }
-          }
-        }
+        // 서버에서 장바구니 추가 액션이 처리되었는지 확인
+        // (서버에서 이미 처리되었으므로 클라이언트에서는 추가 처리 불필요)
         
         // AI 응답 및 사용자 메시지에서 회원가입 정보 추출 (이름, 이메일, 주소 등)
         if (currentView === 'signup' && (botResponse || currentInput)) {

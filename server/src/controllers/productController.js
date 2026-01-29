@@ -234,6 +234,31 @@ async function createProduct(req, res, next) {
       payload.categoryMain = payload.categoryMain.trim();
       payload.categoryMid = payload.categoryMid ? payload.categoryMid.trim() : null;
       payload.categorySub = payload.categorySub ? payload.categorySub.trim() : null;
+      
+      // 카테고리 경로 텍스트 생성
+      const categoryParts = [];
+      if (payload.categoryMain) categoryParts.push(payload.categoryMain);
+      if (payload.categoryMid) categoryParts.push(payload.categoryMid);
+      if (payload.categorySub) categoryParts.push(payload.categorySub);
+      const categoryPathText = categoryParts.join(' > ');
+      
+      // 카테고리 자동 생성 (categoryId가 없으면)
+      if (!payload.categoryId && categoryPathText) {
+        try {
+          const categoryResult = await upsertCategoryFromPath(categoryPathText);
+          payload.categoryId = categoryResult.category._id;
+          payload.categoryPathIds = categoryResult.pathIds;
+          payload.categoryPathText = categoryPathText;
+          console.log(`✅ [CREATE PRODUCT] Auto-created category: ${categoryPathText} (ID: ${payload.categoryId})`);
+        } catch (categoryError) {
+          console.error(`❌ [CREATE PRODUCT] Failed to auto-create category: ${categoryError.message}`);
+          // 카테고리 생성 실패해도 상품 생성은 계속 진행 (categoryId는 필수이므로 에러 발생 가능)
+          return res.status(400).json({ 
+            message: `카테고리 생성 실패: ${categoryError.message}` 
+          });
+        }
+      }
+      
       // category 필드는 최종 선택된 카테고리 (소분류 > 중분류 > 대분류)
       if (!payload.category) {
         payload.category = payload.categorySub || payload.categoryMid || payload.categoryMain;
@@ -243,6 +268,22 @@ async function createProduct(req, res, next) {
       payload.categoryMain = payload.category.trim();
       payload.categoryMid = null;
       payload.categorySub = null;
+      
+      // 카테고리 자동 생성
+      if (!payload.categoryId && payload.categoryMain) {
+        try {
+          const categoryResult = await upsertCategoryFromPath(payload.categoryMain);
+          payload.categoryId = categoryResult.category._id;
+          payload.categoryPathIds = categoryResult.pathIds;
+          payload.categoryPathText = payload.categoryMain;
+          console.log(`✅ [CREATE PRODUCT] Auto-created category: ${payload.categoryMain} (ID: ${payload.categoryId})`);
+        } catch (categoryError) {
+          console.error(`❌ [CREATE PRODUCT] Failed to auto-create category: ${categoryError.message}`);
+          return res.status(400).json({ 
+            message: `카테고리 생성 실패: ${categoryError.message}` 
+          });
+        }
+      }
     }
     
     // 할인율과 원래 가격 처리

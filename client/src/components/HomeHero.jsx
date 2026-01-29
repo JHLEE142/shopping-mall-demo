@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Heart, ShoppingBag, Star, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Heart, ShoppingBag, Star, ChevronLeft, ChevronRight, Search, ChevronDown } from 'lucide-react';
 import { fetchProducts, searchProducts as searchProductsAPI } from '../services/productService';
 import { fetchCategories } from '../services/categoryService';
 import { addWishlistItem, removeWishlistItem, checkWishlistItems } from '../services/wishlistService';
@@ -150,6 +150,7 @@ function HomeHero({
   onMoveToLogin,
   onMoveToLookbook = () => {},
   onMoveToNew = () => {},
+  onMoveToLoyaltyHall = () => {},
   onViewProduct = () => {},
   onWishlistChange = () => {},
   initialCategory = null,
@@ -192,6 +193,8 @@ function HomeHero({
   const [togglingWishlist, setTogglingWishlist] = useState(new Set());
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [loyaltyDropdownOpen, setLoyaltyDropdownOpen] = useState(false);
 
   // 페이지 로드 시 스크롤 복원 제어
   useEffect(() => {
@@ -718,6 +721,141 @@ function HomeHero({
           <ChevronRight size={24} />
         </button>
       </section>
+
+      {/* 좌측 사이드바 (카테고리 & 로열관) */}
+      <div className="home-sidebar">
+        <div className="home-sidebar__container">
+          {/* 카테고리 드롭다운 */}
+          <div className="home-sidebar__dropdown">
+            <button
+              type="button"
+              className="home-sidebar__dropdown-button"
+              onClick={() => {
+                setCategoryDropdownOpen(!categoryDropdownOpen);
+                setLoyaltyDropdownOpen(false);
+              }}
+              aria-expanded={categoryDropdownOpen}
+            >
+              <span>카테고리</span>
+              <ChevronDown 
+                size={16} 
+                style={{ 
+                  transform: categoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+                  transition: 'transform 0.2s' 
+                }} 
+              />
+            </button>
+            {categoryDropdownOpen && (
+              <div className="home-sidebar__dropdown-menu">
+                {categoriesLoading ? (
+                  <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loading">
+                    로딩 중...
+                  </div>
+                ) : categories.length > 0 ? (
+                  categories.map((category) => (
+                    <button
+                      key={category._id || category.code}
+                      type="button"
+                      className="home-sidebar__dropdown-item"
+                      onClick={() => {
+                        setCategoryFilter(category.name);
+                        setCategoryDropdownOpen(false);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {category.name}
+                      {category.productCount !== undefined && category.productCount > 0 && (
+                        <span className="home-sidebar__dropdown-count">({category.productCount})</span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--empty">
+                    카테고리가 없습니다
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 로열관 드롭다운 */}
+          <div className="home-sidebar__dropdown home-sidebar__dropdown--loyalty">
+            <button
+              type="button"
+              className="home-sidebar__dropdown-button home-sidebar__dropdown-button--loyalty"
+              onClick={() => {
+                setLoyaltyDropdownOpen(!loyaltyDropdownOpen);
+                setCategoryDropdownOpen(false);
+              }}
+              aria-expanded={loyaltyDropdownOpen}
+            >
+              <span>로열관</span>
+              <ChevronDown 
+                size={16} 
+                style={{ 
+                  transform: loyaltyDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+                  transition: 'transform 0.2s' 
+                }} 
+              />
+            </button>
+            {loyaltyDropdownOpen && (
+              <div className="home-sidebar__dropdown-menu home-sidebar__dropdown-menu--loyalty">
+                <button
+                  type="button"
+                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                  onClick={() => {
+                    setLoyaltyDropdownOpen(false);
+                    onMoveToLoyaltyHall();
+                  }}
+                >
+                  로열관 입고 예정 상품
+                </button>
+                <div className="home-sidebar__dropdown-divider"></div>
+                <button
+                  type="button"
+                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                  onClick={() => {
+                    setLoyaltyDropdownOpen(false);
+                    // 일반 회원 필터링 로직 (필요시 추가)
+                  }}
+                >
+                  일반 (LV.1)
+                </button>
+                <button
+                  type="button"
+                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                  onClick={() => {
+                    setLoyaltyDropdownOpen(false);
+                    // 프렌즈 필터링 로직 (필요시 추가)
+                  }}
+                >
+                  프렌즈 (LV.2)
+                </button>
+                <button
+                  type="button"
+                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                  onClick={() => {
+                    setLoyaltyDropdownOpen(false);
+                    // VIP 필터링 로직 (필요시 추가)
+                  }}
+                >
+                  VIP (LV.3)
+                </button>
+                <button
+                  type="button"
+                  className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                  onClick={() => {
+                    setLoyaltyDropdownOpen(false);
+                    // 로열 필터링 로직 (필요시 추가)
+                  }}
+                >
+                  로열 (LV.4)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* 테마별 섹션 (검색/필터가 없고 전체상품 모드가 아닐 때만 표시) */}
       {!submittedSearchQuery && !categoryFilter && !showAllProducts ? (

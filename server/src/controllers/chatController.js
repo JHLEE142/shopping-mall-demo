@@ -8,6 +8,8 @@ const ChatConfig = require('../config/chatConfig');
 const ChatLogger = require('../utils/chatLogger');
 const { randomUUID } = require('crypto');
 const { generateSearchQueries, expandSynonyms } = require('../utils/searchExpander');
+const localChatModel = require('../utils/localChatModel');
+const Cart = require('../models/cart');
 
 
 /**
@@ -155,14 +157,8 @@ async function sendChatMessage(req, res) {
       });
     }
 
-    // API 키 검증
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      ChatLogger.error('OpenAI API 키 없음', new Error('API key not set'));
-      return res.status(400).json({
-        message: 'OpenAI API 키가 서버에 설정되지 않았습니다. 서버 관리자에게 문의하세요.',
-      });
-    }
+    // 로컬 모델 사용 (OpenAI API 대신)
+    // API 키 검증은 더 이상 필요 없음
 
     // 대화 컨텍스트 관리
     conversation = await getOrCreateConversation(userId, conversationId);
@@ -327,91 +323,128 @@ async function sendChatMessage(req, res) {
       });
     }
 
-    // 검색 결과를 시스템 프롬프트에 추가
-    let enhancedSystemPrompt = systemPrompt;
-    if (searchKeywords && searchKeywords.length > 0) {
-      if (searchResults.length === 0) {
-        // 검색 의도가 있지만 결과가 없는 경우
-        enhancedSystemPrompt += `\n\n**중요**: 검색을 수행했지만 결과가 없습니다. "잠시만 기다려 주세요" 같은 메시지 없이 바로 결과가 없다는 것을 알려주고, 다른 검색어를 제안하세요.`;
-      } else {
-        // 검색 결과가 있는 경우 (이미 위에서 반환됨, 여기 도달하지 않음)
-        enhancedSystemPrompt += `\n\n**중요**: 검색 결과가 있습니다. 사용자에게 검색 결과를 보여주고 어떤 제품이 마음에 드는지 물어보세요.`;
+    // 로컬 모델을 사용하여 응답 생성
+    const localModelResponse = await localChatModel.processMessage(lastUserMessageText, {
+      isLoggedIn,
+      currentView,
+      userId,
+    });
+
+    let aiMessage = localModelResponse.answer;
+    const action = localModelResponse.action;
+    const actionParams = localModelResponse.params || {};
+
+    // 액션 처리
+    if (action === 'navigate') {
+      // 로그인/회원가입 페이지 이동
+      if (actionParams.page === 'login') {
+        return res.json({
+          message: '로그인 페이지로 이동해드리겠습니다.',
+          response: '로그인 페이지로 이동해드리겠습니다.',
+          action: 'navigate',
+          actionParams: { page: 'login' },
+          conversationId: conversation?.conversationId,
+        });
+      } else if (actionParams.page === 'signup') {
+        return res.json({
+          message: '회원가입 페이지로 이동해드리겠습니다.',
+          response: '회원가입 페이지로 이동해드리겠습니다.',
+          action: 'navigate',
+          actionParams: { page: 'signup' },
+          conversationId: conversation?.conversationId,
+        });
       }
-    }
+    } else if (action === 'addToCart') {
+      // 장바구니 담기
+      if (!isLoggedIn || !req.user) {
+        return res.json({
+          message: '장바구니 기능은 로그인 후 이용 가능합니다. 로그인 페이지로 이동하시겠어요?',
+          response: '장바구니 기능은 로그인 후 이용 가능합니다. 로그인 페이지로 이동하시겠어요?',
+          action: 'navigate',
+          actionParams: { page: 'login' },
+          conversationId: conversation?.conversationId,
+        });
+      }
 
-    // 대화 히스토리를 메시지에 포함 (최근 N개만)
-    const contextMessages = conversationHistory.length > 0 
-      ? conversationHistory 
-      : messages.slice(-ChatConfig.CONVERSATION.CONTEXT_WINDOW_SIZE);
+      // 상품명으로 상품 찾기
+      let product = null;
+      if (actionParams.productName) {
+        product = await Product.findOne({
+          name: { $regex: actionParams.productName, $options: 'i' }
+        });
+      } else if (actionParams.productId) {
+        product = await Product.findById(actionParams.productId);
+      }
 
-    // OpenAI API 호출 (재시도 로직 포함)
-    let response;
-    let attempts = 0;
-    const maxAttempts = ChatConfig.ERROR.RETRY_ATTEMPTS + 1;
-    
-    while (attempts < maxAttempts) {
+      if (!product) {
+        return res.json({
+          message: '상품을 찾을 수 없습니다. 상품명을 정확히 알려주세요.',
+          response: '상품을 찾을 수 없습니다. 상품명을 정확히 알려주세요.',
+          conversationId: conversation?.conversationId,
+        });
+      }
+
+      // 장바구니에 추가
       try {
-        const aiStartTime = Date.now();
-        response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: ChatConfig.AI.MODEL,
-            messages: [
-              { role: 'system', content: enhancedSystemPrompt },
-              ...contextMessages,
-            ],
-            temperature: ChatConfig.AI.TEMPERATURE,
-            max_tokens: ChatConfig.AI.MAX_TOKENS,
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: ChatConfig.AI.TIMEOUT,
-          }
-        );
-        
-        const aiResponseTime = Date.now() - aiStartTime;
-        ChatLogger.aiResponse(response.data.choices[0]?.message?.content || '', aiResponseTime);
-        break; // 성공하면 루프 종료
-      } catch (error) {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          throw error; // 최대 재시도 횟수 초과 시 에러 throw
+        let cart = await Cart.findOne({ user: req.user._id, status: 'active' });
+        if (!cart) {
+          cart = new Cart({
+            user: req.user._id,
+            items: [],
+            status: 'active',
+          });
         }
-        // 재시도 전 대기
-        await new Promise(resolve => setTimeout(resolve, ChatConfig.ERROR.RETRY_DELAY * attempts));
-        ChatLogger.warn('AI API 재시도', { attempt: attempts, error: error.message });
+
+        const existingItem = cart.items.find(
+          item => item.product.toString() === product._id.toString()
+        );
+
+        if (existingItem) {
+          existingItem.quantity += (actionParams.quantity || 1);
+        } else {
+          cart.items.push({
+            product: product._id,
+            quantity: actionParams.quantity || 1,
+            priceSnapshot: product.priceSale || product.price,
+            selectedOptions: actionParams.selectedOptions || {},
+          });
+        }
+
+        cart.summary.subtotal = cart.items.reduce(
+          (sum, item) => sum + item.quantity * item.priceSnapshot,
+          0
+        );
+
+        await cart.save();
+
+        aiMessage = `${product.name}을(를) 장바구니에 추가했습니다.`;
+      } catch (error) {
+        ChatLogger.error('장바구니 추가 오류', error);
+        aiMessage = '장바구니 추가 중 오류가 발생했습니다.';
       }
     }
 
-    let aiMessage = response.data.choices[0]?.message?.content;
-
-    if (!aiMessage) {
-      return res.status(500).json({
-        message: 'AI 응답을 받을 수 없습니다.',
-      });
-    }
-
-    // PRODUCT_CARDS 파싱
+    // 검색 결과가 있으면 상품 카드로 표시
     let productCards = null;
-    const productCardsMatch = aiMessage.match(/\*\*PRODUCT_CARDS\*\*:\s*(\[.*?\])/s);
-    if (productCardsMatch) {
-      try {
-        productCards = JSON.parse(productCardsMatch[1]);
-        // PRODUCT_CARDS 부분을 응답에서 제거 (텍스트만 남김)
-        aiMessage = aiMessage.replace(/\*\*PRODUCT_CARDS\*\*:\s*\[.*?\]/s, '').trim();
-      } catch (parseError) {
-        console.error('[Chat] PRODUCT_CARDS 파싱 오류:', parseError);
-      }
-    } else if (searchResults.length > 0) {
-      // AI가 PRODUCT_CARDS 형식으로 응답하지 않았지만 검색 결과가 있으면 직접 사용
+    if (searchResults.length > 0) {
       productCards = searchResults;
+    } else if (action === 'search' && actionParams.query) {
+      // 검색 액션이 있지만 결과가 없는 경우, 다시 검색 시도
+      const searchQuery = actionParams.query;
+      try {
+        const searchResultsData = await atlasMultiFieldSearch(searchQuery, 40);
+        productCards = searchResultsData.map(result => ({
+          id: result.product._id.toString(),
+          name: result.product.name,
+          price: result.product.priceSale || result.product.price,
+          image: result.product.image || result.product.gallery?.[0] || '',
+          description: result.product.description || '',
+          score: result.score || 0,
+        }));
+      } catch (error) {
+        ChatLogger.error('검색 오류', error);
+      }
     }
-
-    // 응답에서 역할/함수 설명 제거
-    aiMessage = cleanAIResponse(aiMessage);
 
     // 대화 히스토리에 저장
     if (conversation) {
@@ -441,31 +474,9 @@ async function sendChatMessage(req, res) {
       conversationId: conversation?.conversationId,
     });
 
-    // OpenAI API 에러 처리
-    if (error.response?.status === 401) {
-      return res.status(401).json({
-        message: 'OpenAI API 키가 유효하지 않습니다. API 키를 확인해주세요.',
-        conversationId: conversation?.conversationId,
-      });
-    } else if (error.response?.status === 429) {
-      return res.status(429).json({
-        message: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
-        conversationId: conversation?.conversationId,
-      });
-    } else if (error.response?.status === 500) {
-      return res.status(500).json({
-        message: 'OpenAI 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-        conversationId: conversation?.conversationId,
-      });
-    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      return res.status(504).json({
-        message: '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.',
-        conversationId: conversation?.conversationId,
-      });
-    }
-
+    // 에러 처리
     res.status(500).json({
-      message: error.response?.data?.error?.message || '채팅 메시지 처리 중 오류가 발생했습니다.',
+      message: error.message || '채팅 메시지 처리 중 오류가 발생했습니다.',
       conversationId: conversation?.conversationId,
     });
   }

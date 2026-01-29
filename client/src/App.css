@@ -1397,6 +1397,173 @@ body {
   right: clamp(1rem, 4vw, 2.5rem);
 }
 
+/* 홈 사이드바 스타일 (흑백) */
+.home-sidebar {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 1.5rem) clamp(1rem, 3vw, 2rem);
+  background: #f5f7fb;
+}
+
+.home-sidebar__container {
+  max-width: min(1080px, 100%);
+  width: 100%;
+  display: flex;
+  gap: clamp(0.75rem, 2vw, 1rem);
+  flex-wrap: wrap;
+}
+
+.home-sidebar__dropdown {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: clamp(140px, 20vw, 200px);
+}
+
+.home-sidebar__dropdown-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(0.75rem, 2vw, 1rem) clamp(1rem, 2.5vw, 1.25rem);
+  background: #ffffff;
+  border: 1px solid #111827;
+  border-radius: clamp(8px, 1.5vw, 12px);
+  color: #111827;
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+.home-sidebar__dropdown-button:hover {
+  background: #111827;
+  color: #ffffff;
+}
+
+.home-sidebar__dropdown-button:active {
+  transform: scale(0.98);
+}
+
+.home-sidebar__dropdown-button span {
+  flex: 1;
+  text-align: left;
+}
+
+.home-sidebar__dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #111827;
+  border-radius: clamp(8px, 1.5vw, 12px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  max-height: clamp(200px, 50vh, 400px);
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.home-sidebar__dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(0.625rem, 1.5vw, 0.875rem) clamp(1rem, 2.5vw, 1.25rem);
+  background: #ffffff;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+  font-size: clamp(0.8125rem, 1.75vw, 0.9375rem);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+.home-sidebar__dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.home-sidebar__dropdown-item:hover {
+  background: #111827;
+  color: #ffffff;
+}
+
+.home-sidebar__dropdown-item:active {
+  background: #374151;
+  color: #ffffff;
+}
+
+.home-sidebar__dropdown-item--loading,
+.home-sidebar__dropdown-item--empty {
+  color: #6b7280;
+  cursor: default;
+  font-weight: 400;
+}
+
+.home-sidebar__dropdown-item--loading:hover,
+.home-sidebar__dropdown-item--empty:hover {
+  background: #ffffff;
+  color: #6b7280;
+}
+
+.home-sidebar__dropdown-count {
+  font-size: clamp(0.75rem, 1.5vw, 0.8125rem);
+  color: #6b7280;
+  font-weight: 400;
+  margin-left: auto;
+  padding-left: clamp(0.5rem, 1.5vw, 0.75rem);
+}
+
+.home-sidebar__dropdown-item:hover .home-sidebar__dropdown-count {
+  color: #ffffff;
+}
+
+/* 로열관 드롭다운 블랙 스타일 */
+.home-sidebar__dropdown--loyalty .home-sidebar__dropdown-button--loyalty {
+  background: #1a1a1a;
+  border-color: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+}
+
+.home-sidebar__dropdown--loyalty .home-sidebar__dropdown-button--loyalty:hover {
+  background: #2a2a2a;
+  border-color: rgba(255, 215, 0, 0.5);
+  color: #ffd700;
+}
+
+.home-sidebar__dropdown-menu--loyalty {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.home-sidebar__dropdown-item--loyalty {
+  background: #1a1a1a;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+}
+
+.home-sidebar__dropdown-item--loyalty:hover {
+  background: #2a2a2a;
+  color: #ffd700;
+}
+
+.home-sidebar__dropdown-item--loyalty:active {
+  background: #333333;
+  color: #ffd700;
+}
+
+.home-sidebar__dropdown-divider {
+  height: 1px;
+  background: rgba(255, 215, 0, 0.2);
+  margin: clamp(0.25rem, 1vw, 0.5rem) 0;
+}
+
 /* 모바일 프레임 스타일 */
 .mobile-frame {
   width: 100%;
@@ -7495,6 +7662,25 @@ body {
     min-height: 60px;
     padding: 0.75rem 0.875rem;
   }
+
+  /* 홈 사이드바 모바일 스타일 */
+  .home-sidebar {
+    padding: clamp(0.75rem, 2vw, 1rem) clamp(0.75rem, 2vw, 1rem);
+  }
+
+  .home-sidebar__container {
+    flex-direction: column;
+    gap: clamp(0.5rem, 1.5vw, 0.75rem);
+  }
+
+  .home-sidebar__dropdown {
+    min-width: 100%;
+  }
+
+  .home-sidebar__dropdown-menu {
+    max-height: clamp(150px, 40vh, 300px);
+  }
+}
 
   .category-button__name {
     font-size: 0.8125rem;

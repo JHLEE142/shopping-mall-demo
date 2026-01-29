@@ -35,6 +35,7 @@ import NoticePage from './components/NoticePage';
 import RecentlyViewedProductsPage from './components/RecentlyViewedProductsPage';
 import NewArrivalsPage from './components/NewArrivalsPage';
 import AboutPage from './components/AboutPage';
+import LoyaltyHallPage from './components/LoyaltyHallPage';
 import FaqPage from './components/FaqPage';
 import ReviewBoardPage from './components/ReviewBoardPage';
 import DeliveryInquiryPage from './components/DeliveryInquiryPage';
@@ -98,6 +99,7 @@ function App() {
       'terms',
       'privacy',
       'marketing',
+      'loyalty-hall',
     ];
     return validViews.includes(view) ? view : 'home';
   };
@@ -1637,6 +1639,9 @@ function App() {
     case 'marketing':
       content = <MarketingPolicyPage onBack={() => setView('signup')} />;
       break;
+    case 'loyalty-hall':
+      content = <LoyaltyHallPage onBack={() => setView('home')} />;
+      break;
     case 'notifications':
       content = <NotificationCenterPage onBack={() => setView('mypage')} />;
       break;
@@ -1668,6 +1673,7 @@ function App() {
           initialScrollY={homeInitialScrollY}
           onCatalogStateChange={handleCatalogStateChange}
           onCategoryFiltered={() => setSelectedCategory(null)}
+          onMoveToLoyaltyHall={() => setView('loyalty-hall')}
         />
       );
       break;
