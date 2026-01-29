@@ -1416,6 +1416,17 @@ body {
   height: fit-content;
   max-height: calc(100vh - clamp(4rem, 8vw, 6rem));
   overflow-y: auto;
+  overflow-x: hidden;
+  /* 스크롤바 숨기기 (스크롤 기능은 유지) */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 웹킷 브라우저용 스크롤바 숨기기 */
+.home-sidebar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .home-sidebar__content {
@@ -1751,6 +1762,71 @@ body {
   height: 1px;
   background: rgba(255, 215, 0, 0.2);
   margin: clamp(0.25rem, 1vw, 0.5rem) 0;
+}
+
+/* 사이드바 반응형 스타일 */
+@media (max-width: 1024px) {
+  .home-sidebar {
+    flex: 0 0 clamp(200px, 18vw, 250px);
+    max-height: calc(100vh - clamp(3rem, 6vw, 5rem));
+  }
+  
+  .home-sidebar__content {
+    gap: clamp(1rem, 2vw, 1.5rem);
+  }
+  
+  .home-sidebar__nav-item {
+    padding: clamp(0.625rem, 1.2vw, 0.875rem) clamp(0.875rem, 1.8vw, 1rem);
+    font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  }
+}
+
+@media (max-width: 768px) {
+  .home-main-layout {
+    flex-direction: column;
+    gap: clamp(1.5rem, 3vw, 2rem);
+    padding: clamp(1.5rem, 3vw, 2rem) clamp(1rem, 2vw, 1.5rem);
+  }
+  
+  .home-sidebar {
+    flex: 1 1 auto;
+    position: relative;
+    top: 0;
+    width: 100%;
+    max-height: none;
+    overflow-y: visible;
+  }
+  
+  .home-sidebar__content {
+    gap: clamp(1rem, 2vw, 1.5rem);
+  }
+  
+  .home-sidebar__nav {
+    border-radius: clamp(6px, 1.2vw, 10px);
+  }
+  
+  .home-sidebar__nav-item {
+    padding: clamp(0.75rem, 2vw, 1rem) clamp(1rem, 2.5vw, 1.25rem);
+    font-size: clamp(0.8125rem, 1.8vw, 0.9375rem);
+  }
+  
+  .home-sidebar__dropdown-menu {
+    position: static;
+    margin-top: 0.5rem;
+    border-radius: clamp(6px, 1.2vw, 10px);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-sidebar__nav-item {
+    padding: clamp(0.625rem, 1.5vw, 0.875rem) clamp(0.875rem, 2vw, 1rem);
+    font-size: clamp(0.75rem, 1.6vw, 0.875rem);
+  }
+  
+  .home-sidebar__dropdown-item {
+    padding: clamp(0.5rem, 1.2vw, 0.75rem) clamp(0.875rem, 2vw, 1rem);
+    font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+  }
 }
 
 /* 모바일 프레임 스타일 */
