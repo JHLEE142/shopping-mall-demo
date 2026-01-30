@@ -22,6 +22,7 @@ function TossPaymentWidget({
   const paymentMethodWidgetRef = useRef(null);
   const agreementWidgetRef = useRef(null);
   const tossPaymentsRef = useRef(null);
+  const widgetsRef = useRef(null); // widgets 인스턴스 저장
   const isInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -64,6 +65,9 @@ function TossPaymentWidget({
         const widgets = tossPayments.widgets({
           customerKey: ANONYMOUS,
         });
+        
+        // widgets 인스턴스를 ref에 저장하여 재사용
+        widgetsRef.current = widgets;
 
         // 결제 금액 설정
         await widgets.setAmount({
@@ -141,9 +145,17 @@ function TossPaymentWidget({
       }
 
       const orderId = generateOrderId();
-      const widgets = tossPaymentsRef.current.widgets({
-        customerKey: ANONYMOUS,
-      });
+      
+      // 저장된 widgets 인스턴스 사용 (새로 생성하지 않음)
+      const widgets = widgetsRef.current;
+      if (!widgets) {
+        const errorMsg = '결제 위젯이 초기화되지 않았습니다. 페이지를 새로고침해주세요.';
+        console.error('●▶결제 요청 실패 :', errorMsg);
+        setIsLoading(false);
+        const paymentError = new Error(errorMsg);
+        onPaymentError?.(paymentError);
+        return;
+      }
 
       // 결제 수단이 선택되었는지 확인 (이벤트 기반으로 확인)
       // ref와 state 모두 확인하여 더 안정적으로 처리
@@ -165,6 +177,9 @@ function TossPaymentWidget({
       } else if (hasSelectedPaymentMethod) {
         console.log('결제 진행 - 결제 수단 선택됨 (state 확인)');
       }
+
+      // 위젯이 결제 수단 선택 상태를 완전히 인식할 수 있도록 약간의 지연
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // 결제 수단이 선택되었을 때만 requestPayment 호출
       await widgets.requestPayment({
@@ -203,11 +218,8 @@ function TossPaymentWidget({
 
   // 금액이 변경되면 위젯 금액 업데이트
   useEffect(() => {
-    if (isReady && tossPaymentsRef.current && amount) {
-      const widgets = tossPaymentsRef.current.widgets({
-        customerKey: ANONYMOUS,
-      });
-      widgets.setAmount({
+    if (isReady && widgetsRef.current && amount) {
+      widgetsRef.current.setAmount({
         currency: 'KRW',
         value: amount,
       }).catch(err => {
