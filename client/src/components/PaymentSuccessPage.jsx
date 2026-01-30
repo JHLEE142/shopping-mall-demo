@@ -57,38 +57,74 @@ function PaymentSuccessPage({
           const orderInfo = JSON.parse(pendingOrderData);
           const { cart, formData, subtotal, shippingFee, total, couponDiscount, selectedCoupon, directOrderItem } = orderInfo;
 
+          // 서버가 요구하는 형식으로 items 변환
+          const items = (cart?.items || []).map((item) => {
+            const product = item.product || {};
+            const unitPrice = item.priceSnapshot || product.priceSale || product.price || 0;
+            const quantity = item.quantity || 1;
+            const regularPrice = product.price || unitPrice;
+            const lineDiscount = Math.max(regularPrice - unitPrice, 0) * quantity;
+            const lineTotal = unitPrice * quantity;
+
+            return {
+              product: product._id || product.id,
+              name: product.name || '상품명 없음',
+              sku: product.sku || product.code || '',
+              thumbnail: product.image || product.thumbnail || '',
+              options: item.options || {},
+              quantity: quantity,
+              unitPrice: unitPrice,
+              lineDiscount: lineDiscount,
+              lineTotal: lineTotal,
+            };
+          });
+
+          // summary 계산
+          const finalSubtotal = subtotal || items.reduce((sum, item) => sum + item.lineTotal, 0);
+          const finalShippingFee = shippingFee || 0;
+          const finalCouponDiscount = couponDiscount || 0;
+          const grandTotal = total || (finalSubtotal - finalCouponDiscount + finalShippingFee);
+
           // 주문 생성
           const orderPayload = {
-            items: (cart?.items || []).map((item) => ({
-              product: item.product?._id || item.product?.id,
-              quantity: item.quantity,
-              priceSnapshot: item.priceSnapshot || (item.product?.priceSale || item.product?.price),
-              options: item.options || {},
-            })),
-            shipping: {
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              address: {
-                city: formData.city,
-                state: formData.state,
-                postalCode: formData.postalCode,
-                address1: formData.address1,
-                address2: formData.address2,
-              },
-              notes: formData.notes,
-              scheduleEnabled: formData.scheduleEnabled,
+            items: items,
+            summary: {
+              currency: 'KRW',
+              subtotal: finalSubtotal,
+              discountTotal: finalCouponDiscount,
+              shippingFee: finalShippingFee,
+              grandTotal: grandTotal,
             },
+            shipping: {
+              address: {
+                name: formData.name || '',
+                phone: formData.phone || '',
+                postalCode: formData.postalCode || '',
+                address1: formData.address1 || '',
+                address2: formData.address2 || '',
+                city: formData.city || '',
+                state: formData.state || '',
+              },
+              request: formData.notes || '',
+            },
+            contact: {
+              phone: formData.phone || '',
+              email: formData.email || '',
+            },
+            guestName: formData.name || '',
+            guestEmail: formData.email || '',
+            notes: formData.notes || '',
             payment: {
               method: 'online',
               transactionId: paymentKey,
-              amount: total || amount,
+              amount: grandTotal,
               status: 'paid',
             },
-            coupon: selectedCoupon || null,
+            coupon: selectedCoupon ? { userCouponId: selectedCoupon } : null,
+            sourceCart: cart?._id || null,
           };
 
-          console.log('주문 생성 시작:', orderPayload);
+          console.log('주문 생성 시작:', JSON.stringify(orderPayload, null, 2));
           const createdOrder = await createOrderApi(orderPayload);
           console.log('주문 생성 성공:', createdOrder);
           
@@ -97,8 +133,15 @@ function PaymentSuccessPage({
           setStatus('success'); // 주문 생성 성공 시에만 success 상태로 변경
         } catch (e) {
           console.error('주문 생성 오류:', e);
+          console.error('주문 생성 오류 상세:', {
+            message: e.message,
+            status: e.status,
+            data: e.data,
+            stack: e.stack,
+          });
           // 주문 생성 실패 시 에러 상태로 유지
-          setError(`주문 생성 중 오류가 발생했습니다: ${e.message || '알 수 없는 오류'}. 결제는 완료되었으니 고객센터로 문의해주세요.`);
+          const errorMessage = e.data?.message || e.message || '알 수 없는 오류';
+          setError(`주문 생성 중 오류가 발생했습니다: ${errorMessage}. 결제는 완료되었으니 고객센터로 문의해주세요. (결제키: ${paymentKey})`);
           setStatus('error');
           return; // 에러 상태로 유지하고 함수 종료
         }
