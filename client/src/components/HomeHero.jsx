@@ -823,7 +823,7 @@ function HomeHero({
             </div>
 
             {/* 로열관 섹션 */}
-            <div className="home-sidebar__section">
+            <div className={`home-sidebar__section ${loyaltyDropdownOpen ? 'home-sidebar__section--expanded' : ''}`}>
               <button
                 type="button"
                 className="home-sidebar__nav-item home-sidebar__nav-item--expandable home-sidebar__nav-item--loyalty"
@@ -840,10 +840,10 @@ function HomeHero({
                 />
               </button>
               {loyaltyDropdownOpen && (
-                <div className="home-sidebar__dropdown-menu home-sidebar__dropdown-menu--loyalty">
+                <div className="home-sidebar__loyalty-list">
                   <button
                     type="button"
-                    className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loyalty"
+                    className="home-sidebar__loyalty-item"
                     onClick={() => {
                       setLoyaltyDropdownOpen(false);
                       onMoveToLoyaltyHall();
@@ -851,7 +851,6 @@ function HomeHero({
                   >
                     로열관 입고 예정 상품
                   </button>
-                  <div className="home-sidebar__dropdown-divider"></div>
                 </div>
               )}
             </div>

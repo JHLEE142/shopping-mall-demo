@@ -1777,6 +1777,62 @@ body {
   color: #111827;
 }
 
+/* 로열 리스트 (인라인 표시) */
+.home-sidebar__loyalty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-top: none;
+  border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
+  background: #1a1a1a;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+.home-sidebar__loyalty-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(0.625rem, 1.5vw, 0.875rem) clamp(1rem, 2.5vw, 1.25rem);
+  background: #1a1a1a;
+  border: none;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+  color: #ffffff;
+  font-size: clamp(0.8125rem, 1.75vw, 0.9375rem);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+.home-sidebar__loyalty-item:last-child {
+  border-bottom: none;
+}
+
+.home-sidebar__loyalty-item:hover {
+  background: #2a2a2a;
+  color: #ffd700;
+}
+
+.home-sidebar__loyalty-item:active {
+  background: #333333;
+  color: #ffd700;
+}
+
+/* 로열 섹션의 버튼과 리스트 연결 */
+.home-sidebar__section--expanded .home-sidebar__nav-item--loyalty {
+  border-radius: clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px) 0 0;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.home-sidebar__section:not(.home-sidebar__section--expanded) .home-sidebar__nav-item--loyalty {
+  border-radius: clamp(8px, 1.5vw, 12px);
+}
+
 .home-sidebar__dropdown-item {
   width: 100%;
   display: flex;
