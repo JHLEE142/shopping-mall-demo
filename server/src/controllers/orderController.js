@@ -706,6 +706,12 @@ async function createOrder(req, res, next) {
       }
 
       const populatedOrder = await Order.findById(createdOrder._id).populate('user', 'name email user_type');
+      
+      // Slack 알림 전송 (비동기로 처리, 에러가 발생해도 주문 생성은 성공)
+      sendSlackOrderNotification(populatedOrder).catch((error) => {
+        console.error('Slack 주문 알림 전송 실패:', error);
+      });
+      
       return res.status(201).json(populatedOrder);
     } catch (error) {
       await session.abortTransaction();
@@ -1123,6 +1129,102 @@ async function cancelOrder(req, res, next) {
     return next(error);
   } finally {
     session.endSession();
+  }
+}
+
+/**
+ * Slack 주문 알림 전송
+ */
+async function sendSlackOrderNotification(order) {
+  try {
+    // Slack Webhook URL (환경변수에서만 가져오기)
+    const SLACK_WEBHOOK_ORDER = process.env.SLACK_WEBHOOK_ORDER;
+    const SLACK_WEBHOOK_ADMIN = process.env.SLACK_WEBHOOK_ADMIN;
+    
+    // 환경변수가 없으면 알림 전송 건너뛰기
+    if (!SLACK_WEBHOOK_ORDER && !SLACK_WEBHOOK_ADMIN) {
+      console.log('Slack Webhook URL이 설정되지 않아 알림을 전송하지 않습니다.');
+      return;
+    }
+
+    // 주문 정보 포맷팅
+    const orderNumber = order.orderNumber || 'N/A';
+    const totalAmount = order.summary?.grandTotal || order.summary?.total || 0;
+    const formattedAmount = new Intl.NumberFormat('ko-KR').format(totalAmount);
+    
+    // 고객 정보
+    const customerName = order.user?.name || order.guestName || '비회원';
+    const customerEmail = order.user?.email || order.guestEmail || order.contact?.email || 'N/A';
+    const customerPhone = order.contact?.phone || order.shipping?.address?.phone || 'N/A';
+    const isGuest = order.isGuest || !order.user;
+    
+    // 주문 상품 목록
+    const itemsList = order.items?.map((item, index) => {
+      const itemTotal = item.lineTotal || (item.quantity * item.unitPrice);
+      return `${index + 1}. ${item.name} (${item.quantity}개) - ${new Intl.NumberFormat('ko-KR').format(itemTotal)}원`;
+    }).join('\n') || '상품 정보 없음';
+    
+    // 배송지 정보
+    const shippingAddress = order.shipping?.address;
+    const address = shippingAddress 
+      ? `${shippingAddress.address1} ${shippingAddress.address2 || ''}`.trim()
+      : 'N/A';
+    const recipientName = shippingAddress?.name || 'N/A';
+    const recipientPhone = shippingAddress?.phone || 'N/A';
+    
+    // 결제 정보
+    const paymentStatus = order.payment?.status || 'ready';
+    const paymentMethod = order.payment?.method || 'N/A';
+    const paymentStatusEmoji = paymentStatus === 'paid' ? '✅' : '⏳';
+    
+    // 메시지 구성
+    const message = `🛒 *신규 주문 접수!*
+
+*주문번호:* #${orderNumber}
+*결제 상태:* ${paymentStatusEmoji} ${paymentStatus === 'paid' ? '결제 완료' : '결제 대기'}
+*결제 수단:* ${paymentMethod}
+*주문 금액:* ${formattedAmount}원
+
+*고객 정보:*
+• 이름: ${customerName} ${isGuest ? '(비회원)' : '(회원)'}
+• 이메일: ${customerEmail}
+• 전화번호: ${customerPhone}
+
+*주문 상품:*
+${itemsList}
+
+*배송지 정보:*
+• 수령인: ${recipientName}
+• 전화번호: ${recipientPhone}
+• 주소: ${address}
+${order.shipping?.request ? `• 배송 요청사항: ${order.shipping.request}` : ''}
+
+*주문 시간:* ${new Date(order.placedAt || Date.now()).toLocaleString('ko-KR')}`;
+
+    // Slack 메시지 전송 (#order 채널)
+    if (SLACK_WEBHOOK_ORDER) {
+      await fetch(SLACK_WEBHOOK_ORDER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: message,
+        }),
+      });
+    }
+
+    // 관리자 채널에도 전송 (#admin 채널)
+    if (SLACK_WEBHOOK_ADMIN) {
+      await fetch(SLACK_WEBHOOK_ADMIN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: message,
+        }),
+      });
+    }
+  } catch (error) {
+    // Slack 알림 실패는 로그만 남기고 주문 생성에는 영향 없음
+    console.error('Slack 주문 알림 전송 중 오류:', error.message);
   }
 }
 
