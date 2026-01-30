@@ -71,6 +71,16 @@ export async function fetchOrderById(orderId) {
 
   const data = await response.json().catch(() => null);
 
+  if (response.status === 404) {
+    const error = new Error('주문을 찾을 수 없습니다.');
+    error.status = 404;
+    // 전역 에러 핸들러가 처리하도록 이벤트 발생
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('404error', { detail: { url: `${API_BASE_URL}/api/orders/${orderId}`, type: 'order' } }));
+    }, 0);
+    throw error;
+  }
+
   if (!response.ok) {
     const message = data?.message || '주문 정보를 불러오지 못했습니다.';
     const error = new Error(message);

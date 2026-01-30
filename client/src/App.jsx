@@ -321,45 +321,61 @@ function App() {
 
   // 전역 에러 핸들러 (404 등)
   useEffect(() => {
+    const redirectToHome = () => {
+      const currentPath = window.location.pathname;
+      // 메인페이지가 아닌 경우에만 리다이렉트 (로그인 여부 상관없이)
+      if (currentPath !== '/' && currentPath !== '') {
+        console.log('Redirecting to home due to 404 error');
+        setView('home', { replace: true });
+      }
+    };
+
+    // 커스텀 404 에러 이벤트 핸들러
+    const handle404Error = (event) => {
+      console.warn('404 error event detected:', event.detail);
+      redirectToHome();
+    };
+
     const handleError = (event) => {
       // 404 에러나 네트워크 에러 발생 시 메인으로 리다이렉트
       if (event.error && (
         event.error.message?.includes('404') ||
         event.error.message?.includes('Failed to fetch') ||
-        event.error.message?.includes('NetworkError')
+        event.error.message?.includes('NetworkError') ||
+        event.error.message?.includes('상품을 찾을 수 없습니다') ||
+        event.error.message?.includes('주문을 찾을 수 없습니다') ||
+        event.error.message?.includes('찾을 수 없습니다') ||
+        event.error.status === 404
       )) {
         console.warn('Error detected, redirecting to home:', event.error);
-        // 현재 view가 유효한지 확인하고, 유효하지 않으면 home으로
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/' && currentPath !== '') {
-          const currentView = currentPath.slice(1).split('?')[0];
-          if (!validViews.includes(currentView)) {
-            setView('home', { replace: true });
-          }
-        }
+        redirectToHome();
       }
     };
 
     window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', (event) => {
+    window.addEventListener('404error', handle404Error);
+    
+    const handleUnhandledRejection = (event) => {
       if (event.reason && (
         event.reason.message?.includes('404') ||
         event.reason.message?.includes('Failed to fetch') ||
-        event.reason.message?.includes('NetworkError')
+        event.reason.message?.includes('NetworkError') ||
+        event.reason.message?.includes('상품을 찾을 수 없습니다') ||
+        event.reason.message?.includes('주문을 찾을 수 없습니다') ||
+        event.reason.message?.includes('찾을 수 없습니다') ||
+        event.reason.status === 404
       )) {
-        console.warn('Unhandled promise rejection, checking view:', event.reason);
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/' && currentPath !== '') {
-          const currentView = currentPath.slice(1).split('?')[0];
-          if (!validViews.includes(currentView)) {
-            setView('home', { replace: true });
-          }
-        }
+        console.warn('Unhandled promise rejection (404), redirecting to home:', event.reason);
+        redirectToHome();
       }
-    });
+    };
+    
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
       window.removeEventListener('error', handleError);
+      window.removeEventListener('404error', handle404Error);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, [validViews]);
 

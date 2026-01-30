@@ -160,13 +160,21 @@ export async function fetchProductById(productId) {
   const response = await fetch(`${API_BASE_URL}/api/products/${productId}`);
 
   if (response.status === 404) {
-    throw new Error('상품을 찾을 수 없습니다.');
+    const error = new Error('상품을 찾을 수 없습니다.');
+    error.status = 404;
+    // 전역 에러 핸들러가 처리하도록 이벤트 발생
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('404error', { detail: { url: `${API_BASE_URL}/api/products/${productId}`, type: 'product' } }));
+    }, 0);
+    throw error;
   }
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     const message = data?.message || '상품 정보를 불러오지 못했습니다.';
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();

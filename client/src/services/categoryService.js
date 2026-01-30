@@ -75,9 +75,21 @@ export async function fetchCategory(id) {
     },
   });
 
+  if (response.status === 404) {
+    const error = new Error('카테고리를 찾을 수 없습니다.');
+    error.status = 404;
+    // 전역 에러 핸들러가 처리하도록 이벤트 발생
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('404error', { detail: { url: `${API_BASE_URL}/api/categories/${id}`, type: 'category' } }));
+    }, 0);
+    throw error;
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: '카테고리 조회 실패' }));
-    throw new Error(error.message || '카테고리를 찾을 수 없습니다.');
+    const err = new Error(error.message || '카테고리를 찾을 수 없습니다.');
+    err.status = response.status;
+    throw err;
   }
 
   const data = await response.json();
