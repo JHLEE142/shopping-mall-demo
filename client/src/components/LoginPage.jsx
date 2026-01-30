@@ -39,6 +39,7 @@ function LoginPage({
   const [successMessage, setSuccessMessage] = useState('');
   const [token, setToken] = useState('');
   const autoLoginAttempted = useRef(false);
+  const googleSignInButtonRef = useRef(null);
 
   // 컴포넌트 마운트 시 localStorage에서 정보 불러오기
   useEffect(() => {
@@ -122,6 +123,79 @@ function LoginPage({
       clearInterval(checkStorage);
     };
   }, []);
+
+  // Google OAuth 초기화
+  useEffect(() => {
+    const initializeGoogleSignIn = () => {
+      if (window.google && window.google.accounts) {
+        window.google.accounts.id.initialize({
+          client_id: 'AIzaSyDrsI9sHzcfPh55SL0Cga4KeP-WNG2fgfs',
+          callback: handleGoogleSignIn,
+        });
+
+        window.google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          {
+            theme: 'outline',
+            size: 'large',
+            width: '100%',
+            text: 'signin_with',
+            locale: 'ko',
+          }
+        );
+      } else {
+        // Google 스크립트가 아직 로드되지 않은 경우 재시도
+        setTimeout(initializeGoogleSignIn, 100);
+      }
+    };
+
+    initializeGoogleSignIn();
+  }, []);
+
+  const handleGoogleSignIn = async (response) => {
+    try {
+      setStatus('loading');
+      setError('');
+      setSuccessMessage('');
+
+      // Google ID 토큰을 서버로 전송하여 인증
+      const authResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500'}/api/users/google-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      if (!authResponse.ok) {
+        throw new Error('구글 로그인에 실패했어요.');
+      }
+
+      const data = await authResponse.json();
+      const expiresInMs = 60 * 60 * 1000; // 60분
+      const expiresAt = Date.now() + expiresInMs;
+
+      saveSession({
+        token: data.token,
+        user: data.user,
+        expiresAt,
+        lastActivityTime: Date.now(),
+        deviceId: data.deviceId,
+        rememberToken: data.rememberToken,
+        deviceExpiresAt: data.deviceExpiresAt,
+      });
+
+      setForm((prev) => ({ ...INITIAL_FORM, remember: prev.remember }));
+      setStatus('success');
+      setSuccessMessage('구글 로그인에 성공했어요!');
+      setToken(data.token);
+      onLoginSuccess({ ...data, expiresAt });
+    } catch (submitError) {
+      setStatus('error');
+      clearSession();
+      setError(submitError.message || '구글 로그인에 실패했어요.');
+    }
+  };
 
   // 로그인 수행 함수
   const performLogin = async (email, password, remember) => {
@@ -269,15 +343,7 @@ function LoginPage({
         </div>
 
         <div className="social-login-list">
-          <button type="button" className="social-login-button social-login-button--google">
-            G Google로 로그인
-          </button>
-          <button type="button" className="social-login-button social-login-button--facebook">
-            f Facebook으로 로그인
-          </button>
-          <button type="button" className="social-login-button social-login-button--apple">
-             Apple로 로그인
-          </button>
+          <div id="google-signin-button"></div>
         </div>
 
         <div className="auth-footer">

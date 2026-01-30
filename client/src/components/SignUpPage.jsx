@@ -6,7 +6,9 @@ const INITIAL_FORM_DATA = {
   email: '',
   password: '',
   confirmPassword: '',
+  postalCode: '',
   address: '',
+  addressDetail: '',
   user_type: 'customer', // UI에서 제거되었지만 서버 전송 시 항상 'customer'로 고정
 };
 
@@ -125,6 +127,57 @@ function SignUpPage({
     }));
   };
 
+  const handleAddressSearch = () => {
+    if (!window.daum || !window.daum.Postcode) {
+      alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function(data) {
+        // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드
+        let addr = ''; // 주소 변수
+        let extraAddr = ''; // 참고항목 변수
+
+        // 사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+        if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+          addr = data.roadAddress;
+        } else { // 사용자가 지번 주소를 선택했을 경우(J)
+          addr = data.jibunAddress;
+        }
+
+        // 사용자가 선택한 주소가 도로명 타입일때 참고항목을 조합한다.
+        if(data.userSelectedType === 'R'){
+          // 법정동명이 있을 경우 추가한다. (법정리는 제외)
+          // 법정동의 경우 마지막 문자가 "동/로/가"로 끝난다.
+          if(data.bname !== '' && /[동|로|가]$/g.test(data.bname)){
+            extraAddr += data.bname;
+          }
+          // 건물명이 있고, 공동주택일 경우 추가한다.
+          if(data.buildingName !== '' && data.apartment === 'Y'){
+            extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          // 표시할 참고항목이 있을 경우, 괄호까지 추가한 최종 문자열을 만든다.
+          if(extraAddr !== ''){
+            extraAddr = ' (' + extraAddr + ')';
+          }
+        }
+
+        // 우편번호와 주소 정보를 해당 필드에 넣는다.
+        setFormData((prev) => ({
+          ...prev,
+          postalCode: data.zonecode,
+          address: addr + extraAddr,
+        }));
+
+        // 커서를 상세주소 필드로 이동한다.
+        document.getElementById('addressDetail').focus();
+      },
+      width: '100%',
+      height: '100%',
+    }).open();
+  };
+
   const handleAgreementChange = (event) => {
     const { name, checked } = event.target;
     setAgreements((prev) => ({
@@ -171,9 +224,15 @@ function SignUpPage({
       user_type: formData.user_type,
     };
 
-    const addressValue = formData.address.trim();
-    if (addressValue) {
-      payload.address = addressValue;
+    // 주소 정보 조합
+    const addressParts = [];
+    if (formData.postalCode) addressParts.push(`[${formData.postalCode}]`);
+    if (formData.address) addressParts.push(formData.address);
+    if (formData.addressDetail) addressParts.push(formData.addressDetail);
+    
+    const fullAddress = addressParts.join(' ');
+    if (fullAddress.trim()) {
+      payload.address = fullAddress.trim();
     }
 
     setStatus('loading');
@@ -267,13 +326,48 @@ function SignUpPage({
 
 
           <div className="field">
-            <label htmlFor="address">주소 (선택)</label>
+            <label htmlFor="postalCode">주소 (선택)</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input
+                id="postalCode"
+                name="postalCode"
+                type="text"
+                placeholder="우편번호"
+                value={formData.postalCode || ''}
+                readOnly
+                style={{ flex: '0 0 120px' }}
+              />
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                우편번호 찾기
+              </button>
+            </div>
             <input
               id="address"
               name="address"
               type="text"
-              placeholder="배송받을 주소를 입력하세요"
-              value={formData.address}
+              placeholder="기본 주소"
+              value={formData.address || ''}
+              readOnly
+              style={{ marginBottom: '8px' }}
+            />
+            <input
+              id="addressDetail"
+              name="addressDetail"
+              type="text"
+              placeholder="상세 주소를 입력하세요"
+              value={formData.addressDetail || ''}
               onChange={handleChange}
             />
           </div>
