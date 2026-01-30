@@ -88,16 +88,27 @@ function PaymentSuccessPage({
             coupon: selectedCoupon || null,
           };
 
+          console.log('주문 생성 시작:', orderPayload);
           const createdOrder = await createOrderApi(orderPayload);
+          console.log('주문 생성 성공:', createdOrder);
+          
           setOrder(createdOrder.order || createdOrder);
           sessionStorage.removeItem('pendingOrder');
+          setStatus('success'); // 주문 생성 성공 시에만 success 상태로 변경
         } catch (e) {
           console.error('주문 생성 오류:', e);
-          // 주문 생성 실패해도 결제는 완료되었으므로 성공으로 표시
-          setError('결제는 완료되었지만 주문 생성 중 오류가 발생했습니다. 고객센터로 문의해주세요.');
+          // 주문 생성 실패 시 에러 상태로 유지
+          setError(`주문 생성 중 오류가 발생했습니다: ${e.message || '알 수 없는 오류'}. 결제는 완료되었으니 고객센터로 문의해주세요.`);
+          setStatus('error');
+          return; // 에러 상태로 유지하고 함수 종료
         }
+      } else {
+        // pendingOrder가 없는 경우 (세션이 끊겼거나 직접 접근한 경우)
+        console.warn('pendingOrder 데이터가 없습니다. 주문 정보를 찾을 수 없습니다.');
+        setError('주문 정보를 찾을 수 없습니다. 결제는 완료되었으니 고객센터로 문의해주세요.');
+        setStatus('error');
+        return;
       }
-      setStatus('success');
     } catch (err) {
       console.error('결제 승인 오류:', err);
       setError(err.message || '결제 승인 중 오류가 발생했습니다.');
@@ -205,25 +216,52 @@ function PaymentSuccessPage({
       <div className="payment-success-page__success">
         <div className="success-icon">✓</div>
         <h2>결제를 완료했어요</h2>
-        {paymentData && (
-          <div className="payment-info">
-            <div className="info-row">
-              <span className="info-label">결제 금액</span>
-              <span className="info-value">{paymentData.amount.toLocaleString()}원</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">주문번호</span>
-              <span className="info-value">{paymentData.orderId}</span>
-            </div>
-            {paymentData.paymentKey && (
+        {order ? (
+          <>
+            <p style={{ marginTop: '1rem', color: '#059669', fontWeight: 'bold' }}>
+              주문이 성공적으로 생성되었습니다!
+            </p>
+            <div className="payment-info" style={{ marginTop: '1.5rem' }}>
               <div className="info-row">
-                <span className="info-label">결제키</span>
-                <span className="info-value">{paymentData.paymentKey}</span>
+                <span className="info-label">주문번호</span>
+                <span className="info-value">{order.orderNumber || order._id}</span>
               </div>
-            )}
-          </div>
+              <div className="info-row">
+                <span className="info-label">결제 금액</span>
+                <span className="info-value">{paymentData?.amount.toLocaleString() || order.summary?.grandTotal?.toLocaleString() || '0'}원</span>
+              </div>
+              {paymentData?.paymentKey && (
+                <div className="info-row">
+                  <span className="info-label">결제키</span>
+                  <span className="info-value" style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{paymentData.paymentKey}</span>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          paymentData && (
+            <div className="payment-info" style={{ marginTop: '1.5rem' }}>
+              <div className="info-row">
+                <span className="info-label">결제 금액</span>
+                <span className="info-value">{paymentData.amount.toLocaleString()}원</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">주문번호</span>
+                <span className="info-value">{paymentData.orderId}</span>
+              </div>
+              {paymentData.paymentKey && (
+                <div className="info-row">
+                  <span className="info-label">결제키</span>
+                  <span className="info-value" style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{paymentData.paymentKey}</span>
+                </div>
+              )}
+              <p style={{ marginTop: '1rem', color: '#dc2626', fontSize: '0.9rem' }}>
+                ⚠️ 주문 정보를 찾을 수 없습니다. 고객센터로 문의해주세요.
+              </p>
+            </div>
+          )
         )}
-        <div className="button-group">
+        <div className="button-group" style={{ marginTop: '2rem' }}>
           {order && (
             <button className="btn-primary" onClick={() => onViewOrder(order)}>
               주문 상세보기
