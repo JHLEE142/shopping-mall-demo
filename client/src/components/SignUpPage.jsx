@@ -251,7 +251,6 @@ function SignUpPage({
     }
 
     // Google 로그인으로 온 경우 credential 포함
-    const googleSignupData = sessionStorage.getItem('googleSignupData');
     const googleData = googleSignupData ? JSON.parse(googleSignupData) : null;
 
     const payload = {
