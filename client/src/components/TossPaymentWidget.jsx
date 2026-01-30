@@ -17,6 +17,7 @@ function TossPaymentWidget({
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
+  const [hasSelectedPaymentMethod, setHasSelectedPaymentMethod] = useState(false);
   const paymentMethodWidgetRef = useRef(null);
   const agreementWidgetRef = useRef(null);
   const tossPaymentsRef = useRef(null);
@@ -83,13 +84,17 @@ function TossPaymentWidget({
         // 결제 수단 선택 이벤트
         paymentMethodWidget.on('paymentMethodSelect', (selectedPaymentMethod) => {
           console.log('selectedPaymentMethod: ', selectedPaymentMethod);
-          // 결제 수단이 선택되면 버튼 활성화를 위한 상태 업데이트는 필요 없음
-          // (이미 isReady가 true이므로 버튼은 활성화됨)
+          if (isMounted) {
+            setHasSelectedPaymentMethod(true);
+          }
         });
         
-        // 결제 수단 선택 해제 이벤트 (필요시)
+        // 결제 수단 선택 해제 이벤트
         paymentMethodWidget.on('paymentMethodUnselect', () => {
           console.log('결제 수단 선택 해제됨');
+          if (isMounted) {
+            setHasSelectedPaymentMethod(false);
+          }
         });
 
         setIsReady(true);
@@ -133,20 +138,22 @@ function TossPaymentWidget({
       }
 
       const orderId = generateOrderId();
-
-      // 결제 수단 선택 확인 (선택적 - 에러 방지용)
-      let selectedPaymentMethod = null;
-      try {
-        selectedPaymentMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
-        console.log('selectedPaymentMethod: ', selectedPaymentMethod);
-      } catch (methodError) {
-        // 결제 수단이 선택되지 않았어도 requestPayment를 시도 (위젯이 자동으로 선택 UI 표시)
-        console.warn('결제 수단 선택 확인 실패 (계속 진행):', methodError);
-      }
-
       const widgets = tossPaymentsRef.current.widgets({
         customerKey: ANONYMOUS,
       });
+
+      // 결제 수단이 선택되었는지 확인 (선택적 - 에러 방지)
+      // 선택되지 않았어도 requestPayment를 호출하면 위젯이 자동으로 선택 UI 표시
+      try {
+        const selectedMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
+        if (selectedMethod) {
+          console.log('선택된 결제 수단:', selectedMethod);
+          setHasSelectedPaymentMethod(true);
+        }
+      } catch (methodError) {
+        // 결제 수단이 선택되지 않았어도 계속 진행
+        console.log('결제 수단 선택 확인 중... (계속 진행)');
+      }
 
       // requestPayment 호출 - 결제 수단이 선택되지 않았으면 위젯이 자동으로 선택 UI를 표시
       await widgets.requestPayment({
