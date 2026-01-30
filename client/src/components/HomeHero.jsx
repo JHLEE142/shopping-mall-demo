@@ -170,6 +170,7 @@ function HomeHero({
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  const [comparedProducts, setComparedProducts] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(initialPage || 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -445,23 +446,145 @@ function HomeHero({
       if (!products || products.length === 0) {
         return []; // 검색 결과가 없으면 빈 배열 반환
       }
-      return mapProductsToCatalog(products);
+      let filteredProducts = products;
+      
+      // 필터 옵션 적용
+      if (filterOption !== 'all') {
+        filteredProducts = filteredProducts.filter((product) => {
+          switch (filterOption) {
+            case 'new':
+              // 신상품: 최근 30일 이내 등록된 상품
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              const createdAt = new Date(product.createdAt || product.updatedAt || 0);
+              return createdAt >= thirtyDaysAgo;
+            case 'sale':
+              // 할인 상품: discountRate가 있거나 originalPrice가 있는 상품
+              return (product.discountRate && product.discountRate > 0) || 
+                     (product.originalPrice && product.originalPrice > product.price);
+            case 'popular':
+              // 인기 상품: 리뷰 수가 많은 상품 (상위 50%)
+              const sortedByReviews = [...products].sort((a, b) => 
+                (b.reviewCount || 0) - (a.reviewCount || 0)
+              );
+              const top50Percent = Math.ceil(sortedByReviews.length * 0.5);
+              const popularIds = new Set(
+                sortedByReviews.slice(0, top50Percent).map(p => p._id || p.id)
+              );
+              return popularIds.has(product._id || product.id);
+            default:
+              return true;
+          }
+        });
+      }
+      
+      // 정렬 적용
+      const sortedProducts = [...filteredProducts].sort((a, b) => {
+        switch (sortOption) {
+          case 'newest':
+            // 신상품순: 최신 등록일 순
+            const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+            const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+            return dateB - dateA;
+          case 'price-low':
+            // 낮은 가격순
+            const priceA = Number(a.price || 0);
+            const priceB = Number(b.price || 0);
+            return priceA - priceB;
+          case 'price-high':
+            // 높은 가격순
+            const priceAHigh = Number(a.price || 0);
+            const priceBHigh = Number(b.price || 0);
+            return priceBHigh - priceAHigh;
+          case 'featured':
+          default:
+            // 추천순: 리뷰 수와 평점을 고려
+            const ratingA = (a.rating || 0) * (a.reviewCount || 0);
+            const ratingB = (b.rating || 0) * (b.reviewCount || 0);
+            if (ratingB !== ratingA) {
+              return ratingB - ratingA;
+            }
+            // 동일하면 최신순
+            const dateAFeatured = new Date(a.createdAt || a.updatedAt || 0).getTime();
+            const dateBFeatured = new Date(b.createdAt || b.updatedAt || 0).getTime();
+            return dateBFeatured - dateAFeatured;
+        }
+      });
+      
+      return mapProductsToCatalog(sortedProducts);
     }
     
-    // 일반 목록일 때만 카테고리 필터 적용
+    // 일반 목록일 때는 서버에서 이미 카테고리 필터링이 되었으므로 클라이언트 필터링 불필요
+    // 필터 옵션 적용
     let filteredProducts = products;
-    
-    // 카테고리 필터 적용 (대분류 기준)
-    if (categoryFilter) {
-      filteredProducts = products.filter((product) => product.categoryMain === categoryFilter);
+    if (filterOption !== 'all') {
+      filteredProducts = filteredProducts.filter((product) => {
+        switch (filterOption) {
+          case 'new':
+            // 신상품: 최근 30일 이내 등록된 상품
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const createdAt = new Date(product.createdAt || product.updatedAt || 0);
+            return createdAt >= thirtyDaysAgo;
+          case 'sale':
+            // 할인 상품: discountRate가 있거나 originalPrice가 있는 상품
+            return (product.discountRate && product.discountRate > 0) || 
+                   (product.originalPrice && product.originalPrice > product.price);
+          case 'popular':
+            // 인기 상품: 리뷰 수가 많은 상품 (상위 50%)
+            const sortedByReviews = [...products].sort((a, b) => 
+              (b.reviewCount || 0) - (a.reviewCount || 0)
+            );
+            const top50Percent = Math.ceil(sortedByReviews.length * 0.5);
+            const popularIds = new Set(
+              sortedByReviews.slice(0, top50Percent).map(p => p._id || p.id)
+            );
+            return popularIds.has(product._id || product.id);
+          default:
+            return true;
+        }
+      });
     }
+    
+    // 정렬 적용
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+      switch (sortOption) {
+        case 'newest':
+          // 신상품순: 최신 등록일 순
+          const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+          const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+          return dateB - dateA;
+        case 'price-low':
+          // 낮은 가격순
+          const priceA = Number(a.price || 0);
+          const priceB = Number(b.price || 0);
+          return priceA - priceB;
+        case 'price-high':
+          // 높은 가격순
+          const priceAHigh = Number(a.price || 0);
+          const priceBHigh = Number(b.price || 0);
+          return priceBHigh - priceAHigh;
+        case 'featured':
+        default:
+          // 추천순: 리뷰 수와 평점을 고려
+          const ratingA = (a.rating || 0) * (a.reviewCount || 0);
+          const ratingB = (b.rating || 0) * (b.reviewCount || 0);
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          // 동일하면 최신순
+          const dateAFeatured = new Date(a.createdAt || a.updatedAt || 0).getTime();
+          const dateBFeatured = new Date(b.createdAt || b.updatedAt || 0).getTime();
+          return dateBFeatured - dateAFeatured;
+      }
+    });
     
     // 일반 목록에서도 products가 비어있으면 빈 배열 반환 (FALLBACK_CATALOG 제거)
-    if (!filteredProducts || filteredProducts.length === 0) {
+    if (!sortedProducts || sortedProducts.length === 0) {
       return [];
     }
-    return mapProductsToCatalog(filteredProducts);
-  }, [products, categoryFilter, submittedSearchQuery]);
+    return mapProductsToCatalog(sortedProducts);
+  }, [products, categoryFilter, submittedSearchQuery, filterOption, sortOption]);
 
   // 테마별 상품 선택 로직 (검색/필터가 없을 때만 사용)
   const themedProducts = useMemo(() => {
@@ -1144,7 +1267,10 @@ function HomeHero({
         <div className="catalog-toolbar__left">
           <label className="catalog-select">
             <span>필터</span>
-            <select>
+            <select value={filterOption} onChange={(event) => {
+              setFilterOption(event.target.value);
+              setCurrentPage(1);
+            }}>
               <option value="all">전체</option>
               <option value="new">신상품</option>
               <option value="sale">할인</option>
@@ -1153,11 +1279,46 @@ function HomeHero({
           </label>
           <label className="catalog-select">
             <span>비교하기</span>
-            <select value={compareMode ? 'on' : 'off'} onChange={(event) => setCompareMode(event.target.value === 'on')}>
+            <select value={compareMode ? 'on' : 'off'} onChange={(event) => {
+              const newMode = event.target.value === 'on';
+              setCompareMode(newMode);
+              if (!newMode) {
+                setComparedProducts(new Set());
+              }
+            }}>
               <option value="off">끄기</option>
               <option value="on">켜기</option>
             </select>
           </label>
+          {compareMode && comparedProducts.size > 0 && (
+            <div style={{
+              marginLeft: '1rem',
+              padding: '0.5rem 1rem',
+              background: '#f3f4f6',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+            }}>
+              {comparedProducts.size}개 선택됨
+              <button
+                type="button"
+                onClick={() => {
+                  setComparedProducts(new Set());
+                }}
+                style={{
+                  marginLeft: '0.5rem',
+                  padding: '0.25rem 0.5rem',
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                }}
+              >
+                초기화
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="catalog-toolbar__right">
@@ -1190,7 +1351,10 @@ function HomeHero({
           </label>
           <label className="catalog-select">
             <span>정렬</span>
-            <select value={sortOption} onChange={(event) => setSortOption(event.target.value)}>
+            <select value={sortOption} onChange={(event) => {
+              setSortOption(event.target.value);
+              setCurrentPage(1);
+            }}>
               <option value="featured">추천순</option>
               <option value="newest">신상품순</option>
               <option value="price-low">낮은 가격순</option>
@@ -1262,12 +1426,60 @@ function HomeHero({
       <section className="catalog-grid">
         {catalogProducts.map((product) => (
           <article key={`${product.id || product.name}`} className="catalog-card">
-            <div className="catalog-card__media" onClick={() => onViewProduct(product.detail)} role="button" tabIndex={0} onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                onViewProduct(product.detail);
-              }
-            }}>
+            <div 
+              className="catalog-card__media" 
+              onClick={() => onViewProduct(product.detail)} 
+              role="button" 
+              tabIndex={0} 
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  onViewProduct(product.detail);
+                }
+              }}
+              style={{ position: 'relative' }}
+            >
               <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+              {compareMode && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    left: '0.5rem',
+                    zIndex: 10,
+                    background: 'white',
+                    borderRadius: '4px',
+                    padding: '0.25rem',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setComparedProducts((prev) => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(product.id)) {
+                        newSet.delete(product.id);
+                      } else {
+                        if (newSet.size < 4) {
+                          newSet.add(product.id);
+                        } else {
+                          alert('최대 4개까지만 비교할 수 있습니다.');
+                        }
+                      }
+                      return newSet;
+                    });
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={comparedProducts.has(product.id)}
+                    onChange={() => {}}
+                    style={{
+                      width: '1.25rem',
+                      height: '1.25rem',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </div>
+              )}
               <button
                 type="button"
                 className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}

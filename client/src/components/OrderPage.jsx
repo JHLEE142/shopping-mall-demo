@@ -231,7 +231,72 @@ function OrderPage({
     }));
   };
 
-  // 토스페이먼츠 위젯이 결제를 처리하므로 이 함수는 더 이상 사용하지 않음
+  const handlePaymentError = (error) => {
+    console.error('결제 에러:', error);
+    setIsSubmitting(false);
+    setOrderStatus('failure');
+    setOrderFailureMessage(error?.message || '결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    setNotice({
+      type: 'error',
+      message: error?.message || '결제 처리 중 오류가 발생했습니다.',
+    });
+  };
+
+  const handlePaymentSuccess = async (paymentData) => {
+    if (orderStatus !== 'form') {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setNotice({ type: 'info', message: '주문을 처리하는 중입니다...' });
+
+    try {
+      const orderData = {
+        items: cart.items.map((item) => ({
+          product: item.product._id || item.product.id,
+          quantity: item.quantity,
+          priceSnapshot: item.priceSnapshot || (item.product.priceSale || item.product.price),
+          options: convertSelectedOptions(item.options),
+        })),
+        shipping: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: {
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode,
+            address1: formData.address1,
+            address2: formData.address2,
+          },
+          notes: formData.notes,
+          scheduleEnabled: formData.scheduleEnabled,
+        },
+        payment: {
+          method: formData.paymentMethod,
+          transactionId: paymentData.paymentKey,
+          amount: total,
+        },
+        coupon: selectedCoupon?._id || null,
+      };
+
+      const result = await createOrderApi(orderData);
+      
+      setOrderStatus('success');
+      setOrderResult(result.order || result);
+      setNotice({ type: 'success', message: '주문이 성공적으로 완료되었습니다.' });
+      onCartUpdate(0);
+    } catch (err) {
+      console.error('주문 생성 실패:', err);
+      setIsSubmitting(false);
+      setOrderStatus('failure');
+      setOrderFailureMessage(err.message || '주문 처리 중 오류가 발생했습니다.');
+      setNotice({
+        type: 'error',
+        message: err.message || '주문 처리 중 오류가 발생했습니다.',
+      });
+    }
+  };
 
   const renderOrderSummary = () => {
     if (!cart?.items?.length) {
@@ -348,6 +413,7 @@ function OrderPage({
             customerName={formData.name}
             customerEmail={formData.email}
             customerPhone={formData.phone}
+            onPaymentSuccess={handlePaymentSuccess}
             onPaymentError={handlePaymentError}
             disabled={isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1}
           />
