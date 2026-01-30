@@ -83,7 +83,7 @@ function TossPaymentWidget({
 
         // 결제 수단 선택 이벤트
         paymentMethodWidget.on('paymentMethodSelect', (selectedPaymentMethod) => {
-          console.log('selectedPaymentMethod: ', selectedPaymentMethod);
+          console.log('선택된 결제 수단:', selectedPaymentMethod);
           if (isMounted) {
             setHasSelectedPaymentMethod(true);
           }
@@ -142,20 +142,37 @@ function TossPaymentWidget({
         customerKey: ANONYMOUS,
       });
 
-      // 결제 수단이 선택되었는지 확인 (선택적 - 에러 방지)
-      // 선택되지 않았어도 requestPayment를 호출하면 위젯이 자동으로 선택 UI 표시
+      // 결제 수단이 선택되었는지 명확히 확인
+      let selectedMethod = null;
       try {
-        const selectedMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
+        // getSelectedPaymentMethod가 Promise를 반환하는지 확인
+        const methodResult = paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
+        if (methodResult instanceof Promise) {
+          selectedMethod = await methodResult;
+        } else {
+          selectedMethod = methodResult;
+        }
+        
         if (selectedMethod) {
           console.log('선택된 결제 수단:', selectedMethod);
           setHasSelectedPaymentMethod(true);
         }
       } catch (methodError) {
-        // 결제 수단이 선택되지 않았어도 계속 진행
-        console.log('결제 수단 선택 확인 중... (계속 진행)');
+        console.log('결제 수단 선택 확인 중...', methodError);
       }
 
-      // requestPayment 호출 - 결제 수단이 선택되지 않았으면 위젯이 자동으로 선택 UI를 표시
+      // 결제 수단이 선택되지 않았으면 에러 메시지 표시하고 진행 중단
+      // state와 메서드 결과 모두 확인
+      if (!selectedMethod && !hasSelectedPaymentMethod) {
+        const errorMsg = '결제 수단을 선택해주세요. 위젯에서 결제 수단을 먼저 선택한 후 결제하기 버튼을 클릭해주세요.';
+        console.error('●▶결제 요청 실패 :', errorMsg);
+        setIsLoading(false);
+        const paymentError = new Error(errorMsg);
+        onPaymentError?.(paymentError);
+        return;
+      }
+
+      // 결제 수단이 선택되었을 때만 requestPayment 호출
       await widgets.requestPayment({
         orderId,
         orderName,
@@ -166,7 +183,7 @@ function TossPaymentWidget({
         customerMobilePhone: customerPhone || '01012345678',
       });
     } catch (error) {
-      console.error('결제 요청 실패:', error);
+      console.error('●▶결제 요청 실패 :', error);
       setIsLoading(false);
       
       // 에러 메시지 파싱
@@ -175,7 +192,9 @@ function TossPaymentWidget({
       // 토스페이먼츠 에러 메시지 처리
       if (errorMessage.includes('결제수단이 아직 선택되지 않았어요') || 
           errorMessage.includes('결제수단을 선택해 주세요') ||
-          errorMessage.includes('payment method')) {
+          errorMessage.includes('결제 수단') ||
+          errorMessage.includes('payment method') ||
+          errorMessage.includes('선택되지 않았어요')) {
         errorMessage = '결제 수단을 선택해주세요. 위젯에서 결제 수단을 먼저 선택한 후 결제하기 버튼을 클릭해주세요.';
       }
       
@@ -183,6 +202,7 @@ function TossPaymentWidget({
       const paymentError = error instanceof Error ? error : new Error(errorMessage);
       paymentError.message = errorMessage;
       
+      console.error('●▶결제 에러 :', errorMessage);
       onPaymentError?.(paymentError);
     }
   };
