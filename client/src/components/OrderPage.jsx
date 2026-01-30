@@ -597,14 +597,23 @@ function OrderPage({
             onPaymentSuccess={handlePaymentSuccess}
             onPaymentError={handlePaymentError}
             disabled={(() => {
-              const disabled = isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1;
-              if (disabled) {
+              // 필수 필드 확인 (빈 문자열, null, undefined 모두 체크)
+              const hasName = formData.name && formData.name.trim().length > 0;
+              const hasPhone = formData.phone && formData.phone.trim().length > 0;
+              const hasAddress1 = formData.address1 && formData.address1.trim().length > 0;
+              
+              const disabled = isSubmitting || orderStatus !== 'form' || !hasName || !hasPhone || !hasAddress1;
+              
+              if (disabled && process.env.NODE_ENV === 'development') {
                 console.log('결제 버튼 비활성화 이유:', {
                   isSubmitting,
                   orderStatus,
-                  hasName: !!formData.name,
-                  hasPhone: !!formData.phone,
-                  hasAddress1: !!formData.address1,
+                  hasName,
+                  hasPhone,
+                  hasAddress1,
+                  nameValue: formData.name,
+                  phoneValue: formData.phone,
+                  address1Value: formData.address1,
                 });
               }
               return disabled;

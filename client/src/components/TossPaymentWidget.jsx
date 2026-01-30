@@ -16,20 +16,26 @@ function TossPaymentWidget({
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreementChecked, setAgreementChecked] = useState(false);
   const paymentMethodWidgetRef = useRef(null);
   const agreementWidgetRef = useRef(null);
   const tossPaymentsRef = useRef(null);
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
+
+    // 이미 초기화되었으면 재초기화하지 않음
+    if (isInitializedRef.current) {
+      return;
+    }
 
     async function initTossPayments() {
       try {
         // DOM 요소가 준비될 때까지 대기
         const checkDOMReady = () => {
           const paymentMethodEl = document.getElementById('payment-method');
-          const agreementEl = document.getElementById('agreement');
-          return paymentMethodEl && agreementEl;
+          return paymentMethodEl; // agreement는 제거했으므로 체크하지 않음
         };
 
         // DOM 요소가 준비될 때까지 최대 5초 대기
@@ -44,6 +50,7 @@ function TossPaymentWidget({
           console.warn('토스페이먼츠 DOM 요소를 찾을 수 없습니다.');
           if (isMounted) {
             setIsReady(true); // DOM 요소가 없어도 버튼은 활성화 (fallback)
+            isInitializedRef.current = true;
           }
           return;
         }
@@ -62,21 +69,16 @@ function TossPaymentWidget({
           value: amount,
         });
 
-        // 결제 수단 위젯 렌더링
-        const [paymentMethodWidget] = await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: '#payment-method',
-            variantKey: 'DEFAULT',
-          }),
-          widgets.renderAgreement({
-            selector: '#agreement',
-            variantKey: 'AGREEMENT',
-          }),
-        ]);
+        // 결제 수단 위젯만 렌더링 (약관 위젯은 제거하여 중복 에러 방지)
+        const paymentMethodWidget = await widgets.renderPaymentMethods({
+          selector: '#payment-method',
+          variantKey: 'DEFAULT',
+        });
 
         if (!isMounted) return;
 
         paymentMethodWidgetRef.current = paymentMethodWidget;
+        isInitializedRef.current = true;
 
         // 결제 수단 선택 이벤트
         paymentMethodWidget.on('paymentMethodSelect', (selectedPaymentMethod) => {
@@ -89,6 +91,7 @@ function TossPaymentWidget({
         if (isMounted) {
           // 초기화 실패해도 버튼은 활성화 (사용자가 재시도할 수 있도록)
           setIsReady(true);
+          isInitializedRef.current = true;
           onPaymentError?.(error);
         }
       }
@@ -98,15 +101,21 @@ function TossPaymentWidget({
 
     return () => {
       isMounted = false;
+      // cleanup은 하지 않음 (위젯이 유지되어야 함)
     };
-  }, [amount, onPaymentError]);
+  }, []); // 의존성 배열을 비워서 한 번만 실행
 
   const generateOrderId = () => {
     return `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   };
 
   const handlePaymentRequest = async () => {
-    if (!isReady || isLoading || disabled) return;
+    if (!isReady || isLoading || disabled || !agreementChecked) {
+      if (!agreementChecked) {
+        alert('결제 서비스 이용 약관에 동의해주세요.');
+      }
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -141,28 +150,57 @@ function TossPaymentWidget({
     }
   };
 
+  // 금액이 변경되면 위젯 금액 업데이트
+  useEffect(() => {
+    if (isReady && tossPaymentsRef.current && amount) {
+      const widgets = tossPaymentsRef.current.widgets({
+        customerKey: ANONYMOUS,
+      });
+      widgets.setAmount({
+        currency: 'KRW',
+        value: amount,
+      }).catch(err => {
+        console.warn('금액 업데이트 실패:', err);
+      });
+    }
+  }, [amount, isReady]);
+
   return (
     <div className="toss-payment-widget">
       <div id="payment-method" className="payment-method-container"></div>
-      <div id="agreement" className="agreement-container"></div>
+      {/* 약관 위젯 제거 - 직접 체크박스로 대체 */}
+      <div className="agreement-container" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#f9fafb' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={agreementChecked}
+            onChange={(e) => setAgreementChecked(e.target.checked)}
+            style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+            [필수] 결제 서비스 이용 약관, 개인정보 처리에 동의합니다.
+          </span>
+        </label>
+      </div>
       <button
         id="payment-request-button"
         type="button"
         className="payment-request-button"
         onClick={handlePaymentRequest}
         disabled={(() => {
-          const btnDisabled = !isReady || isLoading || disabled;
+          const btnDisabled = !isReady || isLoading || disabled || !agreementChecked;
           if (btnDisabled && process.env.NODE_ENV === 'development') {
             console.log('결제 버튼 비활성화 상태:', {
               isReady,
               isLoading,
               disabled,
-              reason: !isReady ? '위젯 초기화 대기 중' : isLoading ? '결제 처리 중' : disabled ? '외부에서 비활성화됨' : '알 수 없음',
+              agreementChecked,
+              reason: !isReady ? '위젯 초기화 대기 중' : isLoading ? '결제 처리 중' : !agreementChecked ? '약관 동의 필요' : disabled ? '외부에서 비활성화됨' : '알 수 없음',
             });
           }
           return btnDisabled;
         })()}
-        title={!isReady ? '결제 위젯 로딩 중...' : isLoading ? '결제 처리 중...' : disabled ? '결제 조건을 확인해주세요' : '결제하기'}
+        title={!isReady ? '결제 위젯 로딩 중...' : isLoading ? '결제 처리 중...' : !agreementChecked ? '약관 동의가 필요합니다' : disabled ? '결제 조건을 확인해주세요' : '결제하기'}
       >
         {isLoading ? '결제 처리 중...' : !isReady ? '결제 위젯 로딩 중...' : '결제하기'}
       </button>
