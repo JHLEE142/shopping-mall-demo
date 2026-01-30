@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Heart, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { Heart, Trash2, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react';
 import { fetchWishlist, removeWishlistItem, removeWishlistItems } from '../services/wishlistService';
+import { addItemToCart } from '../services/cartService';
+import { getPoints } from '../services/pointService';
 import './WishlistPage.css';
 
 function formatCurrency(value, currency = 'KRW') {
@@ -11,18 +13,35 @@ function formatCurrency(value, currency = 'KRW') {
   }).format(value || 0);
 }
 
-function WishlistPage({ user, onBack, onViewProduct }) {
+function WishlistPage({ user, onBack, onViewProduct, onMoveToOrder, pointsBalance = 0 }) {
   const [wishlist, setWishlist] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [removingItemIds, setRemovingItemIds] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [availablePoints, setAvailablePoints] = useState(pointsBalance);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState(0);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
     loadWishlist();
-  }, []);
+    if (user) {
+      loadPoints();
+    }
+  }, [user]);
+
+  const loadPoints = async () => {
+    try {
+      const data = await getPoints();
+      setAvailablePoints(data.availablePoints || 0);
+    } catch (err) {
+      console.error('적립금 로드 실패:', err);
+      setAvailablePoints(0);
+    }
+  };
 
   const loadWishlist = async () => {
     try {
@@ -116,6 +135,77 @@ function WishlistPage({ user, onBack, onViewProduct }) {
     const start = (currentPage - 1) * itemsPerPage;
     const end = start + itemsPerPage;
     return wishlist.items.slice(start, end);
+  };
+
+  // 선택한 상품들 가져오기
+  const selectedProducts = useMemo(() => {
+    if (!wishlist?.items) return [];
+    return wishlist.items.filter((item) => 
+      selectedItems.has(item.product._id || item.product.id)
+    );
+  }, [wishlist, selectedItems]);
+
+  // 선택한 상품들의 합계 금액 계산
+  const subtotal = useMemo(() => {
+    return selectedProducts.reduce((sum, item) => {
+      const product = item.product;
+      const price = product.price || product.priceSale || 0;
+      return sum + price;
+    }, 0);
+  }, [selectedProducts]);
+
+  // 배송비 계산 (2만원 이상 시 무료)
+  const shippingFee = useMemo(() => {
+    return subtotal >= 20000 ? 0 : 3000;
+  }, [subtotal]);
+
+  // 적립금 사용 금액 (최대 사용 가능 적립금까지)
+  const pointsDiscount = useMemo(() => {
+    if (!usePoints || pointsToUse <= 0) return 0;
+    return Math.min(pointsToUse, availablePoints, subtotal);
+  }, [usePoints, pointsToUse, availablePoints, subtotal]);
+
+  // 총 결제금액
+  const total = useMemo(() => {
+    return Math.max(0, subtotal - pointsDiscount + shippingFee);
+  }, [subtotal, pointsDiscount, shippingFee]);
+
+  // 바로 구매 처리
+  const handleDirectPurchase = async () => {
+    if (selectedProducts.length === 0) {
+      alert('구매할 상품을 선택해주세요.');
+      return;
+    }
+
+    if (usePoints && pointsToUse > availablePoints) {
+      alert('사용 가능한 적립금을 초과했습니다.');
+      return;
+    }
+
+    if (usePoints && pointsToUse > subtotal) {
+      alert('적립금은 상품 금액을 초과할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setIsAddingToCart(true);
+      
+      // 선택한 상품들을 장바구니에 추가
+      for (const item of selectedProducts) {
+        const productId = item.product._id || item.product.id;
+        await addItemToCart(productId, 1, {});
+      }
+
+      // OrderPage로 이동
+      if (onMoveToOrder) {
+        onMoveToOrder();
+      }
+    } catch (err) {
+      console.error('장바구니 추가 실패:', err);
+      alert(err.message || '장바구니에 상품을 추가하지 못했습니다.');
+    } finally {
+      setIsAddingToCart(false);
+    }
   };
 
   const totalPages = wishlist?.items
@@ -300,6 +390,160 @@ function WishlistPage({ user, onBack, onViewProduct }) {
               선택 상품 삭제
             </button>
           </div>
+
+          {/* 선택 상품 구매 섹션 */}
+          {selectedProducts.length > 0 && (
+            <div className="wishlist-purchase-summary" style={{
+              marginTop: '2rem',
+              padding: '1.5rem',
+              background: '#f9fafb',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb',
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600 }}>
+                선택 상품 구매
+              </h3>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>상품 합계</span>
+                  <strong>{formatCurrency(subtotal)}</strong>
+                </div>
+                
+                {user && (
+                  <div style={{ marginTop: '1rem', padding: '1rem', background: 'white', borderRadius: '6px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={usePoints}
+                        onChange={(e) => {
+                          setUsePoints(e.target.checked);
+                          if (!e.target.checked) {
+                            setPointsToUse(0);
+                          } else {
+                            setPointsToUse(Math.min(availablePoints, subtotal));
+                          }
+                        }}
+                        style={{ marginRight: '0.5rem' }}
+                      />
+                      <span>적립금 사용</span>
+                      <span style={{ marginLeft: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                        (사용 가능: {formatCurrency(availablePoints)})
+                      </span>
+                    </label>
+                    
+                    {usePoints && (
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          max={Math.min(availablePoints, subtotal)}
+                          value={pointsToUse}
+                          onChange={(e) => {
+                            const value = Math.max(0, Math.min(Number(e.target.value), availablePoints, subtotal));
+                            setPointsToUse(value);
+                          }}
+                          placeholder="사용할 적립금 입력"
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '0.875rem',
+                          }}
+                        />
+                        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setPointsToUse(Math.min(availablePoints, subtotal))}
+                            style={{
+                              padding: '0.25rem 0.75rem',
+                              background: '#f3f4f6',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            전액 사용
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPointsToUse(0)}
+                            style={{
+                              padding: '0.25rem 0.75rem',
+                              background: '#f3f4f6',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            초기화
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {usePoints && pointsDiscount > 0 && (
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem', background: '#eff6ff', borderRadius: '4px', fontSize: '0.875rem', color: '#1e40af' }}>
+                        적립금 할인: -{formatCurrency(pointsDiscount)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', marginBottom: '0.5rem' }}>
+                  <span>배송비</span>
+                  <span>{shippingFee === 0 ? '무료' : formatCurrency(shippingFee)}</span>
+                </div>
+                {subtotal > 0 && subtotal < 20000 && (
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    {formatCurrency(20000 - subtotal)} 추가 구매 시 무료배송
+                  </div>
+                )}
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  marginTop: '1rem', 
+                  paddingTop: '1rem',
+                  borderTop: '2px solid #e5e7eb',
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                }}>
+                  <span>총 결제금액</span>
+                  <strong style={{ color: '#ef4444', fontSize: '1.25rem' }}>
+                    {formatCurrency(total)}
+                  </strong>
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleDirectPurchase}
+                disabled={isAddingToCart || selectedProducts.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '0.875rem',
+                  background: isAddingToCart ? '#9ca3af' : '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: isAddingToCart ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <ShoppingBag size={20} />
+                {isAddingToCart ? '장바구니에 추가 중...' : '선택 상품 바로 구매'}
+              </button>
+            </div>
+          )}
 
           {totalPages > 1 && (
             <div className="wishlist-page__pagination">

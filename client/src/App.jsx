@@ -986,6 +986,8 @@ function App() {
             onBack={() => setView('home')}
             onViewProduct={handleViewProduct}
             onWishlistChange={handleWishlistUpdate}
+            onMoveToOrder={() => setView('order')}
+            pointsBalance={pointsBalance}
           />
         </main>
         <FloatingHomeButton onClick={() => goHome()} />
