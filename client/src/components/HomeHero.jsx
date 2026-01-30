@@ -773,7 +773,7 @@ function HomeHero({
             </nav>
 
             {/* 카테고리 섹션 */}
-            <div className="home-sidebar__section">
+            <div className={`home-sidebar__section ${categoryDropdownOpen ? 'home-sidebar__section--expanded' : ''}`}>
               <button
                 type="button"
                 className="home-sidebar__nav-item home-sidebar__nav-item--expandable"
@@ -790,9 +790,9 @@ function HomeHero({
                 />
               </button>
               {categoryDropdownOpen && (
-                <div className="home-sidebar__dropdown-menu">
+                <div className="home-sidebar__category-list">
                   {categoriesLoading ? (
-                    <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--loading">
+                    <div className="home-sidebar__category-item home-sidebar__category-item--loading">
                       로딩 중...
                     </div>
                   ) : categories.length > 0 ? (
@@ -800,7 +800,7 @@ function HomeHero({
                       <button
                         key={category._id || category.code}
                         type="button"
-                        className="home-sidebar__dropdown-item"
+                        className="home-sidebar__category-item"
                         onClick={() => {
                           setCategoryFilter(category.name);
                           setCategoryDropdownOpen(false);
@@ -809,12 +809,12 @@ function HomeHero({
                       >
                         {category.name}
                         {category.productCount !== undefined && category.productCount > 0 && (
-                          <span className="home-sidebar__dropdown-count">({category.productCount})</span>
+                          <span className="home-sidebar__category-count">({category.productCount})</span>
                         )}
                       </button>
                     ))
                   ) : (
-                    <div className="home-sidebar__dropdown-item home-sidebar__dropdown-item--empty">
+                    <div className="home-sidebar__category-item home-sidebar__category-item--empty">
                       카테고리가 없습니다
                     </div>
                   )}

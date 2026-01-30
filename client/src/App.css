@@ -1532,6 +1532,22 @@ body {
 
 .home-sidebar__section {
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 카테고리 섹션의 버튼과 리스트 연결 */
+.home-sidebar__section--expanded .home-sidebar__nav-item--expandable {
+  border-radius: clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px) 0 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.home-sidebar__section:not(.home-sidebar__section--expanded) .home-sidebar__nav-item--expandable {
+  border-radius: clamp(8px, 1.5vw, 12px);
+}
+
+.home-sidebar__section .home-sidebar__nav-item--expandable + .home-sidebar__category-list {
+  margin-top: 0;
 }
 
 .home-sidebar__section-button {
@@ -1676,6 +1692,89 @@ body {
   overflow-y: auto;
   margin-top: 4px;
   width: 100%;
+}
+
+/* 카테고리 리스트 (인라인 표시) */
+.home-sidebar__category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
+  background: #ffffff;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+  }
+}
+
+.home-sidebar__category-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(0.625rem, 1.5vw, 0.875rem) clamp(1rem, 2.5vw, 1.25rem);
+  background: #ffffff;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+  font-size: clamp(0.8125rem, 1.75vw, 0.9375rem);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+.home-sidebar__category-item:last-child {
+  border-bottom: none;
+}
+
+.home-sidebar__category-item:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.home-sidebar__category-item:active {
+  background: #f3f4f6;
+}
+
+.home-sidebar__category-item--loading,
+.home-sidebar__category-item--empty {
+  color: #6b7280;
+  cursor: default;
+  font-weight: 400;
+}
+
+.home-sidebar__category-item--loading:hover,
+.home-sidebar__category-item--empty:hover {
+  background: #ffffff;
+  color: #6b7280;
+}
+
+.home-sidebar__category-count {
+  font-size: clamp(0.75rem, 1.5vw, 0.8125rem);
+  color: #6b7280;
+  font-weight: 400;
+  margin-left: auto;
+  padding-left: clamp(0.5rem, 1.5vw, 0.75rem);
+}
+
+.home-sidebar__category-item:hover .home-sidebar__category-count {
+  color: #111827;
 }
 
 .home-sidebar__dropdown-item {

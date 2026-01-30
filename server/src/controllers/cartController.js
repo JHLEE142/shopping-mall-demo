@@ -65,7 +65,12 @@ async function getOrCreateCart(req) {
 
 // 회원 장바구니 조회 (기존 함수 유지)
 async function getActiveCart(userId) {
-  return Cart.findOne({ user: userId, status: 'active' }).populate('items.product', 'name price image sku');
+  return Cart.findOne({ user: userId, status: 'active' }).populate({
+    path: 'items.product',
+    select: 'name price image sku',
+    // 삭제된 상품도 null로 유지 (제거하지 않음)
+    match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+  });
 }
 
 exports.getCart = async (req, res) => {
@@ -79,7 +84,12 @@ exports.getCart = async (req, res) => {
       // 비회원 장바구니
       cart = await getOrCreateCart(req);
       if (cart) {
-        cart = await cart.populate('items.product', 'name price image sku');
+        cart = await cart.populate({
+          path: 'items.product',
+          select: 'name price image sku',
+          // 삭제된 상품도 null로 유지 (제거하지 않음)
+          match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+        });
       }
     }
 
@@ -185,7 +195,12 @@ exports.addCartItem = async (req, res) => {
 
     await cart.save();
 
-    const populatedCart = await cart.populate('items.product', 'name price image sku');
+    const populatedCart = await cart.populate({
+      path: 'items.product',
+      select: 'name price image sku',
+      // 삭제된 상품도 null로 유지 (제거하지 않음)
+      match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+    });
 
     return res.status(201).json({ cart: populatedCart });
   } catch (error) {
@@ -232,7 +247,12 @@ exports.updateCartItem = async (req, res) => {
 
     await cart.save();
 
-    const populatedCart = await cart.populate('items.product', 'name price image sku');
+    const populatedCart = await cart.populate({
+      path: 'items.product',
+      select: 'name price image sku',
+      // 삭제된 상품도 null로 유지 (제거하지 않음)
+      match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+    });
 
     return res.json({ cart: populatedCart });
   } catch (error) {
@@ -268,7 +288,12 @@ exports.removeCartItem = async (req, res) => {
 
     await cart.save();
 
-    const populatedCart = await cart.populate('items.product', 'name price image sku');
+    const populatedCart = await cart.populate({
+      path: 'items.product',
+      select: 'name price image sku',
+      // 삭제된 상품도 null로 유지 (제거하지 않음)
+      match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+    });
 
     return res.json({ cart: populatedCart });
   } catch (error) {
@@ -355,7 +380,12 @@ exports.mergeGuestCartToUser = async (userId, guestSessionId, deviceId, ipAddres
     guestCart.status = 'abandoned';
     await guestCart.save();
     
-    return await userCart.populate('items.product', 'name price image sku');
+    return await userCart.populate({
+      path: 'items.product',
+      select: 'name price image sku',
+      // 삭제된 상품도 null로 유지 (제거하지 않음)
+      match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+    });
   } catch (error) {
     console.error('장바구니 병합 실패:', error);
     throw error;

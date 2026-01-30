@@ -113,7 +113,12 @@ async function getUserNotifications(req, res, next) {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit))
-      .populate('relatedProduct', 'name image')
+      .populate({
+        path: 'relatedProduct',
+        select: 'name image',
+        // 삭제된 상품도 null로 유지 (제거하지 않음)
+        match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+      })
       .populate('relatedOrder', 'orderNumber')
       .lean();
 

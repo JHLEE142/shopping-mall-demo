@@ -188,6 +188,10 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
   const [selectedMainCategory, setSelectedMainCategory] = useState('');
   const [selectedMidCategory, setSelectedMidCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
+  const [categoryInputMode, setCategoryInputMode] = useState('select'); // 'select' or 'input'
+  const [customCategoryMain, setCustomCategoryMain] = useState('');
+  const [customCategoryMid, setCustomCategoryMid] = useState('');
+  const [customCategorySub, setCustomCategorySub] = useState('');
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [previewImages, setPreviewImages] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -757,34 +761,66 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       return subId === (selectedSubCategory?.toString() || selectedSubCategory);
     }) : null;
 
-    // 최종 카테고리: 소분류가 있으면 소분류, 없으면 중분류, 둘 다 없으면 대분류
-    // 소분류는 isLeaf=true이므로 소분류를 categoryId로 사용
-    const finalCategory = selectedSub?.name || selectedMid?.name || selectedMain?.name;
-    const categoryMain = selectedMain.name;
-    const categoryMid = selectedMid?.name || null;
-    const categorySub = selectedSub?.name || null;
+    // 직접 입력 모드와 드롭다운 선택 모드 분기 처리
+    let finalCategory, categoryMain, categoryMid, categorySub, finalCategoryId, categoryPathIds, categoryPathText;
     
-    // categoryId는 최종 선택된 카테고리의 ID (우선순위: 소분류 > 중분류 > 대분류)
-    // 상품은 소분류에만 연결되어야 하지만, 소분류가 없을 수도 있으므로 유연하게 처리
-    const finalCategoryId = selectedSub?._id || selectedMid?._id || selectedMain?._id;
-    
-    // categoryPathIds 계산 (경로상의 모든 카테고리 ID)
-    const categoryPathIds = [];
-    if (selectedMain?._id) {
-      categoryPathIds.push(selectedMain._id);
-      if (selectedMid?._id) {
-        categoryPathIds.push(selectedMid._id);
-        if (selectedSub?._id) {
-          categoryPathIds.push(selectedSub._id);
+    if (categoryInputMode === 'input') {
+      // 직접 입력 모드
+      categoryMain = customCategoryMain.trim();
+      categoryMid = customCategoryMid.trim() || null;
+      categorySub = customCategorySub.trim() || null;
+      finalCategory = categorySub || categoryMid || categoryMain;
+      finalCategoryId = null; // 직접 입력 시 categoryId는 null
+      categoryPathIds = []; // 직접 입력 시 categoryPathIds는 빈 배열
+      
+      const pathParts = [categoryMain];
+      if (categoryMid) pathParts.push(categoryMid);
+      if (categorySub) pathParts.push(categorySub);
+      categoryPathText = pathParts.join(' > ');
+    } else {
+      // 드롭다운 선택 모드
+      const selectedMain = selectedMainCategory ? categoryHierarchy.find(m => {
+        const mainId = m._id?.toString() || m._id;
+        return mainId === (selectedMainCategory?.toString() || selectedMainCategory);
+      }) : null;
+
+      const selectedMid = selectedMidCategory && selectedMain ? selectedMain?.children?.find(m => {
+        const midId = m._id?.toString() || m._id;
+        return midId === (selectedMidCategory?.toString() || selectedMidCategory);
+      }) : null;
+
+      const selectedSub = selectedSubCategory && selectedMid ? selectedMid?.children?.find(s => {
+        const subId = s._id?.toString() || s._id;
+        return subId === (selectedSubCategory?.toString() || selectedSubCategory);
+      }) : null;
+
+      // 최종 카테고리: 소분류가 있으면 소분류, 없으면 중분류, 둘 다 없으면 대분류
+      finalCategory = selectedSub?.name || selectedMid?.name || selectedMain?.name;
+      categoryMain = selectedMain?.name;
+      categoryMid = selectedMid?.name || null;
+      categorySub = selectedSub?.name || null;
+      
+      // categoryId는 최종 선택된 카테고리의 ID (우선순위: 소분류 > 중분류 > 대분류)
+      finalCategoryId = selectedSub?._id || selectedMid?._id || selectedMain?._id;
+      
+      // categoryPathIds 계산 (경로상의 모든 카테고리 ID)
+      categoryPathIds = [];
+      if (selectedMain?._id) {
+        categoryPathIds.push(selectedMain._id);
+        if (selectedMid?._id) {
+          categoryPathIds.push(selectedMid._id);
+          if (selectedSub?._id) {
+            categoryPathIds.push(selectedSub._id);
+          }
         }
       }
+      
+      // categoryPathText 계산
+      const pathParts = [selectedMain?.name];
+      if (selectedMid?.name) pathParts.push(selectedMid.name);
+      if (selectedSub?.name) pathParts.push(selectedSub.name);
+      categoryPathText = pathParts.join(' > ');
     }
-    
-    // categoryPathText 계산
-    const pathParts = [selectedMain?.name];
-    if (selectedMid?.name) pathParts.push(selectedMid.name);
-    if (selectedSub?.name) pathParts.push(selectedSub.name);
-    const categoryPathText = pathParts.join(' > ');
 
     if (!formData.name || !categoryMain || !formData.price) {
       setError('필수 항목(상품명, 카테고리, 가격)을 모두 입력해주세요.');
@@ -811,8 +847,9 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         price: Number(formData.price),
         discountRate: discountRate >= 0 && discountRate <= 100 ? discountRate : 0,
         originalPrice: originalPrice && originalPrice > 0 ? originalPrice : null,
-        categoryId: finalCategoryId, // 최종 선택된 카테고리 ID (필수)
-        categoryPathIds: categoryPathIds, // 경로상의 모든 카테고리 ID 배열
+        // 직접 입력 모드일 때는 categoryId와 categoryPathIds를 null/빈 배열로 설정
+        ...(finalCategoryId ? { categoryId: finalCategoryId } : {}),
+        ...(categoryPathIds.length > 0 ? { categoryPathIds: categoryPathIds } : {}),
         categoryPathText: categoryPathText, // 경로 텍스트 (표시용)
         // 하위 호환성 유지
         category: finalCategory,
@@ -1906,13 +1943,133 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                 <label>
                   카테고리 <span className="required">*</span>
                 </label>
+                <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryInputMode('select')}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      background: categoryInputMode === 'select' ? '#111827' : '#fff',
+                      color: categoryInputMode === 'select' ? '#fff' : '#111827',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    드롭다운 선택
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryInputMode('input')}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      background: categoryInputMode === 'input' ? '#111827' : '#fff',
+                      color: categoryInputMode === 'input' ? '#fff' : '#111827',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    직접 입력
+                  </button>
+                </div>
                 {categoriesLoading ? (
                   <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
                     카테고리를 불러오는 중...
                   </div>
+                ) : categoryInputMode === 'input' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div>
+                      <label htmlFor="customMainCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                        대분류 <span className="required">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="customMainCategory"
+                        value={customCategoryMain}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCustomCategoryMain(value);
+                          setFormData((prev) => ({
+                            ...prev,
+                            categoryMain: value,
+                            category: value,
+                            categoryMid: customCategoryMid || '',
+                            categorySub: customCategorySub || '',
+                          }));
+                        }}
+                        placeholder="대분류를 입력하세요 (예: 상의)"
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="customMidCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                        중분류 (선택사항)
+                      </label>
+                      <input
+                        type="text"
+                        id="customMidCategory"
+                        value={customCategoryMid}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCustomCategoryMid(value);
+                          setFormData((prev) => ({
+                            ...prev,
+                            categoryMid: value,
+                            category: value || prev.categoryMain,
+                            categorySub: customCategorySub || '',
+                          }));
+                        }}
+                        placeholder="중분류를 입력하세요 (예: 티셔츠)"
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="customSubCategory" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#666' }}>
+                        소분류 (선택사항)
+                      </label>
+                      <input
+                        type="text"
+                        id="customSubCategory"
+                        value={customCategorySub}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCustomCategorySub(value);
+                          setFormData((prev) => ({
+                            ...prev,
+                            categorySub: value,
+                            category: value || prev.categoryMid || prev.categoryMain,
+                          }));
+                        }}
+                        placeholder="소분류를 입력하세요 (예: 반팔티)"
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.75rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                        }}
+                      />
+                    </div>
+                  </div>
                 ) : categoryHierarchy.length === 0 ? (
                   <div className="form-hint" style={{ color: '#dc3545', marginTop: '0.5rem' }}>
-                    <p style={{ margin: '0 0 0.5rem' }}>카테고리가 없습니다. 서버에서 카테고리를 생성해주세요.</p>
+                    <p style={{ margin: '0 0 0.5rem' }}>카테고리가 없습니다. 직접 입력 모드를 사용하거나 서버에서 카테고리를 생성해주세요.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

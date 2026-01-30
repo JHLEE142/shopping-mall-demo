@@ -105,8 +105,17 @@ function CartPage({
 
   const handleQuantityChange = async (productId, delta) => {
     if (!cart) return;
-    const currentItem = cart.items.find((item) => item.product._id === productId);
+    const currentItem = cart.items.find((item) => {
+      const itemProductId = item.product?._id || item.product;
+      return itemProductId === productId || itemProductId?.toString() === productId?.toString();
+    });
     if (!currentItem) return;
+    
+    // 삭제된 상품은 수량 변경 불가
+    if (!currentItem.product || currentItem.product === null) {
+      setNotice({ type: 'error', message: '삭제된 상품의 수량을 변경할 수 없습니다.' });
+      return;
+    }
 
     const nextQuantity = currentItem.quantity + delta;
     if (nextQuantity < 1) {
@@ -150,6 +159,18 @@ function CartPage({
   };
 
   const handleSaveForLater = async (productId) => {
+    if (!cart) return;
+    const currentItem = cart.items.find((item) => {
+      const itemProductId = item.product?._id || item.product;
+      return itemProductId === productId || itemProductId?.toString() === productId?.toString();
+    });
+    
+    // 삭제된 상품은 찜하기 불가
+    if (!currentItem || !currentItem.product || currentItem.product === null) {
+      setNotice({ type: 'error', message: '삭제된 상품은 찜하기에 추가할 수 없습니다.' });
+      return;
+    }
+    
     try {
       setAddingToWishlist(productId);
       setNotice({ type: '', message: '' });
@@ -210,91 +231,143 @@ function CartPage({
           <div className="cart-page__body">
             <section className="cart-page__items">
               <ul className="cart-item-list">
-                {cart.items.map((item) => {
-                  const isUpdating = updatingItemId === item.product._id;
-                  const isRemoving = removingItemId === item.product._id;
+                {cart.items.map((item, index) => {
+                  const productId = item.product?._id || item.product || `deleted-${index}`;
+                  const isProductDeleted = !item.product || item.product === null;
+                  const isUpdating = updatingItemId === productId;
+                  const isRemoving = removingItemId === productId;
                   const productPrice = item.priceSnapshot;
                   const hasDiscount =
                     item.product?.price && item.product.price > productPrice ? item.product.price : null;
 
                   return (
-                    <li key={item.product._id} className="cart-item-card">
+                    <li key={productId} className="cart-item-card">
                       <div className="cart-item-card__media">
-                        <img src={item.product.image} alt={item.product.name} />
+                        {isProductDeleted ? (
+                          <div style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            background: '#f3f4f6', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            color: '#9ca3af',
+                            fontSize: '0.875rem'
+                          }}>
+                            이미지 없음
+                          </div>
+                        ) : (
+                          <img src={item.product.image || '/placeholder.png'} alt={item.product.name || '상품'} />
+                        )}
                       </div>
                       <div className="cart-item-card__content">
                         <div className="cart-item-card__header">
                           <div>
-                            <h2>{item.product.name}</h2>
-                            <span className="cart-item-card__sku">SKU: {item.product.sku}</span>
+                            <h2 style={{ 
+                              color: isProductDeleted ? '#9ca3af' : 'inherit',
+                              textDecoration: isProductDeleted ? 'line-through' : 'none'
+                            }}>
+                              {isProductDeleted ? '삭제된 상품' : item.product.name}
+                            </h2>
+                            {!isProductDeleted && (
+                              <span className="cart-item-card__sku">SKU: {item.product.sku || 'N/A'}</span>
+                            )}
+                            {isProductDeleted && (
+                              <span className="cart-item-card__sku" style={{ color: '#dc3545' }}>
+                                이 상품은 더 이상 판매되지 않습니다
+                              </span>
+                            )}
                           </div>
                           <button
                             type="button"
                             className="cart-item-card__remove"
-                            onClick={() => handleRemoveItem(item.product._id)}
+                            onClick={() => handleRemoveItem(productId)}
                             disabled={isRemoving || isUpdating}
                           >
                             <Trash2 size={18} />
                           </button>
                         </div>
 
-                        <div className="cart-item-card__meta">
-                          <span>사이즈: {renderOption(item, 'size')}</span>
-                          <span>컬러: {renderOption(item, 'color')}</span>
-                          <span className="cart-item-card__stock">
-                            <span className="cart-item-card__stock-indicator" /> 재고 있음
-                          </span>
-                        </div>
-
-                        <div className="cart-item-card__footer">
-                          <div className="cart-item-card__quantity">
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(item.product._id, -1)}
-                              disabled={isUpdating || item.quantity <= 1}
-                              aria-label="수량 감소"
-                            >
-                              <Minus size={16} />
-                            </button>
-                            <span>{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(item.product._id, 1)}
-                              disabled={isUpdating}
-                              aria-label="수량 증가"
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </div>
-
-                          <div className="cart-item-card__price">
-                            <strong>{formatCurrency(productPrice * item.quantity, currencyCode)}</strong>
-                            {hasDiscount && (
-                              <span className="cart-item-card__price-original">
-                                {formatCurrency(hasDiscount * item.quantity, currencyCode)}
+                        {!isProductDeleted && (
+                          <>
+                            <div className="cart-item-card__meta">
+                              <span>사이즈: {renderOption(item, 'size')}</span>
+                              <span>컬러: {renderOption(item, 'color')}</span>
+                              <span className="cart-item-card__stock">
+                                <span className="cart-item-card__stock-indicator" /> 재고 있음
                               </span>
-                            )}
-                          </div>
-                        </div>
+                            </div>
 
-                        <div className="cart-item-card__actions">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveForLater(item.product._id)}
-                            disabled={addingToWishlist === item.product._id || isUpdating || isRemoving}
-                          >
-                            <Heart size={16} />
-                            찜하기
-                          </button>
-                          <button
-                            type="button"
-                            className="cart-item-card__action-remove"
-                            onClick={() => handleRemoveItem(item.product._id)}
-                            disabled={isRemoving || isUpdating}
-                          >
-                            삭제하기
-                          </button>
-                        </div>
+                            <div className="cart-item-card__footer">
+                              <div className="cart-item-card__quantity">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(productId, -1)}
+                                  disabled={isUpdating || item.quantity <= 1}
+                                  aria-label="수량 감소"
+                                >
+                                  <Minus size={16} />
+                                </button>
+                                <span>{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(productId, 1)}
+                                  disabled={isUpdating}
+                                  aria-label="수량 증가"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                              </div>
+
+                              <div className="cart-item-card__price">
+                                <strong>{formatCurrency(productPrice * item.quantity, currencyCode)}</strong>
+                                {hasDiscount && (
+                                  <span className="cart-item-card__price-original">
+                                    {formatCurrency(hasDiscount * item.quantity, currencyCode)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="cart-item-card__actions">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveForLater(productId)}
+                                disabled={addingToWishlist === productId || isUpdating || isRemoving}
+                              >
+                                <Heart size={16} />
+                                찜하기
+                              </button>
+                              <button
+                                type="button"
+                                className="cart-item-card__action-remove"
+                                onClick={() => handleRemoveItem(productId)}
+                                disabled={isRemoving || isUpdating}
+                              >
+                                삭제하기
+                              </button>
+                            </div>
+                          </>
+                        )}
+                        {isProductDeleted && (
+                          <div className="cart-item-card__footer">
+                            <div className="cart-item-card__price">
+                              <strong style={{ color: '#9ca3af' }}>
+                                {formatCurrency(productPrice * item.quantity, currencyCode)}
+                              </strong>
+                            </div>
+                            <div className="cart-item-card__actions">
+                              <button
+                                type="button"
+                                className="cart-item-card__action-remove"
+                                onClick={() => handleRemoveItem(productId)}
+                                disabled={isRemoving || isUpdating}
+                              >
+                                삭제하기
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </li>
                   );
