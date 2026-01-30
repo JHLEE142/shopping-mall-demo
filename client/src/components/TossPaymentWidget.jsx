@@ -83,6 +83,13 @@ function TossPaymentWidget({
         // 결제 수단 선택 이벤트
         paymentMethodWidget.on('paymentMethodSelect', (selectedPaymentMethod) => {
           console.log('selectedPaymentMethod: ', selectedPaymentMethod);
+          // 결제 수단이 선택되면 버튼 활성화를 위한 상태 업데이트는 필요 없음
+          // (이미 isReady가 true이므로 버튼은 활성화됨)
+        });
+        
+        // 결제 수단 선택 해제 이벤트 (필요시)
+        paymentMethodWidget.on('paymentMethodUnselect', () => {
+          console.log('결제 수단 선택 해제됨');
         });
 
         setIsReady(true);
@@ -126,14 +133,22 @@ function TossPaymentWidget({
       }
 
       const orderId = generateOrderId();
-      const selectedPaymentMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
-      
-      console.log('selectedPaymentMethod: ', selectedPaymentMethod);
+
+      // 결제 수단 선택 확인 (선택적 - 에러 방지용)
+      let selectedPaymentMethod = null;
+      try {
+        selectedPaymentMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
+        console.log('selectedPaymentMethod: ', selectedPaymentMethod);
+      } catch (methodError) {
+        // 결제 수단이 선택되지 않았어도 requestPayment를 시도 (위젯이 자동으로 선택 UI 표시)
+        console.warn('결제 수단 선택 확인 실패 (계속 진행):', methodError);
+      }
 
       const widgets = tossPaymentsRef.current.widgets({
         customerKey: ANONYMOUS,
       });
 
+      // requestPayment 호출 - 결제 수단이 선택되지 않았으면 위젯이 자동으로 선택 UI를 표시
       await widgets.requestPayment({
         orderId,
         orderName,
@@ -146,7 +161,22 @@ function TossPaymentWidget({
     } catch (error) {
       console.error('결제 요청 실패:', error);
       setIsLoading(false);
-      onPaymentError?.(error);
+      
+      // 에러 메시지 파싱
+      let errorMessage = error?.message || error?.toString() || '결제 처리 중 오류가 발생했습니다.';
+      
+      // 토스페이먼츠 에러 메시지 처리
+      if (errorMessage.includes('결제수단이 아직 선택되지 않았어요') || 
+          errorMessage.includes('결제수단을 선택해 주세요') ||
+          errorMessage.includes('payment method')) {
+        errorMessage = '결제 수단을 선택해주세요. 위젯에서 결제 수단을 먼저 선택한 후 결제하기 버튼을 클릭해주세요.';
+      }
+      
+      // 에러 객체가 아닌 경우 Error 객체로 변환
+      const paymentError = error instanceof Error ? error : new Error(errorMessage);
+      paymentError.message = errorMessage;
+      
+      onPaymentError?.(paymentError);
     }
   };
 
