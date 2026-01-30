@@ -486,13 +486,13 @@ function CartPage({
                           {productName}
                         </h3>
                         <p>{formatCurrency(productPrice, currencyCode)}</p>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
                           <button
                             type="button"
                             onClick={() => handleAddToCart(productId)}
                             disabled={isAdding}
+                            title={isAdding ? '추가 중...' : '장바구니에 담기'}
                             style={{
-                              flex: 1,
                               padding: '0.5rem',
                               background: isAdding ? '#9ca3af' : '#ef4444',
                               color: 'white',
@@ -502,17 +502,34 @@ function CartPage({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '0.25rem',
-                              fontSize: '0.875rem',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isAdding) {
+                                e.currentTarget.style.background = '#dc2626';
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isAdding) {
+                                e.currentTarget.style.background = '#ef4444';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }
                             }}
                           >
-                            <ShoppingBag size={14} />
-                            {isAdding ? '추가 중...' : '장바구니 담기'}
+                            {isAdding ? (
+                              <span style={{ fontSize: '0.75rem' }}>...</span>
+                            ) : (
+                              <ShoppingBag size={18} />
+                            )}
                           </button>
                           <button
                             type="button"
                             onClick={() => onViewProduct && onViewProduct({ id: productId, ...product })}
                             style={{
+                              flex: 1,
                               padding: '0.5rem 1rem',
                               background: '#f3f4f6',
                               border: '1px solid #d1d5db',
