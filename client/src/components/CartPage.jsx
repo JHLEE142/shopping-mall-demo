@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Heart, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { Heart, Minus, Plus, Trash2, ShoppingBag, Eye } from 'lucide-react';
 import { fetchCart, removeCartItem, updateCartItemQuantity, addItemToCart } from '../services/cartService';
 import { addWishlistItem } from '../services/wishlistService';
 import { fetchProducts } from '../services/productService';
@@ -491,9 +491,9 @@ function CartPage({
                             type="button"
                             onClick={() => handleAddToCart(productId)}
                             disabled={isAdding}
-                            title={isAdding ? '추가 중...' : '장바구니에 담기'}
                             style={{
-                              padding: '0.5rem',
+                              flex: 1,
+                              padding: '0.75rem 1rem',
                               background: isAdding ? '#9ca3af' : '#ef4444',
                               color: 'white',
                               border: 'none',
@@ -502,43 +502,52 @@ function CartPage({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: '2.5rem',
-                              height: '2.5rem',
+                              gap: '0.5rem',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
                               transition: 'all 0.2s ease',
                             }}
                             onMouseEnter={(e) => {
                               if (!isAdding) {
                                 e.currentTarget.style.background = '#dc2626';
-                                e.currentTarget.style.transform = 'scale(1.05)';
                               }
                             }}
                             onMouseLeave={(e) => {
                               if (!isAdding) {
                                 e.currentTarget.style.background = '#ef4444';
-                                e.currentTarget.style.transform = 'scale(1)';
                               }
                             }}
                           >
-                            {isAdding ? (
-                              <span style={{ fontSize: '0.75rem' }}>...</span>
-                            ) : (
-                              <ShoppingBag size={18} />
-                            )}
+                            <ShoppingBag size={18} />
+                            {isAdding ? '추가 중...' : '장바구니 담기'}
                           </button>
                           <button
                             type="button"
                             onClick={() => onViewProduct && onViewProduct({ id: productId, ...product })}
+                            title="상세보기"
                             style={{
-                              flex: 1,
-                              padding: '0.5rem 1rem',
+                              padding: '0.5rem',
                               background: '#f3f4f6',
                               border: '1px solid #d1d5db',
                               borderRadius: '4px',
                               cursor: 'pointer',
-                              fontSize: '0.875rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '2.5rem',
+                              height: '2.5rem',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.borderColor = '#9ca3af';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#f3f4f6';
+                              e.currentTarget.style.borderColor = '#d1d5db';
                             }}
                           >
-                            상세보기
+                            <Eye size={18} color="#374151" />
                           </button>
                         </div>
                       </div>
