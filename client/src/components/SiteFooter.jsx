@@ -16,15 +16,17 @@ const BANK_INFOS = [
   { label: '하나', value: '455-910458-16907' },
 ];
 
-const FOOTER_LINKS = ['이용안내', '이용약관', '개인정보취급방침', 'instagram'];
-
 const COMPANY_INFO = [
   '커멧랩스',
-  '경기도 성남시 분당구 서현로237번길 22, 3층  대표 : 이정현  사업자등록번호 : 455-910458-16907',
+  '경기도 성남시 분당구 서현로237번길 22, 3층',
+  '대표 : 이정현',
+  '사업자등록번호 : 355-74-00518',
   '통신판매업 신고 : 제2025-성남분당B-1100호',
   '반품주소 : 경기도 성남시 분당구 서현로237번길 22, 3층',
   'COPYRIGHT(C) 커멧랩스 ALL RIGHT RESERVED. / Hosting By CometLabs',
 ];
+
+const FOOTER_LINKS = ['이용안내', '이용약관', '개인정보취급방침', 'instagram'];
 
 function SiteFooter({
   onNavigateBoard = () => {},
