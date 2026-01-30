@@ -401,6 +401,20 @@ body {
   gap: 0.75rem;
 }
 
+#google-signin-button {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#google-signin-button > div {
+  width: 100% !important;
+}
+
+#google-signin-button iframe {
+  width: 100% !important;
+}
+
 .social-login-button {
   width: 100%;
   padding: 0.85rem 1rem;

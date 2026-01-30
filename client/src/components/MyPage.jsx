@@ -93,9 +93,7 @@ function MyPage({
               >
                 {user?.name || user?.email || '사용자'} <ChevronRight size={16} />
               </button>
-              <div className="my-page__membership">
-                LV.2 프렌즈 · 최대 2.5% 적립 · 무료배송
-              </div>
+            
             </div>
           </div>
         </section>
@@ -105,16 +103,6 @@ function MyPage({
           <div className="my-page__balance-item" onClick={onMoveToPoints}>
             <div className="my-page__balance-label">적립금</div>
             <div className="my-page__balance-value">{pointsBalance.toLocaleString()}원</div>
-            <ChevronRight size={16} className="my-page__balance-arrow" />
-          </div>
-          <div className="my-page__balance-item" onClick={onMoveToMoneyTopup}>
-            <div className="my-page__balance-label">머니</div>
-            <div className="my-page__balance-action">충전하기</div>
-            <ChevronRight size={16} className="my-page__balance-arrow" />
-          </div>
-          <div className="my-page__balance-item" onClick={onMoveToCoupons}>
-            <div className="my-page__balance-label">쿠폰</div>
-            <div className="my-page__balance-value">0장</div>
             <ChevronRight size={16} className="my-page__balance-arrow" />
           </div>
         </section>
@@ -128,7 +116,7 @@ function MyPage({
           </section>
         )}
 
-        {/* 프로모션 배너 */}
+        {/* 프로모션 배너 
         <section className="my-page__banner">
           <div className="my-page__banner-content">
             <div className="my-page__banner-text">
@@ -137,7 +125,7 @@ function MyPage({
             </div>
             <ArrowRight size={20} />
           </div>
-        </section>
+        </section> */}
 
         {/* 주문 내역 섹션 */}
         <section className="my-page__menu-section">
@@ -152,7 +140,6 @@ function MyPage({
           >
             <div className="my-page__menu-content">
               <div className="my-page__menu-title">주문 내역</div>
-              <div className="my-page__menu-subtitle">온·오프라인, 상품권, 티켓 주문 내역 모아보기</div>
             </div>
             <ChevronRight size={20} />
           </button>

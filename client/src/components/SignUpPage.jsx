@@ -246,7 +246,12 @@ function SignUpPage({
       setFormData(INITIAL_FORM_DATA);
       setAgreements(INITIAL_AGREEMENTS);
       setStatus('success');
-      setSuccessMessage('가입이 완료되었어요! 이제 쇼핑을 시작해보세요.');
+      setSuccessMessage('가입이 완료되었어요! 로그인 페이지로 이동합니다.');
+
+      // 성공 메시지를 잠시 보여준 후 로그인 페이지로 이동
+      setTimeout(() => {
+        onNavigateToLogin();
+      }, 1500);
     } catch (submitError) {
       setStatus('error');
       setError(submitError.message || '회원가입에 실패했어요.');

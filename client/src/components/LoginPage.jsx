@@ -145,7 +145,7 @@ function LoginPage({
           {
             theme: 'outline',
             size: 'large',
-            width: '100%',
+            width: 300,
             text: 'signin_with',
             locale: 'ko',
           }
