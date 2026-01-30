@@ -115,7 +115,18 @@ function App() {
       return queryView;
     }
     
-    return validViews.includes(view) ? view : 'home';
+    // 유효한 view인지 확인하고, 유효하지 않으면 home으로
+    if (validViews.includes(view)) {
+      return view;
+    }
+    
+    // 유효하지 않은 view면 home으로 리다이렉트
+    console.warn(`Invalid view in URL: ${view}, redirecting to home`);
+    // URL을 즉시 변경
+    if (window.history.replaceState) {
+      window.history.replaceState({ view: 'home' }, '', '/');
+    }
+    return 'home';
   };
 
   // URL에서 productId 읽기
@@ -326,7 +337,46 @@ function App() {
       // 메인페이지가 아닌 경우에만 리다이렉트 (로그인 여부 상관없이)
       if (currentPath !== '/' && currentPath !== '') {
         console.log('Redirecting to home due to 404 error');
-        setView('home', { replace: true });
+        // 즉시 리다이렉트
+        window.history.replaceState({ view: 'home' }, '', '/');
+        setView('home', { replace: true, skipHistory: true });
+      }
+    };
+
+    // 전역 fetch 인터셉터 - 모든 fetch 요청에서 404 감지
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+      try {
+        const response = await originalFetch.apply(this, args);
+        
+        // 404 응답 감지
+        if (response.status === 404) {
+          const url = args[0]?.toString() || '';
+          console.warn(`404 error detected for URL: ${url}`);
+          
+          // 페이지 자체가 404인 경우 (HTML 요청)
+          if (url.includes(window.location.origin) && !url.includes('/api/')) {
+            redirectToHome();
+            return response;
+          }
+          
+          // API 404는 이벤트로 처리
+          window.dispatchEvent(new CustomEvent('404error', { 
+            detail: { url, type: 'api', response } 
+          }));
+        }
+        
+        return response;
+      } catch (error) {
+        // 네트워크 에러 처리
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+          console.warn('Network error detected:', error);
+          const url = args[0]?.toString() || '';
+          if (url.includes(window.location.origin) && !url.includes('/api/')) {
+            redirectToHome();
+          }
+        }
+        throw error;
       }
     };
 
@@ -373,6 +423,8 @@ function App() {
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
+      // fetch 원래대로 복원
+      window.fetch = originalFetch;
       window.removeEventListener('error', handleError);
       window.removeEventListener('404error', handle404Error);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
