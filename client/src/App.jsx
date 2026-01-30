@@ -178,7 +178,6 @@ function App() {
   };
 
   const footerBoardViewMap = {
-    '카카오톡 상담': 'kakao-support',
     '자주 묻는 질문': 'faq',
     '반품/교환': 'shipping-return-policy',
     '구매후기': 'review-board',
