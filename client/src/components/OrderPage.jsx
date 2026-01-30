@@ -65,12 +65,38 @@ function OrderPage({
     
     // address가 객체인 경우
     if (typeof address === 'object') {
+      // roadAddress가 있으면 우선 사용
+      let roadAddress = address.roadAddress || address.address1 || address.address || '';
+      
+      // address1이 불완전한 경우 (예: "경기"만 있으면) 다른 필드들을 조합
+      if (!roadAddress || roadAddress.length < 5) {
+        // state, city 등을 조합해서 도로명 주소 재구성
+        const parts = [];
+        if (address.state || address.sido) {
+          parts.push(address.state || address.sido);
+        }
+        if (address.city || address.sigungu) {
+          parts.push(address.city || address.sigungu);
+        }
+        if (address.address1 && address.address1.length > 2) {
+          // address1에 추가 정보가 있으면 포함
+          const addr1 = address.address1.trim();
+          // 이미 state나 city에 포함되지 않은 부분만 추가
+          if (!parts.some(part => addr1.includes(part))) {
+            parts.push(addr1);
+          }
+        }
+        if (parts.length > 0) {
+          roadAddress = parts.join(' ');
+        }
+      }
+      
       return {
         postalCode: address.postalCode || address.zonecode || '',
-        address1: address.address1 || address.address || address.roadAddress || '',
+        address1: roadAddress, // 도로명 주소 전체
         address2: address.address2 || address.addressDetail || '',
-        city: address.city || '',
-        state: address.state || '',
+        city: address.city || address.sigungu || '',
+        state: address.state || address.sido || '',
       };
     }
     
@@ -84,22 +110,63 @@ function OrderPage({
       let addressStr = address.replace(/\[\d{5}\]\s*/, '').trim();
       
       // 시/도 추출
-      const stateMatch = addressStr.match(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/);
-      const state = stateMatch ? stateMatch[1] : '';
+      const stateMatch = addressStr.match(/^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/);
+      const state = stateMatch ? stateMatch[1].replace(/특별시|광역시|특별자치시|특별자치도|도$/, '').replace(/특별|광역|자치/g, '') : '';
       
-      // 도시 추출 (시/구/군)
-      const cityMatch = addressStr.match(/([가-힣]+(?:시|구|군))/);
+      // 도시 추출 (시/군/구)
+      const cityMatch = addressStr.match(/([가-힣]+(?:시|군|구))/);
       const city = cityMatch ? cityMatch[1] : '';
       
-      // 주소와 상세주소 분리 (공백이나 쉼표로 구분)
-      const parts = addressStr.split(/\s*,\s*|\s+/);
-      const address1 = parts[0] || addressStr;
-      const address2 = parts.slice(1).join(' ') || '';
+      // 상세주소 패턴 찾기 (동/호수/층 등으로 시작하는 부분)
+      // 상세주소는 보통 "101동 101호", "101-101", "아파트 101동" 같은 형식
+      const detailPattern = /(?:동|호|층|번지|아파트|빌라|오피스텔|상가|단지|로비|지하|지상).*$/;
+      const detailMatch = addressStr.match(detailPattern);
+      
+      let roadAddress = addressStr;
+      let address2 = '';
+      
+      if (detailMatch) {
+        // 상세주소가 있으면 분리
+        const detailIndex = addressStr.indexOf(detailMatch[0]);
+        // 상세주소 시작 전까지가 도로명 주소
+        // 상세주소는 보통 숫자로 시작하거나 특정 키워드로 시작
+        const detailStartPattern = /(\d+동|\d+호|\d+층|\d+번지|아파트|빌라|오피스텔|상가|단지)/;
+        const detailStartMatch = addressStr.match(detailStartPattern);
+        
+        if (detailStartMatch) {
+          const splitIndex = addressStr.indexOf(detailStartMatch[0]);
+          roadAddress = addressStr.substring(0, splitIndex).trim();
+          address2 = addressStr.substring(splitIndex).trim();
+        } else {
+          // 패턴이 없으면 쉼표나 공백으로 분리 시도
+          const parts = addressStr.split(/\s*,\s*/);
+          if (parts.length > 1) {
+            roadAddress = parts[0].trim();
+            address2 = parts.slice(1).join(', ').trim();
+          } else {
+            // 쉼표가 없으면 공백으로 분리 (마지막 부분이 상세주소일 가능성)
+            const spaceParts = addressStr.split(/\s+/);
+            if (spaceParts.length > 4) {
+              // 도로명 주소는 보통 시/도 + 시/군/구 + 도로명 + 건물번호 (4-5개 단어)
+              // 그 이후는 상세주소일 가능성이 높음
+              const roadAddressParts = spaceParts.slice(0, Math.min(5, spaceParts.length - 1));
+              roadAddress = roadAddressParts.join(' ').trim();
+              address2 = spaceParts.slice(roadAddressParts.length).join(' ').trim();
+            } else {
+              roadAddress = addressStr;
+            }
+          }
+        }
+      }
+      
+      // 도로명 주소에서 시/도, 시/군/구 제거 (이미 state, city에 저장됨)
+      // 하지만 address1에는 전체 도로명 주소를 유지해야 함
+      // 따라서 roadAddress를 그대로 사용
       
       return {
         postalCode,
-        address1,
-        address2,
+        address1: roadAddress, // 도로명 주소 전체 (상세주소 제외)
+        address2, // 상세주소
         city,
         state,
       };
