@@ -25,6 +25,29 @@ function TossPaymentWidget({
 
     async function initTossPayments() {
       try {
+        // DOM 요소가 준비될 때까지 대기
+        const checkDOMReady = () => {
+          const paymentMethodEl = document.getElementById('payment-method');
+          const agreementEl = document.getElementById('agreement');
+          return paymentMethodEl && agreementEl;
+        };
+
+        // DOM 요소가 준비될 때까지 최대 5초 대기
+        let attempts = 0;
+        const maxAttempts = 50; // 5초 (100ms * 50)
+        while (!checkDOMReady() && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        if (!checkDOMReady()) {
+          console.warn('토스페이먼츠 DOM 요소를 찾을 수 없습니다.');
+          if (isMounted) {
+            setIsReady(true); // DOM 요소가 없어도 버튼은 활성화 (fallback)
+          }
+          return;
+        }
+
         const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
         if (!isMounted) return;
 
@@ -64,6 +87,8 @@ function TossPaymentWidget({
       } catch (error) {
         console.error('토스페이먼츠 초기화 실패:', error);
         if (isMounted) {
+          // 초기화 실패해도 버튼은 활성화 (사용자가 재시도할 수 있도록)
+          setIsReady(true);
           onPaymentError?.(error);
         }
       }
@@ -125,9 +150,21 @@ function TossPaymentWidget({
         type="button"
         className="payment-request-button"
         onClick={handlePaymentRequest}
-        disabled={!isReady || isLoading || disabled}
+        disabled={(() => {
+          const btnDisabled = !isReady || isLoading || disabled;
+          if (btnDisabled && process.env.NODE_ENV === 'development') {
+            console.log('결제 버튼 비활성화 상태:', {
+              isReady,
+              isLoading,
+              disabled,
+              reason: !isReady ? '위젯 초기화 대기 중' : isLoading ? '결제 처리 중' : disabled ? '외부에서 비활성화됨' : '알 수 없음',
+            });
+          }
+          return btnDisabled;
+        })()}
+        title={!isReady ? '결제 위젯 로딩 중...' : isLoading ? '결제 처리 중...' : disabled ? '결제 조건을 확인해주세요' : '결제하기'}
       >
-        {isLoading ? '결제 처리 중...' : '결제하기'}
+        {isLoading ? '결제 처리 중...' : !isReady ? '결제 위젯 로딩 중...' : '결제하기'}
       </button>
     </div>
   );

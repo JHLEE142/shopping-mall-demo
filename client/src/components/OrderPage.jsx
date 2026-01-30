@@ -596,7 +596,19 @@ function OrderPage({
             customerPhone={formData.phone}
             onPaymentSuccess={handlePaymentSuccess}
             onPaymentError={handlePaymentError}
-            disabled={isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1}
+            disabled={(() => {
+              const disabled = isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1;
+              if (disabled) {
+                console.log('결제 버튼 비활성화 이유:', {
+                  isSubmitting,
+                  orderStatus,
+                  hasName: !!formData.name,
+                  hasPhone: !!formData.phone,
+                  hasAddress1: !!formData.address1,
+                });
+              }
+              return disabled;
+            })()}
             onBeforePayment={() => {
               // 결제 전 주문 정보를 sessionStorage에 저장
               const orderData = {
