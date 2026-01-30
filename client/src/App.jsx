@@ -54,57 +54,59 @@ import PaymentSuccessPage from './components/PaymentSuccessPage';
 import PaymentFailPage from './components/PaymentFailPage';
 
 function App() {
+  // 유효한 view 목록 (함수 외부로 이동하여 재사용)
+  const validViews = [
+    'home',
+    'login',
+    'signup',
+    'password-reset',
+    'admin',
+    'product-create',
+    'product-edit',
+    'product-detail',
+    'lookbook',
+    'style-note',
+    'cart',
+    'order',
+    'order-list',
+    'order-detail',
+    'tracking',
+    'wishlist',
+    'settings',
+    'points',
+    'mypage',
+    'notifications',
+    'profile-edit',
+    'money-topup',
+    'coupon',
+    'shipping-return-policy',
+    'cancel-return-exchange-history',
+    'event-benefit',
+    'feedback',
+    'inquiry-history',
+    'product-inquiry-history',
+    'notice',
+    'recently-viewed-products',
+    'new',
+    'about',
+    'faq',
+    'review-board',
+    'delivery-inquiry',
+    'payment-cancel',
+    'kakao-support',
+    'terms',
+    'privacy',
+    'marketing',
+    'loyalty-hall',
+    'payment-success',
+    'payment-fail',
+  ];
+
   // URL에서 초기 view 읽기
   const getInitialView = () => {
     const path = window.location.pathname;
     if (path === '/' || path === '') return 'home';
     const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
-    const validViews = [
-      'home',
-      'login',
-      'signup',
-      'password-reset',
-      'admin',
-      'product-create',
-      'product-edit',
-      'product-detail',
-      'lookbook',
-      'style-note',
-      'cart',
-      'order',
-      'order-list',
-      'order-detail',
-      'tracking',
-      'wishlist',
-      'settings',
-      'points',
-      'mypage',
-      'notifications',
-      'profile-edit',
-      'money-topup',
-      'coupon',
-      'shipping-return-policy',
-      'cancel-return-exchange-history',
-      'event-benefit',
-      'feedback',
-      'inquiry-history',
-      'product-inquiry-history',
-      'notice',
-      'recently-viewed-products',
-      'new',
-      'about',
-      'faq',
-      'review-board',
-      'delivery-inquiry',
-      'payment-cancel',
-      'kakao-support',
-      'terms',
-      'privacy',
-      'marketing',
-      'loyalty-hall',
-      'payment-success',
-      'payment-fail',
-    ];
     
     // 쿼리 파라미터에서 view 확인
     const urlParams = new URLSearchParams(window.location.search);
@@ -309,29 +311,141 @@ function App() {
     }
   }, [view]);
 
+  // 유효한 view 목록
+  const validViews = [
+    'home',
+    'login',
+    'signup',
+    'password-reset',
+    'admin',
+    'product-create',
+    'product-edit',
+    'product-detail',
+    'lookbook',
+    'style-note',
+    'cart',
+    'order',
+    'order-list',
+    'order-detail',
+    'tracking',
+    'wishlist',
+    'settings',
+    'points',
+    'mypage',
+    'notifications',
+    'profile-edit',
+    'money-topup',
+    'coupon',
+    'shipping-return-policy',
+    'cancel-return-exchange-history',
+    'event-benefit',
+    'feedback',
+    'inquiry-history',
+    'product-inquiry-history',
+    'notice',
+    'recently-viewed-products',
+    'new',
+    'about',
+    'faq',
+    'review-board',
+    'delivery-inquiry',
+    'payment-cancel',
+    'kakao-support',
+    'terms',
+    'privacy',
+    'marketing',
+    'loyalty-hall',
+    'payment-success',
+    'payment-fail',
+  ];
+
+  // view가 유효하지 않으면 home으로 리다이렉트
+  useEffect(() => {
+    if (view && !validViews.includes(view)) {
+      console.warn(`Invalid view: ${view}, redirecting to home`);
+      setView('home', { replace: true });
+    }
+  }, [view]);
+
+  // 전역 에러 핸들러 (404 등)
+  useEffect(() => {
+    const handleError = (event) => {
+      // 404 에러나 네트워크 에러 발생 시 메인으로 리다이렉트
+      if (event.error && (
+        event.error.message?.includes('404') ||
+        event.error.message?.includes('Failed to fetch') ||
+        event.error.message?.includes('NetworkError')
+      )) {
+        console.warn('Error detected, redirecting to home:', event.error);
+        // 현재 view가 유효한지 확인하고, 유효하지 않으면 home으로
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/' && currentPath !== '') {
+          const currentView = currentPath.slice(1).split('?')[0];
+          if (!validViews.includes(currentView)) {
+            setView('home', { replace: true });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', (event) => {
+      if (event.reason && (
+        event.reason.message?.includes('404') ||
+        event.reason.message?.includes('Failed to fetch') ||
+        event.reason.message?.includes('NetworkError')
+      )) {
+        console.warn('Unhandled promise rejection, checking view:', event.reason);
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/' && currentPath !== '') {
+          const currentView = currentPath.slice(1).split('?')[0];
+          if (!validViews.includes(currentView)) {
+            setView('home', { replace: true });
+          }
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+
   // 브라우저 뒤로가기/앞으로가기 처리
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state;
       if (state && state.view) {
-        setViewState(state.view);
-        if (state.view === 'home' && state.homeState) {
-          setHomeRestoreState(state.homeState);
-          setPendingHomeRestore(true);
-          setSelectedCategory(state.homeState.categoryFilter || null);
-        }
-        // productId가 state에 있으면 복원
-        if (state.productId) {
-          setSelectedProductId(state.productId);
+        // 유효한 view인지 확인
+        if (validViews.includes(state.view)) {
+          setViewState(state.view);
+          if (state.view === 'home' && state.homeState) {
+            setHomeRestoreState(state.homeState);
+            setPendingHomeRestore(true);
+            setSelectedCategory(state.homeState.categoryFilter || null);
+          }
+          // productId가 state에 있으면 복원
+          if (state.productId) {
+            setSelectedProductId(state.productId);
+          }
+        } else {
+          // 유효하지 않은 view면 home으로 리다이렉트
+          setView('home', { replace: true });
         }
       } else {
         // state가 없으면 URL에서 읽기
         const currentView = getInitialView();
-        setViewState(currentView);
-        // URL에서 productId 읽기
-        const urlProductId = getProductIdFromURL();
-        if (urlProductId && currentView === 'product-detail') {
-          setSelectedProductId(urlProductId);
+        // 유효한 view인지 확인
+        if (validViews.includes(currentView)) {
+          setViewState(currentView);
+          // URL에서 productId 읽기
+          const urlProductId = getProductIdFromURL();
+          if (urlProductId && currentView === 'product-detail') {
+            setSelectedProductId(urlProductId);
+          }
+        } else {
+          // 유효하지 않으면 home으로 리다이렉트
+          setView('home', { replace: true });
         }
       }
     };
@@ -341,7 +455,13 @@ function App() {
     // 초기 히스토리 상태 설정
     if (window.history.state === null) {
       const initialView = getInitialView();
-      window.history.replaceState({ view: initialView }, '', initialView === 'home' ? '/' : `/${initialView}`);
+      // 유효한 view인지 확인
+      if (validViews.includes(initialView)) {
+        window.history.replaceState({ view: initialView }, '', initialView === 'home' ? '/' : `/${initialView}`);
+      } else {
+        window.history.replaceState({ view: 'home' }, '', '/');
+        setViewState('home');
+      }
     }
 
     return () => {
