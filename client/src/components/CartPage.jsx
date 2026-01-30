@@ -1,38 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Heart, Minus, Plus, Trash2 } from 'lucide-react';
-import { fetchCart, removeCartItem, updateCartItemQuantity } from '../services/cartService';
+import { Heart, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { fetchCart, removeCartItem, updateCartItemQuantity, addItemToCart } from '../services/cartService';
 import { addWishlistItem } from '../services/wishlistService';
-
-const RECOMMENDED_PRODUCTS = [
-  {
-    id: 'rec-1',
-    title: 'Urban Pleats Skirt',
-    price: 89000,
-    image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=560&q=80',
-    tag: '신상',
-  },
-  {
-    id: 'rec-2',
-    title: 'Soft Draped Jacket',
-    price: 129000,
-    image: 'https://images.unsplash.com/photo-1514996937319-344454492b37?auto=format&fit=crop&w=560&q=80',
-    tag: '베스트',
-  },
-  {
-    id: 'rec-3',
-    title: 'Minimal Knit Top',
-    price: 69000,
-    image: 'https://images.unsplash.com/photo-1530023367847-a683933f4175?auto=format&fit=crop&w=560&q=80',
-    tag: '코로라 추천',
-  },
-  {
-    id: 'rec-4',
-    title: 'Contour Wide Pants',
-    price: 99000,
-    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=560&q=80',
-    tag: '한정수량',
-  },
-];
+import { fetchProducts } from '../services/productService';
 
 function normalizeSelectedOptions(options) {
   if (!options) return {};
@@ -66,6 +36,9 @@ function CartPage({
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [removingItemId, setRemovingItemId] = useState(null);
   const [addingToWishlist, setAddingToWishlist] = useState(null);
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,6 +65,69 @@ function CartPage({
       isMounted = false;
     };
   }, [onCartChange]);
+
+  // 추천 상품 로드
+  useEffect(() => {
+    async function loadRecommendedProducts() {
+      try {
+        setRecommendedLoading(true);
+        // 장바구니에 있는 상품들의 카테고리를 기반으로 추천 상품 가져오기
+        if (cart?.items?.length > 0) {
+          // 첫 번째 상품의 카테고리를 기준으로 추천
+          const firstProduct = cart.items[0].product;
+          const category = firstProduct?.categoryMain || firstProduct?.category || null;
+          
+          // 추천 상품 가져오기 (최대 4개)
+          const data = await fetchProducts(1, 4, category, null);
+          const products = data?.items || [];
+          
+          // 장바구니에 이미 있는 상품 제외
+          const cartProductIds = new Set(
+            cart.items.map(item => {
+              const productId = item.product?._id || item.product;
+              return productId?.toString();
+            }).filter(Boolean)
+          );
+          
+          const filteredProducts = products.filter(product => {
+            const productId = product._id?.toString() || product.id?.toString();
+            return !cartProductIds.has(productId);
+          });
+          
+          setRecommendedProducts(filteredProducts.slice(0, 4));
+        } else {
+          // 장바구니가 비어있으면 인기 상품 가져오기
+          const data = await fetchProducts(1, 4, null, null);
+          setRecommendedProducts(data?.items || []);
+        }
+      } catch (err) {
+        console.error('추천 상품 로드 실패:', err);
+        setRecommendedProducts([]);
+      } finally {
+        setRecommendedLoading(false);
+      }
+    }
+
+    if (status === 'success') {
+      loadRecommendedProducts();
+    }
+  }, [cart, status]);
+
+  const handleAddToCart = async (productId) => {
+    try {
+      setAddingToCart(productId);
+      await addItemToCart(productId, 1, {});
+      setNotice({ type: 'success', message: '장바구니에 추가되었습니다.' });
+      // 장바구니 새로고침
+      const data = await fetchCart();
+      setCart(data.cart);
+      onCartChange(data.cart?.items?.length ?? 0);
+    } catch (err) {
+      setNotice({ type: 'error', message: err.message || '장바구니에 추가하지 못했습니다.' });
+    } finally {
+      setAddingToCart(null);
+    }
+  };
 
   const hasItems = cart?.items?.length;
   const subtotal = useMemo(() => {
@@ -417,35 +453,87 @@ function CartPage({
           </div>
 
           <section className="cart-recommend">
-            <h2>You might also like</h2>
-            <div className="cart-recommend__grid">
-              {RECOMMENDED_PRODUCTS.map((product) => (
-                <article key={product.id} className="cart-recommend__card">
-                  <div className="cart-recommend__image">
-                    <img src={product.image} alt={product.title} loading="lazy" />
-                    <span className="cart-recommend__tag">{product.tag}</span>
-                  </div>
-                  <div className="cart-recommend__info">
-                    <h3>{product.title}</h3>
-                    <p>{formatCurrency(product.price, currencyCode)}</p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onViewProduct({
-                          id: product.id,
-                          name: product.title,
-                          price: product.price,
-                          image: product.image,
-                            isStatic: true,
-                        })
-                      }
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <h2>이런 상품은 어떠세요?</h2>
+            {recommendedLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <p>추천 상품을 불러오는 중...</p>
+              </div>
+            ) : recommendedProducts.length > 0 ? (
+              <div className="cart-recommend__grid">
+                {recommendedProducts.map((product) => {
+                  const productId = product._id || product.id;
+                  const productName = product.name || '상품명 없음';
+                  const productPrice = product.price || product.priceSale || 0;
+                  const productImage = product.image || '/placeholder.png';
+                  const isAdding = addingToCart === productId?.toString();
+
+                  return (
+                    <article key={productId} className="cart-recommend__card">
+                      <div className="cart-recommend__image">
+                        <img 
+                          src={productImage} 
+                          alt={productName} 
+                          loading="lazy"
+                          onClick={() => onViewProduct && onViewProduct({ id: productId, ...product })}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </div>
+                      <div className="cart-recommend__info">
+                        <h3 
+                          onClick={() => onViewProduct && onViewProduct({ id: productId, ...product })}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {productName}
+                        </h3>
+                        <p>{formatCurrency(productPrice, currencyCode)}</p>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(productId)}
+                            disabled={isAdding}
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem',
+                              background: isAdding ? '#9ca3af' : '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: isAdding ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            <ShoppingBag size={14} />
+                            {isAdding ? '추가 중...' : '장바구니 담기'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onViewProduct && onViewProduct({ id: productId, ...product })}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#f3f4f6',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            상세보기
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <p>추천 상품이 없습니다.</p>
+              </div>
+            )}
           </section>
         </>
       )}

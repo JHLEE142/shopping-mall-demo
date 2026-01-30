@@ -59,13 +59,69 @@ function OrderPage({
   const [selectedCoupon, setSelectedCoupon] = useState(null);
   const [couponsLoading, setCouponsLoading] = useState(false);
 
+  // 주소 파싱 함수
+  const parseUserAddress = (address) => {
+    if (!address) return { postalCode: '', address1: '', address2: '', city: '', state: '' };
+    
+    // address가 객체인 경우
+    if (typeof address === 'object') {
+      return {
+        postalCode: address.postalCode || address.zonecode || '',
+        address1: address.address1 || address.address || address.roadAddress || '',
+        address2: address.address2 || address.addressDetail || '',
+        city: address.city || '',
+        state: address.state || '',
+      };
+    }
+    
+    // address가 문자열인 경우 파싱
+    if (typeof address === 'string') {
+      // [우편번호] 주소 형식 파싱
+      const postalCodeMatch = address.match(/\[(\d{5})\]?/);
+      const postalCode = postalCodeMatch ? postalCodeMatch[1] : '';
+      
+      // 우편번호 제거
+      let addressStr = address.replace(/\[\d{5}\]\s*/, '').trim();
+      
+      // 시/도 추출
+      const stateMatch = addressStr.match(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/);
+      const state = stateMatch ? stateMatch[1] : '';
+      
+      // 도시 추출 (시/구/군)
+      const cityMatch = addressStr.match(/([가-힣]+(?:시|구|군))/);
+      const city = cityMatch ? cityMatch[1] : '';
+      
+      // 주소와 상세주소 분리 (공백이나 쉼표로 구분)
+      const parts = addressStr.split(/\s*,\s*|\s+/);
+      const address1 = parts[0] || addressStr;
+      const address2 = parts.slice(1).join(' ') || '';
+      
+      return {
+        postalCode,
+        address1,
+        address2,
+        city,
+        state,
+      };
+    }
+    
+    return { postalCode: '', address1: '', address2: '', city: '', state: '' };
+  };
+
   useEffect(() => {
+    const parsedAddress = parseUserAddress(user?.address);
     setFormData((prev) => ({
       ...prev,
       name: user?.name || '',
       email: user?.email || '',
+      phone: user?.phone || '',
+      postalCode: parsedAddress.postalCode || prev.postalCode,
+      address1: parsedAddress.address1 || prev.address1,
+      address2: parsedAddress.address2 || prev.address2,
+      city: parsedAddress.city || prev.city,
+      state: parsedAddress.state || prev.state,
     }));
-  }, [user?.name, user?.email]);
+  }, [user?.name, user?.email, user?.phone, user?.address]);
 
   // 토스페이먼츠는 위젯 컴포넌트에서 초기화됨
 
@@ -214,6 +270,64 @@ function OrderPage({
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleAddressSearch = () => {
+    if (!window.daum || !window.daum.Postcode) {
+      alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function(data) {
+        // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드
+        let addr = ''; // 주소 변수
+        let extraAddr = ''; // 참고항목 변수
+
+        // 사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+        if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+          addr = data.roadAddress;
+        } else { // 사용자가 지번 주소를 선택했을 경우(J)
+          addr = data.jibunAddress;
+        }
+
+        // 사용자가 선택한 주소가 도로명 타입일때 참고항목을 조합한다.
+        if(data.userSelectedType === 'R'){
+          // 법정동명이 있을 경우 추가한다. (법정리는 제외)
+          // 법정동의 경우 마지막 문자가 "동/로/가"로 끝난다.
+          if(data.bname !== '' && /[동|로|가]$/g.test(data.bname)){
+            extraAddr += data.bname;
+          }
+          // 건물명이 있고, 공동주택일 경우 추가한다.
+          if(data.buildingName !== '' && data.apartment === 'Y'){
+            extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+          }
+          // 표시할 참고항목이 있을 경우, 괄호까지 추가한 최종 문자열을 만든다.
+          if(extraAddr !== ''){
+            extraAddr = ' (' + extraAddr + ')';
+          }
+        }
+
+        // 우편번호와 주소 정보를 해당 필드에 넣는다.
+        setFormData((prev) => ({
+          ...prev,
+          postalCode: data.zonecode,
+          address1: addr + extraAddr,
+          state: data.sido || '',
+          city: data.sigungu || '',
+        }));
+
+        // 커서를 상세주소 필드로 이동한다.
+        setTimeout(() => {
+          const address2Input = document.querySelector('input[placeholder*="상세 주소"], input[placeholder*="동/호수"]');
+          if (address2Input) {
+            address2Input.focus();
+          }
+        }, 100);
+      },
+      width: '100%',
+      height: '100%',
+    }).open();
   };
 
   const handleToggleSchedule = () => {
@@ -566,22 +680,47 @@ function OrderPage({
                   placeholder="시/도"
                 />
               </label>
-              <label>
-                ZIP
-                <input
-                  type="text"
-                  value={formData.postalCode}
-                  onChange={handleInputChange('postalCode')}
-                  placeholder="우편번호"
-                />
+              <label style={{ gridColumn: 'span 2' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: '0.25rem', fontSize: '0.875rem' }}>우편번호</div>
+                    <input
+                      type="text"
+                      value={formData.postalCode}
+                      onChange={handleInputChange('postalCode')}
+                      placeholder="우편번호"
+                      readOnly
+                      style={{ background: '#f3f4f6' }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddressSearch}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: '#6366f1',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      whiteSpace: 'nowrap',
+                      height: 'fit-content',
+                    }}
+                  >
+                    주소 검색
+                  </button>
+                </div>
               </label>
-              <label>
-                Address
+              <label style={{ gridColumn: 'span 2' }}>
+                <div style={{ marginBottom: '0.25rem', fontSize: '0.875rem' }}>도로명 주소</div>
                 <input
                   type="text"
                   value={formData.address1}
                   onChange={handleInputChange('address1')}
                   placeholder="도로명 주소"
+                  readOnly
+                  style={{ background: '#f3f4f6' }}
                 />
               </label>
               <label>
