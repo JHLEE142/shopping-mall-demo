@@ -25,6 +25,7 @@ const noticeRouter = require('./notices');
 const recentlyViewedProductRouter = require('./recentlyViewedProducts');
 const passwordResetRouter = require('./passwordResets');
 const newsletterRouter = require('./newsletters');
+const tossPaymentsRouter = require('./tossPayments');
 const { getCurrentUser, logoutUser } = require('../controllers/userController');
 
 const router = Router();
@@ -77,6 +78,7 @@ router.use('/notices', noticeRouter);
 router.use('/recently-viewed-products', recentlyViewedProductRouter);
 router.use('/auth/password-reset', passwordResetRouter);
 router.use('/newsletters', newsletterRouter);
+router.use('/toss-payments', tossPaymentsRouter);
 const aiRouter = require('./ai');
 router.use('/ai', aiRouter);
 router.get('/auth/session', authenticate, getCurrentUser);

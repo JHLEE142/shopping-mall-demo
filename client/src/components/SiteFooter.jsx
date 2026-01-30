@@ -1,10 +1,22 @@
 const BOARD_LINKS = [
-  { label: '카카오톡 상담', highlight: true },
-  { label: '자주 묻는 질문' },
-  { label: '반품/교환' },
-  { label: '구매후기' },
-  { label: '배송문의' },
-  { label: '입금/결제/취소' },
+  { 
+    label: '전화', 
+    type: 'phone',
+    value: '010-4163-5771',
+    action: () => window.location.href = 'tel:010-4163-5771'
+  },
+  { 
+    label: '이메일', 
+    type: 'email',
+    value: 'ljh951128@gmail.com',
+    action: () => window.location.href = 'mailto:ljh951128@gmail.com'
+  },
+  { 
+    label: '민원접수', 
+    type: 'link',
+    value: '1:1 문의게시판',
+    action: 'inquiry-history'
+  },
 ];
 
 const CUSTOMER_SUPPORT = {
@@ -31,8 +43,15 @@ function SiteFooter({
   onNavigateBoard = () => {},
   onNavigateFooter = () => {},
 }) {
-  const handleBoardClick = (label) => {
-    onNavigateBoard(label);
+  const handleBoardClick = (item) => {
+    if (item.action) {
+      if (typeof item.action === 'function') {
+        item.action();
+      } else if (typeof item.action === 'string') {
+        // 'inquiry-history' 같은 뷰 이름인 경우
+        onNavigateBoard(item.action);
+      }
+    }
   };
 
   const handleFooterClick = (label) => {
@@ -46,17 +65,29 @@ function SiteFooter({
     <footer className="site-footer">
       <div className="site-footer__inner">
         <div className="site-footer__column site-footer__column--board">
-          <h3 className="site-footer__title">BOARD LIST</h3>
-          <div className="site-footer__board-grid">
+          <h3 className="site-footer__title">고객센터</h3>
+          <div className="site-footer__customer-service">
             {BOARD_LINKS.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className={`site-footer__board-button ${item.highlight ? 'is-primary' : ''}`}
-                onClick={() => handleBoardClick(item.label)}
-              >
-                {item.label}
-              </button>
+              <div key={item.label} className="site-footer__customer-service-item">
+                <span className="site-footer__customer-service-label">{item.label}</span>
+                {item.type === 'link' ? (
+                  <button
+                    type="button"
+                    className="site-footer__customer-service-link"
+                    onClick={() => handleBoardClick(item)}
+                  >
+                    {item.value}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="site-footer__customer-service-value"
+                    onClick={() => handleBoardClick(item)}
+                  >
+                    {item.value}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

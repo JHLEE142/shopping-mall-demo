@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchCart } from '../services/cartService';
 import { createOrder as createOrderApi } from '../services/orderService';
 import { getUserCoupons } from '../services/couponService';
+import TossPaymentWidget from './TossPaymentWidget';
 
 const PAYMENT_METHODS = [
   { value: 'online', label: 'Online Payment', description: '신용/체크카드, 간편결제' },
@@ -51,7 +52,6 @@ function OrderPage({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isImpReady, setIsImpReady] = useState(false);
   const [orderStatus, setOrderStatus] = useState('form'); // form | success | failure
   const [orderResult, setOrderResult] = useState(null);
   const [orderFailureMessage, setOrderFailureMessage] = useState('');
@@ -67,21 +67,7 @@ function OrderPage({
     }));
   }, [user?.name, user?.email]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const { IMP } = window;
-
-    if (!IMP || typeof IMP.init !== 'function') {
-      console.warn('PortOne SDK(IMP)이 로드되지 않았습니다.');
-      return;
-    }
-
-    IMP.init('imp65366328');
-    setIsImpReady(true);
-  }, []);
+  // 토스페이먼츠는 위젯 컴포넌트에서 초기화됨
 
   useEffect(() => {
     let isMounted = true;
@@ -245,180 +231,7 @@ function OrderPage({
     }));
   };
 
-  const handleConfirmOrder = () => {
-    if (orderStatus !== 'form') {
-      return;
-    }
-
-    if (!isImpReady) {
-      setNotice({
-        type: 'error',
-        message: '결제 모듈 초기화 중입니다. 잠시 후 다시 시도해주세요.',
-      });
-      return;
-    }
-
-    if (!cart?.items?.length) {
-      setNotice({ type: 'error', message: '장바구니가 비어 있어 주문을 진행할 수 없습니다.' });
-      return;
-    }
-
-    const { IMP } = window;
-
-    if (!IMP || typeof IMP.request_pay !== 'function') {
-      setNotice({
-        type: 'error',
-        message: '결제 모듈을 불러오지 못했습니다. 페이지를 새로고침 후 다시 시도해주세요.',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setOrderFailureMessage('');
-    setNotice({ type: 'info', message: '결제 창을 여는 중입니다...' });
-
-    const orderTitle =
-      cart.items.length === 1
-        ? cart.items[0].product.name
-        : `주문 (${cart.items.length}건)`;
-
-    const amount = Number(total || 0);
-    const amountToCharge = amount > 0 ? amount : 1;
-
-    IMP.request_pay(
-      {
-        pg: 'html5_inicis',
-        pay_method: 'card',
-        merchant_uid: `order_${Date.now()}`,
-        name: orderTitle,
-        amount: amountToCharge,
-        buyer_email: formData.email,
-        buyer_name: formData.name,
-        buyer_tel: formData.phone,
-        buyer_addr: `${formData.address1} ${formData.address2}`.trim(),
-        buyer_postcode: formData.postalCode,
-        custom_data: {
-          cartId: directOrderItem ? null : (cart._id ?? null),
-          items: cart.items.map((item) => ({
-            productId: item.product._id || item.product.id,
-            quantity: item.quantity,
-          })),
-        },
-      },
-      async (response) => {
-        if (response.success) {
-          setNotice({
-            type: 'info',
-            message: '결제를 확인하고 주문을 생성하고 있습니다...',
-          });
-
-          const discountTotal = cart.items.reduce((sum, item) => {
-            const regularPrice = Number(item.product?.price ?? item.priceSnapshot);
-            const discount = Math.max(regularPrice - item.priceSnapshot, 0);
-            return sum + discount * item.quantity;
-          }, 0);
-
-          const orderPayload = {
-            items: cart.items.map((item) => ({
-              product: item.product._id || item.product.id,
-              name: item.product.name,
-              sku: item.product.sku || '',
-              thumbnail: item.product.image || item.product.thumbnail || '',
-              options: directOrderItem ? item.options : convertSelectedOptions(item.selectedOptions),
-              quantity: item.quantity,
-              unitPrice: item.priceSnapshot || (item.product.priceSale || item.product.price),
-              lineDiscount: Math.max(Number(item.product?.price ?? 0) - (item.priceSnapshot || (item.product.priceSale || item.product.price)), 0),
-              lineTotal: (item.priceSnapshot || (item.product.priceSale || item.product.price)) * item.quantity,
-            })),
-            summary: {
-              currency: currencyCode || 'KRW',
-              subtotal,
-              discountTotal,
-              shippingFee,
-              grandTotal: amountToCharge,
-            },
-            coupon: selectedCoupon ? {
-              userCouponId: selectedCoupon._id,
-              type: (selectedCoupon.coupon || selectedCoupon.couponId)?.type,
-            } : null,
-            payment: {
-              method: 'card',
-              status: 'paid',
-              amount: amountToCharge,
-              currency: currencyCode || 'KRW',
-              transactionId: response.imp_uid,
-              receiptUrl: response.receipt_url,
-              paidAt: response.paid_at
-                ? new Date(response.paid_at * 1000).toISOString()
-                : new Date().toISOString(),
-            },
-            paymentVerification: {
-              impUid: response.imp_uid,
-            },
-            shipping: {
-              address: {
-                name: formData.name,
-                phone: formData.phone,
-                postalCode: formData.postalCode,
-                address1: formData.address1,
-                address2: formData.address2,
-              },
-              request: formData.notes,
-            },
-            notes: formData.notes,
-            contact: {
-              phone: formData.phone,
-              email: formData.email,
-            },
-            guestName: formData.name,
-            guestEmail: formData.email,
-            sourceCart: directOrderItem ? null : cart._id,
-          };
-
-          try {
-            const createdOrder = await createOrderApi(orderPayload);
-            setOrderResult(createdOrder);
-            setOrderStatus('success');
-            setNotice({
-              type: 'success',
-              message: '주문이 완료되었습니다!',
-            });
-            // 바로 구매가 아닌 경우에만 장바구니 개수 업데이트
-            // 서버에서 장바구니 상태를 변경하지 않으므로 장바구니는 그대로 유지됨
-            if (!directOrderItem) {
-              // 장바구니에서 주문한 경우, 장바구니는 그대로 유지됨
-              fetchCart()
-                .then((data) => {
-                  onCartUpdate(data.cart?.items?.length ?? 0);
-                })
-                .catch(() => {
-                  // 에러가 발생해도 장바구니 개수는 유지
-                });
-            }
-          } catch (orderError) {
-            const message = orderError.message || '주문을 생성하지 못했습니다.';
-            setOrderFailureMessage(message);
-            setOrderStatus('failure');
-            setNotice({
-              type: 'error',
-              message,
-            });
-          } finally {
-            setIsSubmitting(false);
-          }
-        } else {
-          const message = response.error_msg || '결제가 취소되었거나 실패했습니다.';
-          setNotice({
-            type: 'error',
-            message,
-          });
-          setOrderFailureMessage(message);
-          setOrderStatus('failure');
-          setIsSubmitting(false);
-        }
-      }
-    );
-  };
+  // 토스페이먼츠 위젯이 결제를 처리하므로 이 함수는 더 이상 사용하지 않음
 
   const renderOrderSummary = () => {
     if (!cart?.items?.length) {
@@ -528,14 +341,17 @@ function OrderPage({
             <dd>{formatCurrency(total, currencyCode)}</dd>
           </div>
         </dl>
-        <button
-          type="button"
-          className="order-summary__confirm"
-          onClick={handleConfirmOrder}
-          disabled={isSubmitting || orderStatus !== 'form'}
-        >
-          {isSubmitting ? '처리 중...' : 'Confirm Order'}
-        </button>
+        <div className="toss-payment-section">
+          <TossPaymentWidget
+            amount={total}
+            orderName={cart.items.length === 1 ? cart.items[0].product.name : `주문 (${cart.items.length}건)`}
+            customerName={formData.name}
+            customerEmail={formData.email}
+            customerPhone={formData.phone}
+            onPaymentError={handlePaymentError}
+            disabled={isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1}
+          />
+        </div>
       </>
     );
   };

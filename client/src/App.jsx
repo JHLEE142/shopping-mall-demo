@@ -50,6 +50,8 @@ import MoneyTopupPage from './components/MoneyTopupPage';
 import CouponPage from './components/CouponPage';
 import OrderDetailPage from './components/OrderDetailPage';
 import PasswordResetPage from './components/PasswordResetPage';
+import PaymentSuccessPage from './components/PaymentSuccessPage';
+import PaymentFailPage from './components/PaymentFailPage';
 
 function App() {
   // URL에서 초기 view 읽기
@@ -100,7 +102,17 @@ function App() {
       'privacy',
       'marketing',
       'loyalty-hall',
+      'payment-success',
+      'payment-fail',
     ];
+    
+    // 쿼리 파라미터에서 view 확인
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryView = urlParams.get('view');
+    if (queryView && validViews.includes(queryView)) {
+      return queryView;
+    }
+    
     return validViews.includes(view) ? view : 'home';
   };
 
@@ -172,6 +184,7 @@ function App() {
     '구매후기': 'review-board',
     '배송문의': 'delivery-inquiry',
     '입금/결제/취소': 'payment-cancel',
+    'inquiry-history': 'inquiry-history',
   };
   const footerLinkViewMap = {
     '이용안내': 'faq',
@@ -1626,6 +1639,21 @@ function App() {
       break;
     case 'payment-cancel':
       content = <PaymentCancelPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
+      break;
+    case 'payment-success':
+      content = (
+        <PaymentSuccessPage
+          onBackToHome={() => setView('home')}
+          onViewOrder={(order) => {
+            setSelectedOrder(order);
+            setView('order-detail');
+          }}
+          user={user}
+        />
+      );
+      break;
+    case 'payment-fail':
+      content = <PaymentFailPage onBackToHome={() => setView('home')} />;
       break;
     case 'kakao-support':
       content = <KakaoSupportPage onBack={() => setView('home')} />;
