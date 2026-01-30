@@ -18,6 +18,7 @@ function TossPaymentWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
   const [hasSelectedPaymentMethod, setHasSelectedPaymentMethod] = useState(false);
+  const selectedPaymentMethodRef = useRef(null); // 선택된 결제 수단 저장
   const paymentMethodWidgetRef = useRef(null);
   const agreementWidgetRef = useRef(null);
   const tossPaymentsRef = useRef(null);
@@ -85,6 +86,7 @@ function TossPaymentWidget({
         paymentMethodWidget.on('paymentMethodSelect', (selectedPaymentMethod) => {
           console.log('선택된 결제 수단:', selectedPaymentMethod);
           if (isMounted) {
+            selectedPaymentMethodRef.current = selectedPaymentMethod; // ref에 저장
             setHasSelectedPaymentMethod(true);
           }
         });
@@ -93,6 +95,7 @@ function TossPaymentWidget({
         paymentMethodWidget.on('paymentMethodUnselect', () => {
           console.log('결제 수단 선택 해제됨');
           if (isMounted) {
+            selectedPaymentMethodRef.current = null; // ref 초기화
             setHasSelectedPaymentMethod(false);
           }
         });
@@ -142,34 +145,25 @@ function TossPaymentWidget({
         customerKey: ANONYMOUS,
       });
 
-      // 결제 수단이 선택되었는지 명확히 확인
-      let selectedMethod = null;
-      try {
-        // getSelectedPaymentMethod가 Promise를 반환하는지 확인
-        const methodResult = paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
-        if (methodResult instanceof Promise) {
-          selectedMethod = await methodResult;
-        } else {
-          selectedMethod = methodResult;
-        }
-        
-        if (selectedMethod) {
-          console.log('선택된 결제 수단:', selectedMethod);
-          setHasSelectedPaymentMethod(true);
-        }
-      } catch (methodError) {
-        console.log('결제 수단 선택 확인 중...', methodError);
-      }
-
-      // 결제 수단이 선택되지 않았으면 에러 메시지 표시하고 진행 중단
-      // state와 메서드 결과 모두 확인
+      // 결제 수단이 선택되었는지 확인 (이벤트 기반으로 확인)
+      // ref와 state 모두 확인하여 더 안정적으로 처리
+      const selectedMethod = selectedPaymentMethodRef.current;
+      
       if (!selectedMethod && !hasSelectedPaymentMethod) {
         const errorMsg = '결제 수단을 선택해주세요. 위젯에서 결제 수단을 먼저 선택한 후 결제하기 버튼을 클릭해주세요.';
         console.error('●▶결제 요청 실패 :', errorMsg);
+        console.error('●▶결제 에러 :', errorMsg);
         setIsLoading(false);
         const paymentError = new Error(errorMsg);
         onPaymentError?.(paymentError);
         return;
+      }
+
+      // 결제 수단이 선택되었음을 확인
+      if (selectedMethod) {
+        console.log('결제 진행 - 선택된 결제 수단:', selectedMethod);
+      } else if (hasSelectedPaymentMethod) {
+        console.log('결제 진행 - 결제 수단 선택됨 (state 확인)');
       }
 
       // 결제 수단이 선택되었을 때만 requestPayment 호출
