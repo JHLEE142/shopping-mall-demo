@@ -55,11 +55,46 @@ function PaymentSuccessPage({
       if (pendingOrderData) {
         try {
           const orderInfo = JSON.parse(pendingOrderData);
-          // 주문 정보가 있으면 주문 생성 시도 (실제로는 서버에서 처리)
-          // 여기서는 결제 승인만 완료하고 주문은 별도로 처리
+          const { cart, formData, subtotal, shippingFee, total, couponDiscount, selectedCoupon, directOrderItem } = orderInfo;
+
+          // 주문 생성
+          const orderPayload = {
+            items: (cart?.items || []).map((item) => ({
+              product: item.product?._id || item.product?.id,
+              quantity: item.quantity,
+              priceSnapshot: item.priceSnapshot || (item.product?.priceSale || item.product?.price),
+              options: item.options || {},
+            })),
+            shipping: {
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone,
+              address: {
+                city: formData.city,
+                state: formData.state,
+                postalCode: formData.postalCode,
+                address1: formData.address1,
+                address2: formData.address2,
+              },
+              notes: formData.notes,
+              scheduleEnabled: formData.scheduleEnabled,
+            },
+            payment: {
+              method: 'online',
+              transactionId: paymentKey,
+              amount: total || amount,
+              status: 'paid',
+            },
+            coupon: selectedCoupon || null,
+          };
+
+          const createdOrder = await createOrderApi(orderPayload);
+          setOrder(createdOrder.order || createdOrder);
           sessionStorage.removeItem('pendingOrder');
         } catch (e) {
-          console.error('주문 정보 파싱 오류:', e);
+          console.error('주문 생성 오류:', e);
+          // 주문 생성 실패해도 결제는 완료되었으므로 성공으로 표시
+          setError('결제는 완료되었지만 주문 생성 중 오류가 발생했습니다. 고객센터로 문의해주세요.');
         }
       }
       setStatus('success');

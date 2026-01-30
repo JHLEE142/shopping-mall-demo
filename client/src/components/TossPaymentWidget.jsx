@@ -11,6 +11,7 @@ function TossPaymentWidget({
   customerPhone,
   onPaymentSuccess,
   onPaymentError,
+  onBeforePayment,
   disabled = false,
 }) {
   const [isReady, setIsReady] = useState(false);
@@ -85,6 +86,11 @@ function TossPaymentWidget({
     try {
       setIsLoading(true);
 
+      // 결제 전 콜백 실행 (주문 정보 저장 등)
+      if (onBeforePayment) {
+        onBeforePayment();
+      }
+
       const orderId = generateOrderId();
       const selectedPaymentMethod = await paymentMethodWidgetRef.current?.getSelectedPaymentMethod();
       
@@ -94,19 +100,11 @@ function TossPaymentWidget({
         customerKey: ANONYMOUS,
       });
 
-      // 주문 정보를 sessionStorage에 저장 (결제 성공 페이지에서 사용)
-      sessionStorage.setItem('pendingOrder', JSON.stringify({
-        orderName,
-        customerName,
-        customerEmail,
-        customerPhone,
-      }));
-
       await widgets.requestPayment({
         orderId,
         orderName,
-        successUrl: `${window.location.origin}?view=payment-success`,
-        failUrl: `${window.location.origin}?view=payment-fail`,
+        successUrl: `${window.location.origin}?view=payment-success&orderId=${orderId}&amount=${amount}`,
+        failUrl: `${window.location.origin}?view=payment-fail&orderId=${orderId}`,
         customerEmail: customerEmail || 'customer@example.com',
         customerName: customerName || '고객',
         customerMobilePhone: customerPhone || '01012345678',

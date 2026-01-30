@@ -597,6 +597,20 @@ function OrderPage({
             onPaymentSuccess={handlePaymentSuccess}
             onPaymentError={handlePaymentError}
             disabled={isSubmitting || orderStatus !== 'form' || !formData.name || !formData.phone || !formData.address1}
+            onBeforePayment={() => {
+              // 결제 전 주문 정보를 sessionStorage에 저장
+              const orderData = {
+                cart: cart,
+                formData: formData,
+                subtotal,
+                shippingFee,
+                total,
+                couponDiscount,
+                selectedCoupon: selectedCoupon?._id || null,
+                directOrderItem,
+              };
+              sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
+            }}
           />
         </div>
       </>
