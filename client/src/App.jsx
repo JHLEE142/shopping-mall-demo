@@ -309,55 +309,7 @@ function App() {
         }
       }
     }
-  }, [view]);
-
-  // 유효한 view 목록
-  const validViews = [
-    'home',
-    'login',
-    'signup',
-    'password-reset',
-    'admin',
-    'product-create',
-    'product-edit',
-    'product-detail',
-    'lookbook',
-    'style-note',
-    'cart',
-    'order',
-    'order-list',
-    'order-detail',
-    'tracking',
-    'wishlist',
-    'settings',
-    'points',
-    'mypage',
-    'notifications',
-    'profile-edit',
-    'money-topup',
-    'coupon',
-    'shipping-return-policy',
-    'cancel-return-exchange-history',
-    'event-benefit',
-    'feedback',
-    'inquiry-history',
-    'product-inquiry-history',
-    'notice',
-    'recently-viewed-products',
-    'new',
-    'about',
-    'faq',
-    'review-board',
-    'delivery-inquiry',
-    'payment-cancel',
-    'kakao-support',
-    'terms',
-    'privacy',
-    'marketing',
-    'loyalty-hall',
-    'payment-success',
-    'payment-fail',
-  ];
+  }, [view, validViews]);
 
   // view가 유효하지 않으면 home으로 리다이렉트
   useEffect(() => {
@@ -365,7 +317,7 @@ function App() {
       console.warn(`Invalid view: ${view}, redirecting to home`);
       setView('home', { replace: true });
     }
-  }, [view]);
+  }, [view, validViews]);
 
   // 전역 에러 핸들러 (404 등)
   useEffect(() => {
@@ -409,7 +361,7 @@ function App() {
     return () => {
       window.removeEventListener('error', handleError);
     };
-  }, []);
+  }, [validViews]);
 
   // 브라우저 뒤로가기/앞으로가기 처리
   useEffect(() => {
@@ -467,7 +419,7 @@ function App() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [validViews]);
 
   // home 뷰로 전환 시 스크롤을 맨 위로 이동
   useEffect(() => {
