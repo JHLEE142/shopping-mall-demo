@@ -126,10 +126,17 @@ function LoginPage({
 
   // Google OAuth 초기화
   useEffect(() => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    
+    if (!googleClientId) {
+      console.warn('Google Client ID가 설정되지 않았습니다. 환경변수 VITE_GOOGLE_CLIENT_ID를 확인해주세요.');
+      return;
+    }
+
     const initializeGoogleSignIn = () => {
       if (window.google && window.google.accounts) {
         window.google.accounts.id.initialize({
-          client_id: 'AIzaSyDrsI9sHzcfPh55SL0Cga4KeP-WNG2fgfs',
+          client_id: googleClientId,
           callback: handleGoogleSignIn,
         });
 

@@ -21,6 +21,7 @@ cp .env.example .env
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | 백엔드 서버 주소 | 기본값: `http://localhost:6500` |
 | `VITE_TOSS_CLIENT_KEY` | 토스페이먼츠 Client Key | 토스페이먼츠 결제 연동 필수 |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID | 구글 로그인 연동 필수 |
 
 ### 선택 환경 변수
 
@@ -36,6 +37,7 @@ cp .env.example .env
 # 필수
 VITE_API_BASE_URL=http://localhost:6500
 VITE_TOSS_CLIENT_KEY=test_ck_50WRapdA8dvz2Gm72XIBVo1zEqZK
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 
 # 선택 (Cloudinary 사용 시)
 VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
