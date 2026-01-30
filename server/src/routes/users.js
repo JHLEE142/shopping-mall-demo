@@ -7,6 +7,7 @@ const {
   updateUser,
   deleteUser,
   loginUser,
+  googleLogin,
 } = require('../controllers/userController');
 
 const router = Router();
@@ -14,6 +15,8 @@ const router = Router();
 router.post('/', createUser);
 
 router.post('/login', loginUser);
+
+router.post('/google-login', googleLogin);
 
 router.get('/', getUsers);
 

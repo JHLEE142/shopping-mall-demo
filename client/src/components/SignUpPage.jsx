@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { createUser } from '../services/userService';
+import { createUser, loginUser } from '../services/userService';
+import { saveSession } from '../utils/sessionStorage';
 
 const INITIAL_FORM_DATA = {
   name: '',
@@ -26,6 +27,7 @@ function SignUpPage({
   onViewTerms = () => {},
   onViewPrivacy = () => {},
   onViewMarketing = () => {},
+  onLoginSuccess = () => {},
 }) {
   // localStorage에서 저장된 회원가입 정보 불러오기
   const loadStoredFormData = () => {
@@ -53,11 +55,33 @@ function SignUpPage({
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // 컴포넌트 마운트 시 localStorage에서 정보 불러오기
+  // 컴포넌트 마운트 시 localStorage와 sessionStorage에서 정보 불러오기
   useEffect(() => {
+    // Google 로그인으로 온 경우 sessionStorage에서 정보 불러오기
+    const googleSignupData = sessionStorage.getItem('googleSignupData');
+    if (googleSignupData) {
+      try {
+        const googleData = JSON.parse(googleSignupData);
+        setFormData((prev) => ({
+          ...prev,
+          email: googleData.email || prev.email,
+          name: googleData.name || prev.name,
+        }));
+      } catch (error) {
+        console.error('Google 회원가입 정보 불러오기 실패:', error);
+      }
+    }
+
+    // localStorage에서 저장된 정보 불러오기
     const storedData = loadStoredFormData();
     if (storedData.name || storedData.email || storedData.address) {
-      setFormData(storedData);
+      setFormData((prev) => ({
+        ...prev,
+        ...storedData,
+        // Google 정보가 있으면 우선 적용
+        email: googleSignupData ? JSON.parse(googleSignupData).email : prev.email,
+        name: googleSignupData ? JSON.parse(googleSignupData).name : prev.name,
+      }));
     }
   }, []);
 
@@ -200,8 +224,17 @@ function SignUpPage({
     setError('');
     setSuccessMessage('');
 
-    if (formData.password !== formData.confirmPassword) {
+    // Google 로그인으로 온 경우 비밀번호 검증 건너뛰기
+    const googleSignupData = sessionStorage.getItem('googleSignupData');
+    const isGoogleSignup = !!googleSignupData;
+
+    if (!isGoogleSignup && formData.password !== formData.confirmPassword) {
       setError('비밀번호가 일치하지 않아요.');
+      return;
+    }
+
+    if (!isGoogleSignup && !formData.password) {
+      setError('비밀번호를 입력해주세요.');
       return;
     }
 
@@ -217,12 +250,21 @@ function SignUpPage({
       return;
     }
 
+    // Google 로그인으로 온 경우 credential 포함
+    const googleSignupData = sessionStorage.getItem('googleSignupData');
+    const googleData = googleSignupData ? JSON.parse(googleSignupData) : null;
+
     const payload = {
       email: trimmedEmail,
       name: trimmedName,
-      password: formData.password,
+      password: formData.password || '', // Google 로그인인 경우 빈 문자열
       user_type: formData.user_type,
     };
+
+    // Google 로그인으로 온 경우 credential 추가
+    if (googleData && googleData.credential) {
+      payload.googleCredential = googleData.credential;
+    }
 
     // 주소 정보 조합
     const addressParts = [];
@@ -243,6 +285,56 @@ function SignUpPage({
       // 회원가입 성공 시 localStorage의 저장된 정보 삭제
       localStorage.removeItem('signupFormData');
 
+      // Google 로그인으로 온 경우 자동 로그인
+      const googleSignupData = sessionStorage.getItem('googleSignupData');
+      if (googleSignupData) {
+        try {
+          const googleData = JSON.parse(googleSignupData);
+          // Google credential로 다시 로그인 시도 (이제 사용자가 존재하므로 로그인 성공)
+          const loginResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500'}/api/users/google-login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ credential: googleData.credential }),
+          });
+
+          if (loginResponse.ok) {
+            const loginData = await loginResponse.json();
+            const expiresInMs = 60 * 60 * 1000; // 60분
+            const expiresAt = Date.now() + expiresInMs;
+
+            saveSession({
+              token: loginData.token,
+              user: loginData.user,
+              expiresAt,
+              lastActivityTime: Date.now(),
+              deviceId: loginData.deviceId,
+              rememberToken: loginData.rememberToken,
+              deviceExpiresAt: loginData.deviceExpiresAt,
+            });
+
+            // Google 회원가입 정보 삭제
+            sessionStorage.removeItem('googleSignupData');
+
+            setFormData(INITIAL_FORM_DATA);
+            setAgreements(INITIAL_AGREEMENTS);
+            setStatus('success');
+            setSuccessMessage('가입이 완료되었어요! 자동으로 로그인됩니다.');
+
+            // 자동 로그인 성공 콜백 호출
+            setTimeout(() => {
+              onLoginSuccess({ ...loginData, expiresAt });
+            }, 1000);
+            return;
+          }
+        } catch (autoLoginError) {
+          console.error('자동 로그인 실패:', autoLoginError);
+          // 자동 로그인 실패해도 회원가입은 성공했으므로 로그인 페이지로 이동
+        }
+      }
+
+      // 일반 회원가입 또는 자동 로그인 실패 시
       setFormData(INITIAL_FORM_DATA);
       setAgreements(INITIAL_AGREEMENTS);
       setStatus('success');
@@ -261,6 +353,9 @@ function SignUpPage({
   const isAllAgreed = agreements.terms && agreements.privacy && agreements.marketing;
 
   const canSubmit = agreements.terms && agreements.privacy && status !== 'loading';
+
+  // Google 로그인으로 온 경우 확인
+  const isGoogleSignup = !!sessionStorage.getItem('googleSignupData');
 
   return (
     <div className="signup-wrapper">
@@ -301,33 +396,44 @@ function SignUpPage({
             />
           </div>
 
-          <div className="field">
-            <label htmlFor="password">비밀번호</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="비밀번호를 입력하세요"
-              value={formData.password}
-              onChange={handleChange}
-              minLength={8}
-              required
-            />
-            <small className="helper-text">8자 이상, 영문, 숫자, 특수문자 포함을 권장드려요.</small>
-          </div>
+          {!isGoogleSignup && (
+            <>
+              <div className="field">
+                <label htmlFor="password">비밀번호</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="비밀번호를 입력하세요"
+                  value={formData.password}
+                  onChange={handleChange}
+                  minLength={8}
+                  required
+                />
+                <small className="helper-text">8자 이상, 영문, 숫자, 특수문자 포함을 권장드려요.</small>
+              </div>
 
-          <div className="field">
-            <label htmlFor="confirmPassword">비밀번호 확인</label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              placeholder="비밀번호를 다시 입력하세요"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-            />
-          </div>
+              <div className="field">
+                <label htmlFor="confirmPassword">비밀번호 확인</label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="비밀번호를 다시 입력하세요"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </>
+          )}
+          {isGoogleSignup && (
+            <div className="field">
+              <small className="helper-text" style={{ color: '#6366f1', fontWeight: 500 }}>
+                구글 계정으로 로그인하시므로 비밀번호 입력이 필요 없습니다.
+              </small>
+            </div>
+          )}
 
 
           <div className="field">

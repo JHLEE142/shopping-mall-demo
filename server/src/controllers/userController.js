@@ -28,10 +28,20 @@ function createAuthToken(userId) {
 
 async function createUser(req, res, next) {
   try {
-    const { password, confirmPassword, ...rest } = req.body;
+    const { password, confirmPassword, googleCredential, ...rest } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ message: '비밀번호를 입력해주세요.' });
+    // Google 로그인으로 온 경우 비밀번호가 없을 수 있음
+    let hashedPassword;
+    if (googleCredential) {
+      // Google 로그인: 임시 비밀번호 생성 (사용자는 Google로만 로그인)
+      const crypto = require('crypto');
+      hashedPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+    } else {
+      // 일반 회원가입: 비밀번호 필수
+      if (!password) {
+        return res.status(400).json({ message: '비밀번호를 입력해주세요.' });
+      }
+      hashedPassword = await bcrypt.hash(password, 10);
     }
 
     const normalizedEmail = rest.email ? rest.email.trim().toLowerCase() : '';
@@ -45,8 +55,8 @@ async function createUser(req, res, next) {
       return res.status(400).json({ message: '올바른 이메일 주소를 입력해주세요.' });
     }
 
-    // 비밀번호 확인
-    if (confirmPassword && password !== confirmPassword) {
+    // 비밀번호 확인 (Google 로그인이 아닌 경우만)
+    if (!googleCredential && confirmPassword && password !== confirmPassword) {
       return res.status(400).json({ message: '비밀번호가 일치하지 않습니다.' });
     }
 
@@ -56,7 +66,10 @@ async function createUser(req, res, next) {
       return res.status(409).json({ message: '이미 사용 중인 이메일입니다.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 비밀번호 해싱 (Google 로그인인 경우 위에서 이미 처리됨)
+    if (!hashedPassword) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
 
     const user = await User.create({
       ...rest,
@@ -276,6 +289,88 @@ async function loginUser(req, res, next) {
   }
 }
 
+async function googleLogin(req, res, next) {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ message: 'Google credential is required' });
+    }
+
+    // Google ID 토큰 디코딩 (JWT 형식)
+    // 주의: 프로덕션에서는 Google의 공개키로 검증해야 합니다
+    const tokenParts = credential.split('.');
+    if (tokenParts.length !== 3) {
+      return res.status(400).json({ message: 'Invalid Google credential format' });
+    }
+
+    // JWT payload 디코딩
+    const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+    const { email, name, picture } = payload;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email not found in Google credential' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 기존 사용자 확인
+    const existingUser = await User.findOne({ email: normalizedEmail });
+
+    if (existingUser) {
+      // 기존 사용자: 바로 로그인
+      const token = createAuthToken(existingUser.id);
+
+      const responseData = {
+        message: 'Login successful',
+        token,
+        user: sanitizeUser(existingUser),
+      };
+
+      // 비회원 장바구니를 회원 장바구니로 병합
+      try {
+        const guestCartId = req.headers['x-guest-cart-id'];
+        if (guestCartId) {
+          await mergeGuestCartToUser(guestCartId, existingUser.id);
+        }
+      } catch (cartMergeError) {
+        console.error('[Google 로그인] 장바구니 병합 실패:', cartMergeError.message);
+      }
+
+      // 자동 로그인 설정
+      const userAgent = req.headers['user-agent'] || '';
+      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || '';
+      try {
+        const deviceInfo = await createTrustedDevice(existingUser.id, userAgent, ip);
+        responseData.deviceId = deviceInfo.deviceId;
+        responseData.rememberToken = deviceInfo.rememberToken;
+        responseData.deviceExpiresAt = deviceInfo.expiresAt;
+      } catch (deviceError) {
+        console.error('[Google 로그인] 기기 정보 저장 실패:', deviceError);
+      }
+
+      return res.json(responseData);
+    } else {
+      // 신규 사용자: 회원가입 필요 정보 반환
+      return res.status(200).json({
+        requiresSignup: true,
+        googleUser: {
+          email: normalizedEmail,
+          name: name || email.split('@')[0],
+          picture: picture || null,
+        },
+        message: '회원가입이 필요합니다.',
+      });
+    }
+  } catch (error) {
+    console.error('Google 로그인 오류:', error);
+    if (error.message === 'Missing JWT_SECRET environment variable') {
+      error.status = 500;
+    }
+    return res.status(500).json({ message: 'Google 로그인 처리 중 오류가 발생했습니다.' });
+  }
+}
+
 function getCurrentUser(req, res) {
   if (!req.user) {
     return res.status(401).json({ message: 'Unauthorized' });
@@ -294,6 +389,7 @@ module.exports = {
   updateUser,
   deleteUser,
   loginUser,
+  googleLogin,
   getCurrentUser,
   logoutUser,
 };

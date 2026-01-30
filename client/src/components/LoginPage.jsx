@@ -174,11 +174,29 @@ function LoginPage({
         body: JSON.stringify({ credential: response.credential }),
       });
 
+      const data = await authResponse.json();
+
       if (!authResponse.ok) {
-        throw new Error('구글 로그인에 실패했어요.');
+        throw new Error(data.message || '구글 로그인에 실패했어요.');
       }
 
-      const data = await authResponse.json();
+      // 회원가입이 필요한 경우
+      if (data.requiresSignup) {
+        // Google 사용자 정보를 sessionStorage에 저장하고 회원가입 페이지로 이동
+        sessionStorage.setItem('googleSignupData', JSON.stringify({
+          email: data.googleUser.email,
+          name: data.googleUser.name,
+          picture: data.googleUser.picture,
+          credential: response.credential,
+        }));
+        // 회원가입 페이지로 이동하는 콜백 호출 (App.jsx에서 처리)
+        if (onNavigateToSignup) {
+          onNavigateToSignup();
+        }
+        return;
+      }
+
+      // 기존 사용자: 바로 로그인
       const expiresInMs = 60 * 60 * 1000; // 60분
       const expiresAt = Date.now() + expiresInMs;
 

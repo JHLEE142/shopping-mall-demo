@@ -93,17 +93,12 @@ function MyPage({
               >
                 {user?.name || user?.email || '사용자'} <ChevronRight size={16} />
               </button>
-            
             </div>
-          </div>
-        </section>
-
-        {/* 금액 정보 섹션 */}
-        <section className="my-page__balance-section">
-          <div className="my-page__balance-item" onClick={onMoveToPoints}>
-            <div className="my-page__balance-label">적립금</div>
-            <div className="my-page__balance-value">{pointsBalance.toLocaleString()}원</div>
-            <ChevronRight size={16} className="my-page__balance-arrow" />
+            <div className="my-page__profile-points" onClick={onMoveToPoints}>
+              <div className="my-page__points-label">적립금</div>
+              <div className="my-page__points-value">{pointsBalance.toLocaleString()}원</div>
+              <ChevronRight size={16} className="my-page__points-arrow" />
+            </div>
           </div>
         </section>
 
@@ -175,7 +170,7 @@ function MyPage({
 
 
         {/* 이벤트/혜택 섹션 */}
-        <section className="my-page__menu-section">
+        <section className="my-page__menu-section"> 
           <button 
             type="button" 
             className="my-page__menu-item"

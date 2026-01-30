@@ -1598,6 +1598,7 @@ function App() {
             onViewTerms={() => setView('terms')}
             onViewPrivacy={() => setView('privacy')}
             onViewMarketing={() => setView('marketing')}
+            onLoginSuccess={handleLoginSuccess}
           />
         </div>
       );
