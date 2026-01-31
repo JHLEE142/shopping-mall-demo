@@ -105,15 +105,21 @@ function App() {
   // URL에서 초기 view 읽기
   const getInitialView = () => {
     const path = window.location.pathname;
-    if (path === '/' || path === '') return 'home';
-    const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
     
-    // 쿼리 파라미터에서 view 확인
+    // 먼저 쿼리 파라미터에서 view 확인 (payment-success, payment-fail 등)
     const urlParams = new URLSearchParams(window.location.search);
     const queryView = urlParams.get('view');
     if (queryView && validViews.includes(queryView)) {
+      console.log('[getInitialView] 쿼리 파라미터에서 view 발견:', queryView);
       return queryView;
     }
+    
+    // path가 '/' 또는 ''이면 home
+    if (path === '/' || path === '') {
+      return 'home';
+    }
+    
+    const view = path.slice(1).split('?')[0]; // '/' 제거 및 쿼리 파라미터 제거
     
     // 유효한 view인지 확인하고, 유효하지 않으면 home으로
     if (validViews.includes(view)) {
@@ -136,7 +142,9 @@ function App() {
   };
 
   const [selectedStyleNote, setSelectedStyleNote] = useState(null);
-  const [view, setViewState] = useState(getInitialView);
+  const initialView = getInitialView();
+  console.log('[App] 초기 view:', initialView, 'URL:', window.location.href);
+  const [view, setViewState] = useState(initialView);
   const [session, setSession] = useState(null);
   const [dashboardInitialNav, setDashboardInitialNav] = useState('Dashboard');
   const [editingProduct, setEditingProduct] = useState(null);
