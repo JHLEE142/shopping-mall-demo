@@ -14,23 +14,38 @@ function PaymentSuccessPage({
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
+    // URL 파라미터 읽기 (여러 방법 시도)
     const urlParams = new URLSearchParams(window.location.search);
-    const paymentKey = urlParams.get('paymentKey');
-    const orderId = urlParams.get('orderId');
-    const amount = urlParams.get('amount');
+    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    
+    const paymentKey = urlParams.get('paymentKey') || hashParams.get('paymentKey');
+    const orderId = urlParams.get('orderId') || hashParams.get('orderId');
+    const amount = urlParams.get('amount') || hashParams.get('amount');
 
-    if (!paymentKey || !orderId || !amount) {
-      setError('결제 정보가 올바르지 않습니다.');
+    console.log('PaymentSuccessPage - URL 파라미터:', {
+      search: window.location.search,
+      hash: window.location.hash,
+      paymentKey,
+      orderId,
+      amount,
+    });
+
+    if (!paymentKey || !orderId) {
+      console.error('필수 파라미터 누락:', { paymentKey, orderId });
+      setError('결제 정보가 올바르지 않습니다. (paymentKey 또는 orderId가 없습니다)');
       setStatus('error');
       return;
     }
 
-    setPaymentData({ paymentKey, orderId, amount: Number(amount) });
-    confirmPayment(paymentKey, orderId, Number(amount));
+    // amount가 없어도 결제 승인 API에서 받을 수 있으므로 일단 진행
+    setPaymentData({ paymentKey, orderId, amount: amount ? Number(amount) : null });
+    confirmPayment(paymentKey, orderId, amount ? Number(amount) : null);
   }, []);
 
   const confirmPayment = async (paymentKey, orderId, amount) => {
     try {
+      console.log('결제 승인 요청 시작:', { paymentKey, orderId, amount });
+      
       // 서버에 결제 승인 요청
       const response = await fetch(`${API_BASE_URL}/api/toss-payments/confirm`, {
         method: 'POST',
@@ -40,15 +55,27 @@ function PaymentSuccessPage({
         body: JSON.stringify({
           paymentKey,
           orderId,
-          amount,
+          amount: amount || 0, // amount가 없으면 0으로 전송 (서버에서 실제 금액 확인)
         }),
       });
 
+      console.log('결제 승인 응답 상태:', response.status);
       const data = await response.json();
+      console.log('결제 승인 응답 데이터:', data);
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || '결제 승인에 실패했습니다.');
+        const errorMsg = data.message || data.error?.message || '결제 승인에 실패했습니다.';
+        console.error('결제 승인 실패:', errorMsg);
+        throw new Error(errorMsg);
       }
+
+      // 결제 승인 성공 - 실제 결제 금액 업데이트
+      const confirmedAmount = data.data?.amount || amount;
+      if (confirmedAmount) {
+        setPaymentData(prev => ({ ...prev, amount: confirmedAmount }));
+      }
+      
+      console.log('결제 승인 성공:', data.data);
 
       // 결제 승인 성공 후 주문 생성
       const pendingOrderData = sessionStorage.getItem('pendingOrder');
@@ -148,12 +175,20 @@ function PaymentSuccessPage({
       } else {
         // pendingOrder가 없는 경우 (세션이 끊겼거나 직접 접근한 경우)
         console.warn('pendingOrder 데이터가 없습니다. 주문 정보를 찾을 수 없습니다.');
+        console.warn('sessionStorage 내용:', {
+          pendingOrder: sessionStorage.getItem('pendingOrder'),
+          allKeys: Object.keys(sessionStorage),
+        });
         setError('주문 정보를 찾을 수 없습니다. 결제는 완료되었으니 고객센터로 문의해주세요.');
         setStatus('error');
         return;
       }
     } catch (err) {
       console.error('결제 승인 오류:', err);
+      console.error('결제 승인 오류 상세:', {
+        message: err.message,
+        stack: err.stack,
+      });
       setError(err.message || '결제 승인 중 오류가 발생했습니다.');
       setStatus('error');
     }
@@ -243,11 +278,60 @@ function PaymentSuccessPage({
   if (status === 'error') {
     return (
       <div className="payment-success-page">
-        <div className="payment-success-page__error">
-          <h2>결제 처리 중 오류가 발생했습니다</h2>
-          <p>{error}</p>
-          <div className="button-group">
-            <button onClick={onBackToHome}>홈으로 돌아가기</button>
+        <div className="payment-success-page__error" style={{ 
+          padding: '2rem', 
+          textAlign: 'center',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}>
+          <div style={{ fontSize: '4rem', color: '#dc2626', marginBottom: '1rem' }}>✗</div>
+          <h2 style={{ marginBottom: '1rem', color: '#1f2937' }}>결제 처리 중 오류가 발생했습니다</h2>
+          <p style={{ 
+            marginBottom: '2rem', 
+            color: '#6b7280', 
+            fontSize: '1rem',
+            lineHeight: '1.6',
+            wordBreak: 'break-word'
+          }}>{error}</p>
+          {paymentData && (
+            <div style={{ 
+              marginBottom: '2rem', 
+              padding: '1rem', 
+              background: '#f9fafb', 
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              textAlign: 'left'
+            }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>결제키:</strong> {paymentData.paymentKey}
+              </div>
+              {paymentData.orderId && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <strong>주문번호:</strong> {paymentData.orderId}
+                </div>
+              )}
+              {paymentData.amount && (
+                <div>
+                  <strong>결제 금액:</strong> {paymentData.amount.toLocaleString()}원
+                </div>
+              )}
+            </div>
+          )}
+          <div className="button-group" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button 
+              onClick={onBackToHome}
+              style={{
+                padding: '0.75rem 2rem',
+                fontSize: '1rem',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              홈으로 돌아가기
+            </button>
           </div>
         </div>
       </div>
@@ -271,7 +355,11 @@ function PaymentSuccessPage({
               </div>
               <div className="info-row">
                 <span className="info-label">결제 금액</span>
-                <span className="info-value">{paymentData?.amount.toLocaleString() || order.summary?.grandTotal?.toLocaleString() || '0'}원</span>
+                <span className="info-value">
+                  {paymentData?.amount ? paymentData.amount.toLocaleString() : 
+                   order.summary?.grandTotal ? order.summary.grandTotal.toLocaleString() : 
+                   '0'}원
+                </span>
               </div>
               {paymentData?.paymentKey && (
                 <div className="info-row">
