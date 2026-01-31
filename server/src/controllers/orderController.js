@@ -328,6 +328,21 @@ async function createOrder(req, res, next) {
       return res.status(400).json({ message: '배송 정보는 필수입니다.' });
     }
 
+    // 배송 주소 필수 필드 검증
+    const address = shipping.address;
+    if (!address.name || !address.name.trim()) {
+      return res.status(400).json({ message: '배송지 수령인 이름은 필수입니다.' });
+    }
+    if (!address.phone || !address.phone.trim()) {
+      return res.status(400).json({ message: '배송지 연락처는 필수입니다.' });
+    }
+    if (!address.postalCode || !address.postalCode.trim()) {
+      return res.status(400).json({ message: '배송지 우편번호는 필수입니다.' });
+    }
+    if (!address.address1 || !address.address1.trim()) {
+      return res.status(400).json({ message: '배송지 주소는 필수입니다.' });
+    }
+
     // 비회원 주문인 경우 필수 정보 확인
     if (!req.user) {
       if (!guestName && !contact.email && !contact.phone) {

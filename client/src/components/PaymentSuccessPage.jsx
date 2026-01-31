@@ -125,6 +125,15 @@ function PaymentSuccessPage({
           const orderInfo = JSON.parse(pendingOrderData);
           const { cart, formData, subtotal, shippingFee, total, couponDiscount, selectedCoupon, directOrderItem } = orderInfo;
 
+          // formData가 없거나 필수 필드가 비어있는지 확인
+          if (!formData || !formData.name || !formData.phone || !formData.postalCode || !formData.address1) {
+            console.error('[PaymentSuccessPage] 배송 정보가 불완전합니다:', formData);
+            isProcessingRef.current = false;
+            setError('배송 정보가 불완전합니다. 결제는 완료되었으니 고객센터로 문의해주세요.');
+            setStatus('error');
+            return;
+          }
+
           // 서버가 요구하는 형식으로 items 변환
           const items = (cart?.items || []).map((item) => {
             const product = item.product || {};
@@ -167,23 +176,23 @@ function PaymentSuccessPage({
             },
             shipping: {
               address: {
-                name: formData.name || '',
-                phone: formData.phone || '',
-                postalCode: formData.postalCode || '',
-                address1: formData.address1 || '',
-                address2: formData.address2 || '',
-                city: formData.city || '',
-                state: formData.state || '',
+                name: formData.name.trim(),
+                phone: formData.phone.trim(),
+                postalCode: formData.postalCode.trim(),
+                address1: formData.address1.trim(),
+                address2: (formData.address2 || '').trim(),
+                city: (formData.city || '').trim(),
+                state: (formData.state || '').trim(),
               },
-              request: formData.notes || '',
+              request: (formData.notes || '').trim(),
             },
             contact: {
-              phone: formData.phone || '',
-              email: formData.email || '',
+              phone: formData.phone.trim(),
+              email: (formData.email || '').trim(),
             },
-            guestName: formData.name || '',
-            guestEmail: formData.email || '',
-            notes: formData.notes || '',
+            guestName: formData.name.trim(),
+            guestEmail: (formData.email || '').trim(),
+            notes: (formData.notes || '').trim(),
             payment: {
               method: 'online',
               transactionId: paymentKey,
