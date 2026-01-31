@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import './LoyaltyHallPage.css';
 
-// 입고 예정 상품 데이터 (이미지 설명 기반)
+// 입고 예정 상품 데이터 (실제 상품 이미지)
 const UPCOMING_PRODUCTS = [
   {
     id: 'wedgwood-turquoise-plate-26cm',
     name: '웨지우드 터콰즈 원형 접시 26CM',
     price: 208000,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -16,7 +16,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-turquoise-plate-18cm',
     name: '웨지우드 터콰즈 집시 접시 18CM',
     price: 89800,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -24,7 +24,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-turquoise-plate-27cm',
     name: '웨지우드 터콰즈 진시 접시 27CM',
     price: 149800,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -32,7 +32,7 @@ const UPCOMING_PRODUCTS = [
     id: 'corelle-rosemont-24pc',
     name: '코렐 코디네이츠 로즈몬트 홈세트 24종',
     price: 125000,
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=600&fit=crop&q=80',
     brand: 'Corelle',
     status: 'upcoming'
   },
@@ -40,7 +40,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-mellory-ribbon-cake-stand',
     name: '웨지우드 멜로우리본 2단 케이크 스탠드',
     price: 139500,
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1571115177098-24ec42ed204d?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -48,7 +48,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-turquoise-bowl',
     name: '웨지우드 터콰즈 공기',
     price: 89800,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -56,7 +56,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-turquoise-cereal-bowl',
     name: '웨지우드 터콰즈 시리얼볼 15.5CM',
     price: 119500,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   },
@@ -64,7 +64,7 @@ const UPCOMING_PRODUCTS = [
     id: 'wedgwood-turquoise-sugar',
     name: '웨지우드 터콰즈 슈가볼',
     price: 189500,
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=600&h=600&fit=crop&q=80',
     brand: 'Wedgwood',
     status: 'upcoming'
   }
