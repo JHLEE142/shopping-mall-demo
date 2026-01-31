@@ -115,7 +115,11 @@ async function confirmPayment(req, res, next) {
           status: order.status,
         });
       } else {
-        console.warn('[주문을 찾을 수 없음]', { orderId, paymentKey });
+        console.warn('[토스페이먼츠 결제 승인] 주문을 찾을 수 없음 - PaymentSuccessPage에서 생성 예정', { 
+          orderId, 
+          paymentKey,
+          searchAttempts: ['orderNumber', 'payment.transactionId']
+        });
         // 주문이 없어도 결제 승인은 성공했으므로 응답은 성공으로 반환
         // (주문은 PaymentSuccessPage에서 생성할 수 있음)
       }

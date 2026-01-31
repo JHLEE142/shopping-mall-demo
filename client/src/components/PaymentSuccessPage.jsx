@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createOrder as createOrderApi } from '../services/orderService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6500';
@@ -12,6 +12,8 @@ function PaymentSuccessPage({
   const [paymentData, setPaymentData] = useState(null);
   const [error, setError] = useState(null);
   const [order, setOrder] = useState(null);
+  const confirmExecutedRef = useRef(false); // confirm 중복 실행 방지
+  const isProcessingRef = useRef(false); // 처리 중 플래그
 
   useEffect(() => {
     // URL이 변경되지 않도록 보장 (payment-success view일 때는 쿼리 파라미터 유지)
@@ -52,21 +54,30 @@ function PaymentSuccessPage({
     });
 
     if (!paymentKey || !orderId) {
-      console.error('필수 파라미터 누락:', { paymentKey, orderId });
+      console.error('[PaymentSuccessPage] 필수 파라미터 누락:', { paymentKey, orderId });
       setError('결제 정보가 올바르지 않습니다. (paymentKey 또는 orderId가 없습니다)');
       setStatus('error');
+      return;
+    }
+
+    // 중복 실행 방지
+    if (confirmExecutedRef.current || isProcessingRef.current) {
+      console.warn('[PaymentSuccessPage] confirm이 이미 실행되었거나 처리 중입니다.');
       return;
     }
 
     // amount는 URL에서 가져오거나 sessionStorage에서 가져오거나 결제 승인 API에서 받을 수 있음
     const initialAmount = amount ? Number(amount) : null;
     setPaymentData({ paymentKey, orderId, amount: initialAmount, paymentType });
+    
+    confirmExecutedRef.current = true;
+    isProcessingRef.current = true;
     confirmPayment(paymentKey, orderId, initialAmount);
   }, []);
 
   const confirmPayment = async (paymentKey, orderId, amount) => {
     try {
-      console.log('결제 승인 요청 시작:', { paymentKey, orderId, amount });
+      console.log('[PaymentSuccessPage] 결제 승인 요청 시작:', { paymentKey, orderId, amount });
       
       // 서버에 결제 승인 요청
       const response = await fetch(`${API_BASE_URL}/api/toss-payments/confirm`, {
@@ -74,6 +85,7 @@ function PaymentSuccessPage({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // 쿠키 인증 지원
         body: JSON.stringify({
           paymentKey,
           orderId,
@@ -81,14 +93,18 @@ function PaymentSuccessPage({
         }),
       });
 
-      console.log('결제 승인 응답 상태:', response.status);
+      console.log('[PaymentSuccessPage] 결제 승인 응답 상태:', response.status);
       const data = await response.json();
-      console.log('결제 승인 응답 데이터:', data);
+      console.log('[PaymentSuccessPage] 결제 승인 응답 데이터:', data);
 
       if (!response.ok || !data.success) {
         const errorMsg = data.message || data.error?.message || '결제 승인에 실패했습니다.';
-        console.error('결제 승인 실패:', errorMsg);
-        throw new Error(errorMsg);
+        console.error('[PaymentSuccessPage] 결제 승인 실패:', errorMsg, data);
+        isProcessingRef.current = false;
+        // 결제 승인 실패 시 payment-fail로 이동
+        const failUrl = `${window.location.origin}?view=payment-fail&orderId=${orderId}&code=${data.code || 'PAYMENT_CONFIRM_FAILED'}&message=${encodeURIComponent(errorMsg)}`;
+        window.location.href = failUrl;
+        return;
       }
 
       // 결제 승인 성공 - 실제 결제 금액 업데이트
@@ -97,12 +113,13 @@ function PaymentSuccessPage({
         setPaymentData(prev => ({ ...prev, amount: confirmedAmount }));
       }
       
-      console.log('결제 승인 성공:', data.data);
+      console.log('[PaymentSuccessPage] 결제 승인 성공:', data.data);
 
       // 결제 승인 성공 후 주문 생성 또는 확인
       // confirm API에서 이미 주문을 찾아서 업데이트했을 수 있으므로,
       // 먼저 주문이 있는지 확인하고 없으면 생성
       const pendingOrderData = sessionStorage.getItem('pendingOrder');
+      console.log('[PaymentSuccessPage] pendingOrder 데이터 확인:', pendingOrderData ? '존재함' : '없음');
       if (pendingOrderData) {
         try {
           const orderInfo = JSON.parse(pendingOrderData);
@@ -177,21 +194,36 @@ function PaymentSuccessPage({
             sourceCart: cart?._id || null,
           };
 
-          console.log('주문 생성 시작:', JSON.stringify(orderPayload, null, 2));
-          const createdOrder = await createOrderApi(orderPayload);
-          console.log('주문 생성 성공:', createdOrder);
+          console.log('[PaymentSuccessPage] 주문 생성 시작:', JSON.stringify(orderPayload, null, 2));
           
-          setOrder(createdOrder.order || createdOrder);
-          sessionStorage.removeItem('pendingOrder');
-          setStatus('success'); // 주문 생성 성공 시에만 success 상태로 변경
+          try {
+            const createdOrder = await createOrderApi(orderPayload);
+            console.log('[PaymentSuccessPage] 주문 생성 성공:', createdOrder);
+            
+            setOrder(createdOrder.order || createdOrder);
+            sessionStorage.removeItem('pendingOrder');
+            isProcessingRef.current = false;
+            setStatus('success'); // 주문 생성 성공 시에만 success 상태로 변경
+            
+            // 주문 완료 페이지로 이동 (선택적)
+            // 주문 상세 페이지로 이동하거나 주문 목록으로 이동할 수 있음
+            // setTimeout(() => {
+            //   window.location.href = `?view=order-list`;
+            // }, 2000);
+          } catch (createError) {
+            // 주문 생성 실패 시에도 결제는 완료되었으므로 에러 표시
+            console.error('[PaymentSuccessPage] 주문 생성 실패:', createError);
+            throw createError;
+          }
         } catch (e) {
-          console.error('주문 생성 오류:', e);
-          console.error('주문 생성 오류 상세:', {
+          console.error('[PaymentSuccessPage] 주문 생성 오류:', e);
+          console.error('[PaymentSuccessPage] 주문 생성 오류 상세:', {
             message: e.message,
             status: e.status,
             data: e.data,
             stack: e.stack,
           });
+          isProcessingRef.current = false;
           // 주문 생성 실패 시 에러 상태로 유지
           const errorMessage = e.data?.message || e.message || '알 수 없는 오류';
           setError(`주문 생성 중 오류가 발생했습니다: ${errorMessage}. 결제는 완료되었으니 고객센터로 문의해주세요. (결제키: ${paymentKey})`);
@@ -200,21 +232,27 @@ function PaymentSuccessPage({
         }
       } else {
         // pendingOrder가 없는 경우 (세션이 끊겼거나 직접 접근한 경우)
-        console.warn('pendingOrder 데이터가 없습니다. 주문 정보를 찾을 수 없습니다.');
-        console.warn('sessionStorage 내용:', {
+        // confirm API에서 이미 주문을 업데이트했을 수 있으므로, 주문 목록으로 이동
+        console.warn('[PaymentSuccessPage] pendingOrder 데이터가 없습니다. confirm API에서 주문을 업데이트했을 수 있습니다.');
+        console.warn('[PaymentSuccessPage] sessionStorage 내용:', {
           pendingOrder: sessionStorage.getItem('pendingOrder'),
           allKeys: Object.keys(sessionStorage),
         });
-        setError('주문 정보를 찾을 수 없습니다. 결제는 완료되었으니 고객센터로 문의해주세요.');
-        setStatus('error');
+        isProcessingRef.current = false;
+        // 결제는 완료되었으므로 주문 목록으로 이동
+        setStatus('success');
+        setTimeout(() => {
+          window.location.href = `?view=order-list`;
+        }, 2000);
         return;
       }
     } catch (err) {
-      console.error('결제 승인 오류:', err);
-      console.error('결제 승인 오류 상세:', {
+      console.error('[PaymentSuccessPage] 결제 승인 오류:', err);
+      console.error('[PaymentSuccessPage] 결제 승인 오류 상세:', {
         message: err.message,
         stack: err.stack,
       });
+      isProcessingRef.current = false;
       setError(err.message || '결제 승인 중 오류가 발생했습니다.');
       setStatus('error');
     }
