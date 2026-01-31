@@ -822,7 +822,12 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       categoryPathText = pathParts.join(' > ');
     }
 
-    if (!formData.name || !categoryMain || !formData.price) {
+    // 카테고리 검증: 직접 입력 모드일 때는 customCategoryMain도 확인
+    const isValidCategory = categoryInputMode === 'input' 
+      ? (customCategoryMain && customCategoryMain.trim()) || categoryMain
+      : categoryMain;
+    
+    if (!formData.name || !isValidCategory || !formData.price) {
       setError('필수 항목(상품명, 카테고리, 가격)을 모두 입력해주세요.');
       return;
     }

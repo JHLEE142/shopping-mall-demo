@@ -569,7 +569,15 @@ async function updateProduct(req, res, next) {
     
     // inventory 필드가 있으면 nested object 업데이트 처리
     if (payload.inventory) {
-      const inventory = { ...payload.inventory };
+      // 기존 상품 정보를 가져와서 inventory 필드를 병합 (부분 업데이트 지원)
+      const existingProduct = await Product.findById(req.params.id).lean();
+      const existingInventory = existingProduct?.inventory || {};
+      
+      // 기존 inventory와 새로운 inventory를 병합
+      const inventory = {
+        ...existingInventory,
+        ...payload.inventory,
+      };
       
       // inventory.updatedAt 자동 설정
       inventory.updatedAt = new Date();
