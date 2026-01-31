@@ -176,10 +176,19 @@ function App() {
 
   // 브라우저 히스토리와 동기화된 setView
   const setView = (newView, options = {}) => {
-    const { replace = false, skipHistory = false, state = {} } = options;
+    const { replace = false, skipHistory = false, state = {}, preserveQuery = false } = options;
     
     if (!skipHistory) {
-      const url = newView === 'home' ? '/' : `/${newView}`;
+      let url = newView === 'home' ? '/' : `/${newView}`;
+      
+      // payment-success나 payment-fail일 때는 쿼리 파라미터 유지
+      if (preserveQuery || newView === 'payment-success' || newView === 'payment-fail') {
+        const currentSearch = window.location.search;
+        if (currentSearch) {
+          url += currentSearch;
+        }
+      }
+      
       if (replace) {
         window.history.replaceState({ view: newView, ...state }, '', url);
       } else {
@@ -463,6 +472,13 @@ function App() {
           if (urlProductId && currentView === 'product-detail') {
             setSelectedProductId(urlProductId);
           }
+          // payment-success나 payment-fail일 때는 쿼리 파라미터 유지
+          if (currentView === 'payment-success' || currentView === 'payment-fail') {
+            const currentSearch = window.location.search;
+            if (currentSearch && !window.history.state?.preserveQuery) {
+              window.history.replaceState({ view: currentView, preserveQuery: true }, '', window.location.pathname + currentSearch);
+            }
+          }
         } else {
           // 유효하지 않으면 home으로 리다이렉트
           setView('home', { replace: true });
@@ -477,7 +493,15 @@ function App() {
       const initialView = getInitialView();
       // 유효한 view인지 확인
       if (validViews.includes(initialView)) {
-        window.history.replaceState({ view: initialView }, '', initialView === 'home' ? '/' : `/${initialView}`);
+        // payment-success나 payment-fail일 때는 현재 URL 유지 (쿼리 파라미터 포함)
+        if (initialView === 'payment-success' || initialView === 'payment-fail') {
+          // 현재 URL을 그대로 유지 (쿼리 파라미터 포함)
+          const currentUrl = window.location.pathname + window.location.search;
+          window.history.replaceState({ view: initialView, preserveQuery: true }, '', currentUrl);
+        } else {
+          const url = initialView === 'home' ? '/' : `/${initialView}`;
+          window.history.replaceState({ view: initialView }, '', url);
+        }
       } else {
         window.history.replaceState({ view: 'home' }, '', '/');
         setViewState('home');

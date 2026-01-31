@@ -14,6 +14,18 @@ function PaymentSuccessPage({
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
+    // URL이 변경되지 않도록 보장 (payment-success view일 때는 쿼리 파라미터 유지)
+    const currentSearch = window.location.search;
+    if (currentSearch && !currentSearch.includes('view=payment-success')) {
+      // view 파라미터가 없으면 추가
+      const urlParams = new URLSearchParams(currentSearch);
+      if (!urlParams.has('view')) {
+        urlParams.set('view', 'payment-success');
+        const newUrl = window.location.pathname + '?' + urlParams.toString();
+        window.history.replaceState({ view: 'payment-success', preserveQuery: true }, '', newUrl);
+      }
+    }
+
     // URL 파라미터 읽기 (토스페이먼츠가 paymentKey와 orderId를 자동으로 추가)
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
@@ -26,8 +38,10 @@ function PaymentSuccessPage({
     // 우리가 추가한 파라미터 (중복될 수 있음)
     const amount = urlParams.get('amount') || hashParams.get('amount');
 
+    console.log('=== PaymentSuccessPage 마운트 ===');
     console.log('PaymentSuccessPage - URL 파라미터:', {
       fullUrl: window.location.href,
+      pathname: window.location.pathname,
       search: window.location.search,
       hash: window.location.hash,
       paymentKey,
