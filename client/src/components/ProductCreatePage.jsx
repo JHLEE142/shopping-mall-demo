@@ -823,9 +823,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     }
 
     // 카테고리 검증: 직접 입력 모드일 때는 customCategoryMain도 확인
-    const isValidCategory = categoryInputMode === 'input' 
-      ? (customCategoryMain && customCategoryMain.trim()) || categoryMain
-      : categoryMain;
+    // 수정 모드일 때는 기존 product의 categoryMain도 확인
+    let isValidCategory;
+    if (categoryInputMode === 'input') {
+      isValidCategory = (customCategoryMain && customCategoryMain.trim()) || categoryMain;
+    } else {
+      isValidCategory = categoryMain;
+    }
+    
+    // 수정 모드일 때 기존 상품의 카테고리가 있으면 그것도 유효한 것으로 간주
+    if (isEditMode && !isValidCategory && product) {
+      isValidCategory = product.categoryMain || product.category || product.categoryPathText;
+    }
     
     if (!formData.name || !isValidCategory || !formData.price) {
       setError('필수 항목(상품명, 카테고리, 가격)을 모두 입력해주세요.');
