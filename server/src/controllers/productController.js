@@ -567,31 +567,54 @@ async function updateProduct(req, res, next) {
       }
     }
     
+    // totalStock이 있으면 inventory.stock으로 변환 (하위 호환성)
+    if (payload.totalStock !== undefined && !payload.inventory) {
+      payload.inventory = { stock: payload.totalStock };
+    }
+    
     // inventory 필드가 있으면 nested object 업데이트 처리
     if (payload.inventory) {
       // 기존 상품 정보를 가져와서 inventory 필드를 병합 (부분 업데이트 지원)
       const existingProduct = await Product.findById(req.params.id).lean();
-      const existingInventory = existingProduct?.inventory || {};
+      if (!existingProduct) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      
+      const existingInventory = existingProduct.inventory || {};
       
       // 기존 inventory와 새로운 inventory를 병합
+      // 숫자 필드는 명시적으로 변환하여 처리
       const inventory = {
-        ...existingInventory,
-        ...payload.inventory,
+        stock: payload.inventory.stock !== undefined 
+          ? Math.max(Number(payload.inventory.stock) || 0, 0)
+          : (existingInventory.stock ?? 0),
+        reserved: payload.inventory.reserved !== undefined
+          ? Math.max(Number(payload.inventory.reserved) || 0, 0)
+          : (existingInventory.reserved ?? 0),
+        reorderPoint: payload.inventory.reorderPoint !== undefined
+          ? Math.max(Number(payload.inventory.reorderPoint) || 0, 0)
+          : (existingInventory.reorderPoint ?? 0),
+        supplier: payload.inventory.supplier !== undefined
+          ? (payload.inventory.supplier || '')
+          : (existingInventory.supplier || ''),
+        cost: payload.inventory.cost !== undefined
+          ? Math.max(Number(payload.inventory.cost) || 0, 0)
+          : (existingInventory.cost ?? 0),
       };
       
       // inventory.updatedAt 자동 설정
       inventory.updatedAt = new Date();
       
       // 재고 상태 자동 계산
-      const stock = inventory.stock ?? 0;
-      const reserved = inventory.reserved ?? 0;
-      let reorderPoint = inventory.reorderPoint ?? 0;
+      const stock = inventory.stock;
+      const reserved = inventory.reserved;
+      let reorderPoint = inventory.reorderPoint;
       const available = Math.max(stock - reserved, 0);
       
       // reorderPoint가 0이거나 재고보다 크면 합리적인 기본값 설정
       // 기본값: 재고 수량의 20% (최소 10개)
       if (reorderPoint <= 0 || reorderPoint > stock) {
-        reorderPoint = Math.max(Math.ceil(stock * 0.2), 10);
+        reorderPoint = stock > 0 ? Math.max(Math.ceil(stock * 0.2), 10) : 10;
         inventory.reorderPoint = reorderPoint;
       }
       
@@ -602,15 +625,15 @@ async function updateProduct(req, res, next) {
       updateQuery['inventory.stock'] = inventory.stock;
       updateQuery['inventory.reserved'] = inventory.reserved;
       updateQuery['inventory.reorderPoint'] = inventory.reorderPoint;
-      updateQuery['inventory.supplier'] = inventory.supplier || '';
-      updateQuery['inventory.cost'] = inventory.cost || 0;
+      updateQuery['inventory.supplier'] = inventory.supplier;
+      updateQuery['inventory.cost'] = inventory.cost;
       updateQuery['inventory.status'] = inventory.status;
       updateQuery['inventory.updatedAt'] = inventory.updatedAt;
     }
     
-    // 다른 필드들도 업데이트 (inventory, discountRate, originalPrice 제외)
+    // 다른 필드들도 업데이트 (inventory, discountRate, originalPrice, totalStock 제외)
     Object.keys(payload).forEach((key) => {
-      if (key !== 'inventory' && key !== 'discountRate' && key !== 'originalPrice' && key !== '_id' && key !== '__v') {
+      if (key !== 'inventory' && key !== 'discountRate' && key !== 'originalPrice' && key !== 'totalStock' && key !== '_id' && key !== '__v') {
         // image 필드는 유효한 값이 있을 때만 업데이트 (빈 문자열이면 기존 이미지 유지)
         if (key === 'image') {
           if (payload[key] && payload[key].trim() !== '') {
