@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd client && npm ci && npm run build"
+    "build": "cd client && npm ci && npm run build",
+    "git:push": "node -e \"const readline=require('readline');const rl=readline.createInterface({input:process.stdin,output:process.stdout});rl.question('Enter commit message: ',msg=>{if(!msg.trim()){console.error('Error: Commit message required!');process.exit(1);}const{execSync}=require('child_process');try{execSync('git add .',{stdio:'inherit'});execSync(`git commit -m \"${msg}\"`,{stdio:'inherit'});const branch=execSync('git branch --show-current',{encoding:'utf8'}).trim();execSync(`git push origin ${branch}`,{stdio:'inherit'});console.log('Successfully pushed!');}catch(e){console.error('Error:',e.message);process.exit(1);}rl.close();});\""
   }
 }
 

@@ -491,9 +491,22 @@ async function createOrder(req, res, next) {
 
     let verifiedPaymentInfo = null;
 
-    const shouldVerifyPayment =
-      normalizeString(payment?.transactionId) ||
-      normalizeString(paymentVerification?.impUid);
+    // 토스페이먼츠 결제인지 확인 (paymentKey 형식: tgen_ 또는 t_ 로 시작)
+    const transactionId = normalizeString(payment?.transactionId || '');
+    const isTossPayment = transactionId && (
+      transactionId.startsWith('tgen_') || 
+      transactionId.startsWith('t_') ||
+      transactionId.startsWith('toss_')
+    );
+
+    // 포트원 결제 검증이 필요한 경우에만 검증 수행
+    // 토스페이먼츠 결제는 이미 confirmPayment API에서 승인되었으므로 검증 건너뛰기
+    // payment.status가 이미 'paid'이고 토스페이먼츠 결제인 경우도 검증 건너뛰기
+    const shouldVerifyPayment = 
+      !isTossPayment && // 토스페이먼츠 결제가 아닌 경우
+      payment?.status !== 'paid' && // 결제 상태가 아직 'paid'가 아닌 경우
+      (normalizeString(paymentVerification?.impUid) || // impUid가 명시적으로 전달된 경우
+       (transactionId && !isTossPayment)); // transactionId가 있고 토스페이먼츠가 아닌 경우
 
     if (shouldVerifyPayment) {
       try {
@@ -527,6 +540,12 @@ async function createOrder(req, res, next) {
           retryable: !errorMessage.includes('금액이 일치하지 않습니다'),
         });
       }
+    } else if (isTossPayment && payment?.status === 'paid') {
+      // 토스페이먼츠 결제이고 이미 paid 상태인 경우, 검증 없이 진행
+      console.log('[주문 생성] 토스페이먼츠 결제 - 검증 건너뛰기 (이미 승인됨)', {
+        transactionId,
+        amount: payment?.amount,
+      });
     }
 
     // 재고 확인 및 차감 (트랜잭션 사용)

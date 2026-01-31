@@ -1,0 +1,27 @@
+========================================
+바로 복사해서 사용할 수 있는 Git Push 명령어
+========================================
+
+【Windows PowerShell에서 사용】
+git add .; git commit -m "커밋 메시지"; git push origin (git branch --show-current)
+
+【예시】
+git add .; git commit -m "결제 성공 후 주문 생성 로직 수정"; git push origin (git branch --show-current)
+
+========================================
+【Windows CMD에서 사용】
+git add . && git commit -m "커밋 메시지" && git push origin %(git branch --show-current)
+
+【예시】
+git add . && git commit -m "결제 성공 후 주문 생성 로직 수정" && git push origin %(git branch --show-current)
+
+========================================
+【Git Bash / Linux / Mac에서 사용】
+git add . && git commit -m "커밋 메시지" && git push origin $(git branch --show-current)
+
+【예시】
+git add . && git commit -m "결제 성공 후 주문 생성 로직 수정" && git push origin $(git branch --show-current)
+
+========================================
+주의: "커밋 메시지" 부분을 실제 커밋 메시지로 변경하세요!
+

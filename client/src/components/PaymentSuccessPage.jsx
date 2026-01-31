@@ -397,7 +397,9 @@ function PaymentSuccessPage({
             <p style={{ marginTop: '1rem', color: '#059669', fontWeight: 'bold' }}>
               주문이 성공적으로 생성되었습니다!
             </p>
-            <div className="payment-info" style={{ marginTop: '1.5rem' }}>
+            
+            {/* 주문 기본 정보 */}
+            <div className="payment-info" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
               <div className="info-row">
                 <span className="info-label">주문번호</span>
                 <span className="info-value">{order.orderNumber || order._id}</span>
@@ -410,13 +412,142 @@ function PaymentSuccessPage({
                    '0'}원
                 </span>
               </div>
-              {paymentData?.paymentKey && (
-                <div className="info-row">
-                  <span className="info-label">결제키</span>
-                  <span className="info-value" style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{paymentData.paymentKey}</span>
-                </div>
-              )}
+              <div className="info-row">
+                <span className="info-label">결제 방법</span>
+                <span className="info-value">{order.payment?.method === 'online' ? '온라인 결제' : order.payment?.method || '알 수 없음'}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">주문 상태</span>
+                <span className="info-value">
+                  {order.status === 'paid' ? '결제 완료' : 
+                   order.status === 'pending' ? '결제 대기' : 
+                   order.status || '알 수 없음'}
+                </span>
+              </div>
             </div>
+
+            {/* 주문 상품 목록 */}
+            {order.items && order.items.length > 0 && (
+              <div className="order-items" style={{ 
+                marginTop: '2rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#f9fafb', 
+                borderRadius: '8px',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>주문 상품</h3>
+                {order.items.map((item, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    gap: '1rem', 
+                    padding: '1rem', 
+                    backgroundColor: 'white', 
+                    borderRadius: '6px',
+                    marginBottom: '0.5rem'
+                  }}>
+                    {item.thumbnail && (
+                      <img 
+                        src={item.thumbnail} 
+                        alt={item.name} 
+                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{item.name}</div>
+                      {item.sku && (
+                        <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                          상품코드: {item.sku}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.9rem', color: '#374151' }}>
+                        수량: {item.quantity}개 × {item.unitPrice?.toLocaleString() || 0}원
+                        {item.lineDiscount > 0 && (
+                          <span style={{ color: '#dc2626', marginLeft: '0.5rem' }}>
+                            (할인: -{item.lineDiscount.toLocaleString()}원)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ marginTop: '0.5rem', fontWeight: 'bold', color: '#059669' }}>
+                        {item.lineTotal?.toLocaleString() || 0}원
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 주문 요약 */}
+            {order.summary && (
+              <div className="order-summary" style={{ 
+                marginTop: '1rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#f9fafb', 
+                borderRadius: '8px',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>주문 요약</h3>
+                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>상품 금액</span>
+                  <span>{order.summary.subtotal?.toLocaleString() || 0}원</span>
+                </div>
+                {order.summary.discountTotal > 0 && (
+                  <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#dc2626' }}>
+                    <span>할인 금액</span>
+                    <span>-{order.summary.discountTotal.toLocaleString()}원</span>
+                  </div>
+                )}
+                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>배송비</span>
+                  <span>{order.summary.shippingFee?.toLocaleString() || 0}원</span>
+                </div>
+                <div className="summary-row" style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  marginTop: '1rem', 
+                  paddingTop: '1rem', 
+                  borderTop: '2px solid #e5e7eb',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold'
+                }}>
+                  <span>총 결제 금액</span>
+                  <span style={{ color: '#059669' }}>{order.summary.grandTotal?.toLocaleString() || 0}원</span>
+                </div>
+              </div>
+            )}
+
+            {/* 배송 정보 */}
+            {order.shipping && order.shipping.address && (
+              <div className="shipping-info" style={{ 
+                marginTop: '1rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#f9fafb', 
+                borderRadius: '8px',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>배송 정보</h3>
+                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>수령인:</span>
+                  <span>{order.shipping.address.name}</span>
+                </div>
+                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>연락처:</span>
+                  <span>{order.shipping.address.phone}</span>
+                </div>
+                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>주소:</span>
+                  <span>
+                    [{order.shipping.address.postalCode}] {order.shipping.address.address1}
+                    {order.shipping.address.address2 && ` ${order.shipping.address.address2}`}
+                  </span>
+                </div>
+                {order.shipping.request && (
+                  <div className="info-row" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>배송 요청사항:</span>
+                    <span>{order.shipping.request}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         ) : (
           paymentData && (
