@@ -99,7 +99,9 @@ function PaymentSuccessPage({
       
       console.log('결제 승인 성공:', data.data);
 
-      // 결제 승인 성공 후 주문 생성
+      // 결제 승인 성공 후 주문 생성 또는 확인
+      // confirm API에서 이미 주문을 찾아서 업데이트했을 수 있으므로,
+      // 먼저 주문이 있는지 확인하고 없으면 생성
       const pendingOrderData = sessionStorage.getItem('pendingOrder');
       if (pendingOrderData) {
         try {
@@ -135,7 +137,9 @@ function PaymentSuccessPage({
           const grandTotal = total || (finalSubtotal - finalCouponDiscount + finalShippingFee);
 
           // 주문 생성
+          // orderNumber를 토스페이먼츠의 orderId로 설정하여 confirm API에서 주문을 찾을 수 있도록 함
           const orderPayload = {
+            orderNumber: orderId, // 토스페이먼츠 orderId를 orderNumber로 사용
             items: items,
             summary: {
               currency: 'KRW',
