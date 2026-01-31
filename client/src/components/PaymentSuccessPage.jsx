@@ -101,8 +101,8 @@ function PaymentSuccessPage({
         const errorMsg = data.message || data.error?.message || '결제 승인에 실패했습니다.';
         console.error('[PaymentSuccessPage] 결제 승인 실패:', errorMsg, data);
         isProcessingRef.current = false;
-        // 결제 승인 실패 시 payment-fail로 이동
-        const failUrl = `${window.location.origin}?view=payment-fail&orderId=${orderId}&code=${data.code || 'PAYMENT_CONFIRM_FAILED'}&message=${encodeURIComponent(errorMsg)}`;
+        // 결제 승인 실패 시 payment-fail로 이동 (결제키, 주문번호, 에러코드 전달하지 않음)
+        const failUrl = `${window.location.origin}?view=payment-fail`;
         window.location.href = failUrl;
         return;
       }
@@ -224,9 +224,9 @@ function PaymentSuccessPage({
             stack: e.stack,
           });
           isProcessingRef.current = false;
-          // 주문 생성 실패 시 에러 상태로 유지
+          // 주문 생성 실패 시 에러 상태로 유지 (결제키 등 민감 정보 노출하지 않음)
           const errorMessage = e.data?.message || e.message || '알 수 없는 오류';
-          setError(`주문 생성 중 오류가 발생했습니다: ${errorMessage}. 결제는 완료되었으니 고객센터로 문의해주세요. (결제키: ${paymentKey})`);
+          setError('주문 생성 중 오류가 발생했습니다. 결제는 완료되었으니 고객센터로 문의해주세요.');
           setStatus('error');
           return; // 에러 상태로 유지하고 함수 종료
         }
@@ -357,30 +357,6 @@ function PaymentSuccessPage({
             lineHeight: '1.6',
             wordBreak: 'break-word'
           }}>{error}</p>
-          {paymentData && (
-            <div style={{ 
-              marginBottom: '2rem', 
-              padding: '1rem', 
-              background: '#f9fafb', 
-              borderRadius: '8px',
-              fontSize: '0.9rem',
-              textAlign: 'left'
-            }}>
-              <div style={{ marginBottom: '0.5rem' }}>
-                <strong>결제키:</strong> {paymentData.paymentKey}
-              </div>
-              {paymentData.orderId && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <strong>주문번호:</strong> {paymentData.orderId}
-                </div>
-              )}
-              {paymentData.amount && (
-                <div>
-                  <strong>결제 금액:</strong> {paymentData.amount.toLocaleString()}원
-                </div>
-              )}
-            </div>
-          )}
           <div className="button-group" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <button 
               onClick={onBackToHome}

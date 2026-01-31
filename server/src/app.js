@@ -40,8 +40,11 @@ function createCorsOptions() {
       
       // Vercel 도메인 허용 (모든 *.vercel.app 도메인)
       const isVercelDomain = normalized.includes('.vercel.app');
+      
+      // nekonoble.shop 도메인 허용
+      const isNekonobleDomain = normalized.includes('nekonoble.shop');
 
-      if (isAllowed || isVercelDomain) {
+      if (isAllowed || isVercelDomain || isNekonobleDomain) {
         callback(null, true);
         return;
       }
@@ -51,6 +54,7 @@ function createCorsOptions() {
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-OpenAI-API-Key', 'x-openai-api-key'],
+    credentials: true, // 쿠키 및 인증 정보 허용
     optionsSuccessStatus: 204,
     preflightContinue: false,
   };
