@@ -14,20 +14,27 @@ function PaymentSuccessPage({
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
-    // URL 파라미터 읽기 (여러 방법 시도)
+    // URL 파라미터 읽기 (토스페이먼츠가 paymentKey와 orderId를 자동으로 추가)
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
     
+    // 토스페이먼츠가 자동으로 추가하는 파라미터
     const paymentKey = urlParams.get('paymentKey') || hashParams.get('paymentKey');
     const orderId = urlParams.get('orderId') || hashParams.get('orderId');
+    const paymentType = urlParams.get('paymentType') || hashParams.get('paymentType');
+    
+    // 우리가 추가한 파라미터 (중복될 수 있음)
     const amount = urlParams.get('amount') || hashParams.get('amount');
 
     console.log('PaymentSuccessPage - URL 파라미터:', {
+      fullUrl: window.location.href,
       search: window.location.search,
       hash: window.location.hash,
       paymentKey,
       orderId,
+      paymentType,
       amount,
+      allParams: Object.fromEntries(urlParams.entries()),
     });
 
     if (!paymentKey || !orderId) {
@@ -37,9 +44,10 @@ function PaymentSuccessPage({
       return;
     }
 
-    // amount가 없어도 결제 승인 API에서 받을 수 있으므로 일단 진행
-    setPaymentData({ paymentKey, orderId, amount: amount ? Number(amount) : null });
-    confirmPayment(paymentKey, orderId, amount ? Number(amount) : null);
+    // amount는 URL에서 가져오거나 sessionStorage에서 가져오거나 결제 승인 API에서 받을 수 있음
+    const initialAmount = amount ? Number(amount) : null;
+    setPaymentData({ paymentKey, orderId, amount: initialAmount, paymentType });
+    confirmPayment(paymentKey, orderId, initialAmount);
   }, []);
 
   const confirmPayment = async (paymentKey, orderId, amount) => {

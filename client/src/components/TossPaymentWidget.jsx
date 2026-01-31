@@ -182,11 +182,13 @@ function TossPaymentWidget({
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // 결제 수단이 선택되었을 때만 requestPayment 호출
+      // 토스페이먼츠가 paymentKey와 orderId를 자동으로 추가하므로 successUrl에는 view만 포함
+      // amount는 sessionStorage에 저장하여 PaymentSuccessPage에서 사용
       await widgets.requestPayment({
         orderId,
         orderName,
-        successUrl: `${window.location.origin}?view=payment-success&orderId=${orderId}&amount=${amount}`,
-        failUrl: `${window.location.origin}?view=payment-fail&orderId=${orderId}`,
+        successUrl: `${window.location.origin}?view=payment-success`,
+        failUrl: `${window.location.origin}?view=payment-fail`,
         customerEmail: customerEmail || 'customer@example.com',
         customerName: customerName || '고객',
         customerMobilePhone: customerPhone || '01012345678',
