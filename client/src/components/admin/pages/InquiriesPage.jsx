@@ -20,11 +20,13 @@ function InquiriesPage() {
     try {
       setLoading(true);
       const data = inquiryType === 'one-on-one'
-        ? await getAllOneOnOneInquiries()
-        : await getAllProductInquiries();
-      setInquiries(data || []);
+        ? await getAllOneOnOneInquiries({ page: 1, limit: 100 })
+        : await getAllProductInquiries({ page: 1, limit: 100 });
+      // API 응답 형식: { items: [], pagination: {} }
+      setInquiries(data?.items || data || []);
     } catch (error) {
       console.error('문의 로드 실패:', error);
+      setInquiries([]);
     } finally {
       setLoading(false);
     }
@@ -42,10 +44,10 @@ function InquiriesPage() {
       }
       setSelectedInquiry(null);
       setAnswer('');
-      loadInquiries();
+      await loadInquiries();
     } catch (error) {
       console.error('답변 실패:', error);
-      alert('답변 등록에 실패했습니다.');
+      alert('답변 등록에 실패했습니다: ' + (error.message || '알 수 없는 오류'));
     } finally {
       setAnswering(false);
     }
@@ -110,7 +112,7 @@ function InquiriesPage() {
         {loading ? (
           <div className="admin-page-loading">Loading...</div>
         ) : (
-          <div className="admin-table admin-table--inquiries">
+          <div className={`admin-table admin-table--inquiries admin-table--${inquiryType === 'one-on-one' ? 'one-on-one' : 'product'}`}>
             <div className="admin-table__header">
               {inquiryType === 'one-on-one' ? (
                 <>
@@ -135,14 +137,20 @@ function InquiriesPage() {
               )}
             </div>
             <div className="admin-table__body">
-              {inquiries.map((inquiry, index) => {
+              {inquiries.length === 0 ? (
+                <div className="admin-empty-state" style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center' }}>
+                  <MessageCircle size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <p>문의가 없습니다.</p>
+                </div>
+              ) : (
+                inquiries.map((inquiry, index) => {
                 const status = getStatusBadge(inquiry.status);
                 return (
                   <div key={inquiry._id || index} className="admin-table__row">
                     <span>{index + 1}</span>
                     <div className="admin-table__cell-user">
                       <div className="admin-table__user-avatar">
-                        {inquiry.user?.name?.[0]?.toUpperCase() || inquiry.userId?.name?.[0]?.toUpperCase() || 'U'}
+                        {(inquiry.user?.name || inquiry.userId?.name || 'U')?.[0]?.toUpperCase() || 'U'}
                       </div>
                       <div>
                         <div>{inquiry.user?.name || inquiry.userId?.name || 'Unknown'}</div>
@@ -152,18 +160,20 @@ function InquiriesPage() {
                     {inquiryType === 'one-on-one' ? (
                       <>
                         <span>{inquiry.type || '일반'}</span>
-                        <span>{inquiry.title || inquiry.content?.substring(0, 30)}</span>
+                        <span className="admin-table__inquiry-preview">
+                          {inquiry.title || (inquiry.content ? (inquiry.content.length > 50 ? inquiry.content.substring(0, 50) + '...' : inquiry.content) : '-')}
+                        </span>
                       </>
                     ) : (
                       <>
                         <div className="admin-table__cell-product">
-                          {inquiry.productId?.image && (
-                            <img src={inquiry.productId.image} alt={inquiry.productId.name} />
+                          {(inquiry.productId?.image || inquiry.product?.image) && (
+                            <img src={inquiry.productId?.image || inquiry.product?.image} alt={inquiry.productId?.name || inquiry.product?.name} />
                           )}
-                          <span>{inquiry.productId?.name || '-'}</span>
+                          <span>{inquiry.productId?.name || inquiry.product?.name || '-'}</span>
                         </div>
                         <span className="admin-table__inquiry-preview">
-                          {inquiry.question?.substring(0, 100) || '-'}
+                          {inquiry.question ? (inquiry.question.length > 100 ? inquiry.question.substring(0, 100) + '...' : inquiry.question) : '-'}
                         </span>
                       </>
                     )}
@@ -184,7 +194,7 @@ function InquiriesPage() {
                     </span>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
         )}
@@ -208,28 +218,30 @@ function InquiriesPage() {
                 </div>
                 {inquiryType === 'one-on-one' ? (
                   <>
-                    <div className="admin-inquiry-detail__row">
-                      <span>제목</span>
-                      <span>{selectedInquiry.title}</span>
-                    </div>
+                    {selectedInquiry.title && (
+                      <div className="admin-inquiry-detail__row">
+                        <span>제목</span>
+                        <span>{selectedInquiry.title}</span>
+                      </div>
+                    )}
                     <div className="admin-inquiry-detail__row">
                       <span>유형</span>
                       <span>{selectedInquiry.type || '일반'}</span>
                     </div>
                     <div className="admin-inquiry-detail__row">
                       <span>내용</span>
-                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.content}</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.content || '-'}</span>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="admin-inquiry-detail__row">
                       <span>상품</span>
-                      <span>{selectedInquiry.productId?.name || '-'}</span>
+                      <span>{selectedInquiry.productId?.name || selectedInquiry.product?.name || '-'}</span>
                     </div>
                     <div className="admin-inquiry-detail__row">
                       <span>문의 내용</span>
-                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.question}</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.question || '-'}</span>
                     </div>
                   </>
                 )}
@@ -245,16 +257,28 @@ function InquiriesPage() {
                   <>
                     <div className="admin-inquiry-detail__row">
                       <span>답변</span>
-                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.answer.content || selectedInquiry.answer}</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>
+                        {typeof selectedInquiry.answer === 'string' 
+                          ? selectedInquiry.answer 
+                          : (selectedInquiry.answer.content || selectedInquiry.answer.answer || '-')}
+                      </span>
                     </div>
-                    <div className="admin-inquiry-detail__row">
-                      <span>답변일</span>
-                      <span>{formatDate(selectedInquiry.answer.answeredAt)}</span>
-                    </div>
+                    {selectedInquiry.answer.answeredAt && (
+                      <div className="admin-inquiry-detail__row">
+                        <span>답변일</span>
+                        <span>{formatDate(selectedInquiry.answer.answeredAt)}</span>
+                      </div>
+                    )}
+                    {selectedInquiry.answer.answeredBy && (
+                      <div className="admin-inquiry-detail__row">
+                        <span>답변자</span>
+                        <span>{selectedInquiry.answer.answeredBy?.name || '-'}</span>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
-              {!selectedInquiry.answer && (
+              {!selectedInquiry.answer && selectedInquiry.status !== 'answered' && (
                 <div className="admin-inquiry-answer">
                   <label>답변 작성</label>
                   <textarea
@@ -264,7 +288,10 @@ function InquiriesPage() {
                     rows={5}
                   />
                   <div className="admin-inquiry-answer__actions">
-                    <button type="button" className="admin-button" onClick={() => setSelectedInquiry(null)}>
+                    <button type="button" className="admin-button" onClick={() => {
+                      setSelectedInquiry(null);
+                      setAnswer('');
+                    }}>
                       취소
                     </button>
                     <button

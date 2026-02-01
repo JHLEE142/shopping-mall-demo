@@ -58,12 +58,35 @@ function DashboardPage() {
       ]);
 
       setStats(statsData);
-      setRevenueTrend(trendData || []);
-      setCategorySales(categoryData || []);
-      setTopProducts(productsData || []);
-      setRecentOrders(ordersData.orders || []);
+      // revenueTrend는 배열로 직접 반환됨
+      setRevenueTrend(Array.isArray(trendData) ? trendData : []);
+      // categorySales는 배열로 직접 반환됨
+      setCategorySales(Array.isArray(categoryData) ? categoryData : []);
+      // topProducts는 배열로 직접 반환됨
+      setTopProducts(Array.isArray(productsData) ? productsData : []);
+      // API 응답 형식: { page, limit, totalItems, totalPages, items }
+      setRecentOrders(ordersData.items || ordersData.orders || []);
     } catch (error) {
       console.error('Dashboard 데이터 로드 실패:', error);
+      // 기본값 설정
+      setStats({
+        totalRevenue: 0,
+        recentRevenue: 0,
+        revenueChange: 0,
+        totalOrders: 0,
+        recentOrdersCount: 0,
+        ordersChange: 0,
+        totalCustomers: 0,
+        recentCustomers: 0,
+        customersChange: 0,
+        totalProducts: 0,
+        recentProducts: 0,
+        productsChange: 0,
+      });
+      setRevenueTrend([]);
+      setCategorySales([]);
+      setTopProducts([]);
+      setRecentOrders([]);
     } finally {
       setLoading(false);
     }

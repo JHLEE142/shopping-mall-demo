@@ -22,7 +22,9 @@ function CustomersPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const users = await getUsersApi();
+      const usersData = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
+      // API 응답 형식: { page, limit, totalItems, totalPages, items }
+      const users = usersData.items || (Array.isArray(usersData) ? usersData : []);
       const customerUsers = users.filter(u => u.user_type === 'customer') || [];
       setStats({
         totalCustomer: customerUsers.length,

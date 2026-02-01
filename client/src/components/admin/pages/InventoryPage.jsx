@@ -22,8 +22,9 @@ function InventoryPage() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await fetchProducts({ limit: 100 });
-      let filtered = data.products || [];
+      const data = await fetchProducts(1, 100);
+      // API 응답 형식: { page, limit, totalItems, totalPages, items }
+      let filtered = data.items || data.products || [];
 
       if (statusFilter !== 'All Products') {
         filtered = filtered.filter(p => {
@@ -46,7 +47,7 @@ function InventoryPage() {
       setProducts(filtered);
 
       // Calculate stats
-      const allProducts = data.products || [];
+      const allProducts = data.items || data.products || [];
       const lowStockCount = allProducts.filter(p => {
         const stock = p.inventory?.stock || 0;
         const minStock = p.inventory?.reorderPoint || 0;
@@ -62,6 +63,13 @@ function InventoryPage() {
       });
     } catch (error) {
       console.error('상품 로드 실패:', error);
+      setProducts([]);
+      setStats({
+        totalProducts: 0,
+        lowStock: 0,
+        outOfStock: 0,
+        topCategory: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -133,6 +141,11 @@ function InventoryPage() {
 
         {loading ? (
           <div className="admin-page-loading">Loading...</div>
+        ) : products.length === 0 ? (
+          <div className="admin-empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
+            <Package size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p>상품이 없습니다.</p>
+          </div>
         ) : (
           <div className="admin-table admin-table--inventory">
             <div className="admin-table__header">
@@ -194,6 +207,13 @@ function InventoryPage() {
     </div>
   );
 }
+
+// 빈 상태 스타일 추가
+const emptyStateStyle = {
+  padding: '2rem',
+  textAlign: 'center',
+  color: '#6b7280',
+};
 
 function StatCard({ icon: Icon, label, value, change }) {
   return (

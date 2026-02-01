@@ -34,15 +34,16 @@ function OrderPage() {
         params.search = searchQuery;
       }
       const data = await fetchOrdersApi(params);
-      setOrders(data.orders || []);
+      // API 응답 형식: { page, limit, totalItems, totalPages, items }
+      setOrders(data.items || data.orders || []);
       setPagination({
-        totalPages: data.pagination?.totalPages || 1,
-        totalItems: data.pagination?.totalItems || 0,
+        totalPages: data.totalPages || data.pagination?.totalPages || 1,
+        totalItems: data.totalItems || data.pagination?.totalItems || 0,
       });
 
       // Calculate stats
       const allOrders = await fetchOrdersApi({ limit: 1000 });
-      const allOrdersList = allOrders.orders || [];
+      const allOrdersList = allOrders.items || allOrders.orders || [];
       setStats({
         totalNew: allOrdersList.length,
         totalPending: allOrdersList.filter(o => o.status === 'pending').length,
@@ -51,6 +52,13 @@ function OrderPage() {
       });
     } catch (error) {
       console.error('주문 로드 실패:', error);
+      setOrders([]);
+      setStats({
+        totalNew: 0,
+        totalPending: 0,
+        totalCompleted: 0,
+        totalCanceled: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -169,6 +177,11 @@ function OrderPage() {
 
         {loading ? (
           <div className="admin-page-loading">Loading...</div>
+        ) : orders.length === 0 ? (
+          <div className="admin-empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
+            <ShoppingCart size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p>주문이 없습니다.</p>
+          </div>
         ) : (
           <>
             <div className="admin-table admin-table--orders">
