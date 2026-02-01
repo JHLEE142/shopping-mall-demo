@@ -1,0 +1,43 @@
+.admin-report-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-grid--charts {
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+.admin-grid--charts > .admin-card:nth-child(3),
+.admin-grid--charts > .admin-card:nth-child(4) {
+  grid-column: span 1;
+}
+
+.admin-card__stat-icon--green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.admin-card__stat-icon--blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.admin-card__stat-icon--purple {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.admin-card__stat-icon--red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .admin-grid--charts {
+    grid-template-columns: 1fr;
+  }
+}
+

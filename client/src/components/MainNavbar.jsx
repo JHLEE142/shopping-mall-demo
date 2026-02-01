@@ -72,9 +72,16 @@ function MainNavbar({
       try {
         setUnreviewedLoading(true);
         const data = await getUnreviewedProducts();
-        setUnreviewedProducts(data.items || []);
+        // 유효한 상품만 필터링 (productId와 productName이 있는 것만)
+        const validProducts = (data.items || []).filter(item => 
+          item.productId && 
+          item.productName && 
+          item.productName.trim() !== '' &&
+          item.productName !== 'undefined'
+        );
+        setUnreviewedProducts(validProducts);
       } catch (error) {
-        console.error('리뷰 미작성 상품 로드 실패:', error.message);
+        // 콘솔 에러를 표시하지 않음 (사용자 요청)
         setUnreviewedProducts([]);
       } finally {
         setUnreviewedLoading(false);
@@ -485,7 +492,7 @@ function MainNavbar({
                           >
                             <img
                               src={item.productImage || '/placeholder.png'}
-                              alt={item.productName}
+                              alt={item.productName || '상품'}
                               style={{
                                 width: '60px',
                                 height: '60px',
@@ -494,7 +501,10 @@ function MainNavbar({
                                 flexShrink: 0,
                               }}
                               onError={(e) => {
-                                e.target.src = '/placeholder.png';
+                                // 콘솔 에러를 표시하지 않고 조용히 처리
+                                if (e.target.src !== '/placeholder.png') {
+                                  e.target.src = '/placeholder.png';
+                                }
                               }}
                             />
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -511,7 +521,13 @@ function MainNavbar({
                                 {item.productName}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                주문일: {new Date(item.orderedAt).toLocaleDateString('ko-KR')}
+                                주문일: {item.orderedAt ? (() => {
+                                  try {
+                                    return new Date(item.orderedAt).toLocaleDateString('ko-KR');
+                                  } catch (e) {
+                                    return '날짜 정보 없음';
+                                  }
+                                })() : '날짜 정보 없음'}
                               </div>
                               <div
                                 style={{

@@ -30,6 +30,7 @@ import CancelReturnExchangeHistoryPage from './components/CancelReturnExchangeHi
 import EventBenefitPage from './components/EventBenefitPage';
 import FeedbackPage from './components/FeedbackPage';
 import InquiryHistoryPage from './components/InquiryHistoryPage';
+import InquiryWritePage from './components/InquiryWritePage';
 import ProductInquiryHistoryPage from './components/ProductInquiryHistoryPage';
 import NoticePage from './components/NoticePage';
 import RecentlyViewedProductsPage from './components/RecentlyViewedProductsPage';
@@ -86,6 +87,7 @@ function App() {
     'feedback',
     'inquiry-history',
     'product-inquiry-history',
+    'inquiry-write',
     'notice',
     'recently-viewed-products',
     'new',
@@ -215,6 +217,7 @@ function App() {
     '구매후기': 'review-board',
     '배송문의': 'delivery-inquiry',
     '입금/결제/취소': 'payment-cancel',
+    '1:1 문의하기': 'inquiry-write',
     'inquiry-history': 'inquiry-history',
   };
   const footerLinkViewMap = {
@@ -1631,6 +1634,45 @@ function App() {
         <FloatingHomeButton onClick={() => goHome()} />
         <FloatingHomeButton onClick={() => goHome()} />
       <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
+      </div>
+    );
+  }
+
+  if (view === 'inquiry-write') {
+    return (
+      <div className="app">
+        <MainNavbar
+          user={session?.user || null}
+          onNavigateHome={() => goHome()}
+          onMoveToLogin={() => setView('login')}
+          onMoveToSignUp={() => setView('signup')}
+          onMoveToCart={() => setView('cart')}
+          onMoveToLookbook={() => setView('lookbook')}
+          onNavigateToCategory={(category) => {
+            setSelectedCategory(category);
+            setView('home');
+          }}
+          onMoveToAdmin={() => {
+            setDashboardInitialNav('Dashboard');
+            setView('admin');
+          }}
+          pointsBalance={pointsBalance}
+          onMoveToWishlist={() => setView('wishlist')}
+          onMoveToSettings={() => setView('settings')}
+          onMoveToPoints={() => setView('points')}
+          onMoveToMyPage={() => setView('mypage')}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onLogout={handleLogout}
+        />
+        <main className="app-main app-main--default">
+          <InquiryWritePage
+            user={session?.user || null}
+            onBack={() => setView('home')}
+          />
+        </main>
+        <FloatingHomeButton onClick={() => goHome()} />
+        <SiteFooter onNavigateBoard={handleFooterBoardNavigate} onNavigateFooter={handleFooterLinkNavigate} />
       </div>
     );
   }

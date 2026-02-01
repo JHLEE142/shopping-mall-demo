@@ -1,0 +1,23 @@
+.admin-customers-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-grid--charts {
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+.admin-grid--charts > .admin-card:nth-child(3),
+.admin-grid--charts > .admin-card:nth-child(4) {
+  grid-column: span 1;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .admin-grid--charts {
+    grid-template-columns: 1fr;
+  }
+}
+

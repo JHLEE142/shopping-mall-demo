@@ -1,0 +1,304 @@
+import React, { useEffect, useState } from 'react';
+import { MessageCircle, Clock, CheckCircle, Timer, Search, X } from 'lucide-react';
+import { getAllInquiries as getAllOneOnOneInquiries, answerInquiry as answerOneOnOneInquiry } from '../../../services/inquiryService';
+import { getAllInquiries as getAllProductInquiries, answerInquiry as answerProductInquiry } from '../../../services/productInquiryService';
+import './InquiriesPage.css';
+
+function InquiriesPage() {
+  const [inquiries, setInquiries] = useState([]);
+  const [inquiryType, setInquiryType] = useState('one-on-one');
+  const [selectedInquiry, setSelectedInquiry] = useState(null);
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [answering, setAnswering] = useState(false);
+
+  useEffect(() => {
+    loadInquiries();
+  }, [inquiryType]);
+
+  const loadInquiries = async () => {
+    try {
+      setLoading(true);
+      const data = inquiryType === 'one-on-one'
+        ? await getAllOneOnOneInquiries()
+        : await getAllProductInquiries();
+      setInquiries(data || []);
+    } catch (error) {
+      console.error('문의 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnswer = async () => {
+    if (!selectedInquiry || !answer.trim()) return;
+
+    try {
+      setAnswering(true);
+      if (inquiryType === 'one-on-one') {
+        await answerOneOnOneInquiry(selectedInquiry._id, answer);
+      } else {
+        await answerProductInquiry(selectedInquiry._id, answer);
+      }
+      setSelectedInquiry(null);
+      setAnswer('');
+      loadInquiries();
+    } catch (error) {
+      console.error('답변 실패:', error);
+      alert('답변 등록에 실패했습니다.');
+    } finally {
+      setAnswering(false);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
+  const getStatusBadge = (status) => {
+    const statusMap = {
+      pending: { label: '대기중', class: 'warning' },
+      answered: { label: '답변완료', class: 'success' },
+      closed: { label: '종료', class: 'default' },
+    };
+    return statusMap[status] || { label: status, class: 'default' };
+  };
+
+  return (
+    <div className="admin-inquiries-page">
+      {/* Stats Cards (Optional) */}
+      <div className="admin-grid admin-grid--stats">
+        <StatCard icon={MessageCircle} label="Total Inquiries" value={inquiries.length} />
+        <StatCard icon={Clock} label="Pending Inquiries" value={inquiries.filter(i => i.status === 'pending').length} />
+        <StatCard icon={CheckCircle} label="Answered Inquiries" value={inquiries.filter(i => i.status === 'answered').length} />
+        <StatCard icon={Timer} label="Response Time (Avg)" value="2.5 hours" />
+      </div>
+
+      {/* Inquiries List */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <h3>Inquiries List</h3>
+          <div className="admin-card__header-actions">
+            <div className="admin-tabs">
+              <button
+                type="button"
+                className={`admin-tab ${inquiryType === 'one-on-one' ? 'is-active' : ''}`}
+                onClick={() => setInquiryType('one-on-one')}
+              >
+                1:1 문의
+              </button>
+              <button
+                type="button"
+                className={`admin-tab ${inquiryType === 'product' ? 'is-active' : ''}`}
+                onClick={() => setInquiryType('product')}
+              >
+                상품 문의
+              </button>
+            </div>
+            <div className="admin-search-bar">
+              <Search size={18} />
+              <input type="text" placeholder="문의 내용 검색..." />
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="admin-page-loading">Loading...</div>
+        ) : (
+          <div className="admin-table admin-table--inquiries">
+            <div className="admin-table__header">
+              {inquiryType === 'one-on-one' ? (
+                <>
+                  <span>번호</span>
+                  <span>사용자</span>
+                  <span>유형</span>
+                  <span>제목</span>
+                  <span>상태</span>
+                  <span>작성일</span>
+                  <span>관리</span>
+                </>
+              ) : (
+                <>
+                  <span>번호</span>
+                  <span>사용자</span>
+                  <span>상품</span>
+                  <span>문의 내용</span>
+                  <span>상태</span>
+                  <span>작성일</span>
+                  <span>관리</span>
+                </>
+              )}
+            </div>
+            <div className="admin-table__body">
+              {inquiries.map((inquiry, index) => {
+                const status = getStatusBadge(inquiry.status);
+                return (
+                  <div key={inquiry._id || index} className="admin-table__row">
+                    <span>{index + 1}</span>
+                    <div className="admin-table__cell-user">
+                      <div className="admin-table__user-avatar">
+                        {inquiry.user?.name?.[0]?.toUpperCase() || inquiry.userId?.name?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <div>{inquiry.user?.name || inquiry.userId?.name || 'Unknown'}</div>
+                        <div className="admin-table__user-email">{inquiry.user?.email || inquiry.userId?.email || ''}</div>
+                      </div>
+                    </div>
+                    {inquiryType === 'one-on-one' ? (
+                      <>
+                        <span>{inquiry.type || '일반'}</span>
+                        <span>{inquiry.title || inquiry.content?.substring(0, 30)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="admin-table__cell-product">
+                          {inquiry.productId?.image && (
+                            <img src={inquiry.productId.image} alt={inquiry.productId.name} />
+                          )}
+                          <span>{inquiry.productId?.name || '-'}</span>
+                        </div>
+                        <span className="admin-table__inquiry-preview">
+                          {inquiry.question?.substring(0, 100) || '-'}
+                        </span>
+                      </>
+                    )}
+                    <span>
+                      <span className={`admin-badge admin-badge--${status.class}`}>
+                        {status.label}
+                      </span>
+                    </span>
+                    <span>{formatDate(inquiry.createdAt)}</span>
+                    <span>
+                      <button
+                        type="button"
+                        className="admin-button"
+                        onClick={() => setSelectedInquiry(inquiry)}
+                      >
+                        상세보기
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Inquiry Detail Modal */}
+      {selectedInquiry && (
+        <div className="admin-modal-overlay" onClick={() => setSelectedInquiry(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-modal__header">
+              <h3>문의 상세</h3>
+              <button type="button" className="admin-modal__close" onClick={() => setSelectedInquiry(null)}>
+                <X size={18} />
+              </button>
+            </header>
+            <div className="admin-modal__body">
+              <div className="admin-inquiry-detail">
+                <div className="admin-inquiry-detail__row">
+                  <span>사용자</span>
+                  <span>{selectedInquiry.user?.name || selectedInquiry.userId?.name || 'Unknown'}</span>
+                </div>
+                {inquiryType === 'one-on-one' ? (
+                  <>
+                    <div className="admin-inquiry-detail__row">
+                      <span>제목</span>
+                      <span>{selectedInquiry.title}</span>
+                    </div>
+                    <div className="admin-inquiry-detail__row">
+                      <span>유형</span>
+                      <span>{selectedInquiry.type || '일반'}</span>
+                    </div>
+                    <div className="admin-inquiry-detail__row">
+                      <span>내용</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.content}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="admin-inquiry-detail__row">
+                      <span>상품</span>
+                      <span>{selectedInquiry.productId?.name || '-'}</span>
+                    </div>
+                    <div className="admin-inquiry-detail__row">
+                      <span>문의 내용</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.question}</span>
+                    </div>
+                  </>
+                )}
+                <div className="admin-inquiry-detail__row">
+                  <span>상태</span>
+                  <span>
+                    <span className={`admin-badge admin-badge--${getStatusBadge(selectedInquiry.status).class}`}>
+                      {getStatusBadge(selectedInquiry.status).label}
+                    </span>
+                  </span>
+                </div>
+                {selectedInquiry.answer && (
+                  <>
+                    <div className="admin-inquiry-detail__row">
+                      <span>답변</span>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{selectedInquiry.answer.content || selectedInquiry.answer}</span>
+                    </div>
+                    <div className="admin-inquiry-detail__row">
+                      <span>답변일</span>
+                      <span>{formatDate(selectedInquiry.answer.answeredAt)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {!selectedInquiry.answer && (
+                <div className="admin-inquiry-answer">
+                  <label>답변 작성</label>
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="답변 내용을 입력하세요..."
+                    rows={5}
+                  />
+                  <div className="admin-inquiry-answer__actions">
+                    <button type="button" className="admin-button" onClick={() => setSelectedInquiry(null)}>
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-button admin-button--primary"
+                      onClick={handleAnswer}
+                      disabled={answering || !answer.trim()}
+                    >
+                      {answering ? '답변 중...' : '답변 등록'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value }) {
+  return (
+    <div className="admin-card admin-card--stat">
+      <div className="admin-card__stat-icon">
+        <Icon className="admin-icon" size={24} />
+      </div>
+      <div className="admin-card__stat-body">
+        <div className="admin-card__label">{label}</div>
+        <div className="admin-card__value">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+export default InquiriesPage;
+

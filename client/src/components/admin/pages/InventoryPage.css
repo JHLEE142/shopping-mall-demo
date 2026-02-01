@@ -1,0 +1,75 @@
+.admin-inventory-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-table--inventory {
+  display: grid;
+}
+
+.admin-table--inventory .admin-table__header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr 1fr 80px;
+  padding: 1rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.admin-table--inventory .admin-table__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr 1fr 80px;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+}
+
+.admin-table__stock-info {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.admin-table__stock-min {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.admin-table__stock-progress {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.admin-table__stock-progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.admin-table__stock-progress-bar--success {
+  background: #374151;
+}
+
+.admin-table__stock-progress-bar--warning {
+  background: #9ca3af;
+}
+
+.admin-table__stock-progress-bar--error {
+  background: #1f2937;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .admin-table--inventory .admin-table__header,
+  .admin-table--inventory .admin-table__row {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
+}
+

@@ -4,6 +4,7 @@ const BOARD_LINKS = [
   { label: '구매후기' },
   { label: '배송문의' },
   { label: '입금/결제/취소' },
+  { label: '1:1 문의하기' },
 ];
 
 const CUSTOMER_SUPPORT = {

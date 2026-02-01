@@ -307,17 +307,23 @@ async function getUnreviewedProducts(req, res, next) {
 
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
-    const finalResult = result.map((item) => {
-      const product = productMap.get(item.productId.toString());
-      return {
-        productId: item.productId,
-        productName: product?.name || item.productName,
-        productImage: product?.images?.[0] || product?.image || item.productImage,
-        orderNumber: item.orderNumber,
-        orderedAt: item.orderedAt,
-        quantity: item.quantity,
-      };
-    });
+    const finalResult = result
+      .map((item) => {
+        const product = productMap.get(item.productId.toString());
+        // 삭제된 상품은 제외 (product가 없으면 null 반환)
+        if (!product) {
+          return null;
+        }
+        return {
+          productId: item.productId,
+          productName: product.name || item.productName,
+          productImage: product.images?.[0] || product.image || item.productImage,
+          orderNumber: item.orderNumber,
+          orderedAt: item.orderedAt,
+          quantity: item.quantity,
+        };
+      })
+      .filter(item => item !== null); // null 항목 제거
 
     res.json({
       count: finalResult.length,
