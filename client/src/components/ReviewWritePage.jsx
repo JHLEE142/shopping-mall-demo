@@ -15,12 +15,7 @@ function ReviewWritePage({ onBack, user, productId: initialProductId }) {
     rating: 5,
     title: '',
     body: '',
-    region: '',
-    fit: '',
-    purchaseSize: '',
     images: [],
-    gender: '',
-    purpose: '',
   });
 
   // URL에서 productId 읽기
@@ -221,68 +216,6 @@ function ReviewWritePage({ onBack, user, productId: initialProductId }) {
             maxLength={1000}
           />
           <p className="review-write-page__char-count">{reviewForm.body.length}/1000</p>
-        </div>
-
-        {/* 선택 항목들 */}
-        <div className="review-write-page__section">
-          <label className="review-write-page__label">구매 사이즈 (선택)</label>
-          <input
-            type="text"
-            value={reviewForm.purchaseSize}
-            onChange={(e) => setReviewForm((prev) => ({ ...prev, purchaseSize: e.target.value }))}
-            placeholder="예: M, 270mm 등"
-            className="review-write-page__input"
-          />
-        </div>
-
-        <div className="review-write-page__section">
-          <label className="review-write-page__label">사이즈 평가 (선택)</label>
-          <select
-            value={reviewForm.fit}
-            onChange={(e) => setReviewForm((prev) => ({ ...prev, fit: e.target.value }))}
-            className="review-write-page__select"
-          >
-            <option value="">선택 안함</option>
-            <option value="정사이즈">정사이즈</option>
-            <option value="작음">작음</option>
-            <option value="큼">큼</option>
-          </select>
-        </div>
-
-        <div className="review-write-page__section">
-          <label className="review-write-page__label">성별 (선택)</label>
-          <select
-            value={reviewForm.gender}
-            onChange={(e) => setReviewForm((prev) => ({ ...prev, gender: e.target.value }))}
-            className="review-write-page__select"
-          >
-            <option value="">선택 안함</option>
-            <option value="male">남성</option>
-            <option value="female">여성</option>
-            <option value="other">기타</option>
-          </select>
-        </div>
-
-        <div className="review-write-page__section">
-          <label className="review-write-page__label">용도 (선택)</label>
-          <input
-            type="text"
-            value={reviewForm.purpose}
-            onChange={(e) => setReviewForm((prev) => ({ ...prev, purpose: e.target.value }))}
-            placeholder="예: 러닝, 트레이닝, 일상 등"
-            className="review-write-page__input"
-          />
-        </div>
-
-        <div className="review-write-page__section">
-          <label className="review-write-page__label">지역 (선택)</label>
-          <input
-            type="text"
-            value={reviewForm.region}
-            onChange={(e) => setReviewForm((prev) => ({ ...prev, region: e.target.value }))}
-            placeholder="예: 서울, 경기 등"
-            className="review-write-page__input"
-          />
         </div>
 
         {/* 이미지 업로드 */}
