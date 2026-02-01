@@ -38,6 +38,7 @@ import AboutPage from './components/AboutPage';
 import LoyaltyHallPage from './components/LoyaltyHallPage';
 import FaqPage from './components/FaqPage';
 import ReviewBoardPage from './components/ReviewBoardPage';
+import ReviewWritePage from './components/ReviewWritePage';
 import DeliveryInquiryPage from './components/DeliveryInquiryPage';
 import PaymentCancelPage from './components/PaymentCancelPage';
 import KakaoSupportPage from './components/KakaoSupportPage';
@@ -91,6 +92,7 @@ function App() {
     'about',
     'faq',
     'review-board',
+    'review-write',
     'delivery-inquiry',
     'payment-cancel',
     'kakao-support',
@@ -1807,6 +1809,24 @@ function App() {
       break;
     case 'review-board':
       content = <ReviewBoardPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;
+      break;
+    case 'review-write':
+      content = (
+        <ReviewWritePage
+          onBack={() => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromProduct = urlParams.get('fromProduct');
+            if (fromProduct) {
+              setSelectedProductId(fromProduct);
+              setView('product-detail');
+            } else {
+              setView('mypage');
+            }
+          }}
+          user={user}
+          productId={getProductIdFromURL()}
+        />
+      );
       break;
     case 'delivery-inquiry':
       content = <DeliveryInquiryPage onBack={() => setView('home')} isLoggedIn={isLoggedIn} />;

@@ -475,14 +475,12 @@ function MainNavbar({
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fff')}
                             onClick={() => {
                               closeNotification();
-                              // 상품 상세 페이지로 이동 (App.jsx에서 처리)
-                              if (window.location.pathname.includes('product-detail')) {
-                                const url = new URL(window.location);
-                                url.searchParams.set('productId', item.productId);
-                                window.location.href = url.toString();
-                              } else {
-                                window.location.href = `/product-detail?productId=${item.productId}`;
-                              }
+                              // 리뷰 작성 페이지로 이동
+                              const url = new URL(window.location.origin);
+                              url.searchParams.set('view', 'review-write');
+                              url.searchParams.set('productId', item.productId);
+                              url.searchParams.set('fromProduct', item.productId);
+                              window.location.href = url.toString();
                             }}
                           >
                             <img
