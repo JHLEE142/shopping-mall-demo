@@ -249,9 +249,16 @@ function ExchangeReturnPage({
                       )}
                     </div>
                     <div className="exchange-return-page__product-info">
-                      <div className="exchange-return-page__product-delivery">
-                        <span>로켓 새벽</span>
-                      </div>
+                      {order.shipping?.carrier && (
+                        <div className="exchange-return-page__product-delivery">
+                          <span>{order.shipping.carrier}</span>
+                        </div>
+                      )}
+                      {order.shipping?.status && (
+                        <div className="exchange-return-page__product-shipping-status">
+                          <span>{order.shipping.status}</span>
+                        </div>
+                      )}
                       <div className="exchange-return-page__product-name">{item.name}</div>
                       <div className="exchange-return-page__product-price">
                         {formatCurrency(item.unitPrice)} 원 {item.quantity > 1 ? `${item.quantity}개` : '1개'}

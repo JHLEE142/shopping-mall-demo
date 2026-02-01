@@ -40,7 +40,7 @@ import {
   YAxis,
 } from 'recharts';
 import { deleteProduct, fetchProducts, updateProduct } from '../services/productService';
-import { fetchOrders as fetchOrdersApi, fetchOrderById } from '../services/orderService';
+import { fetchOrders as fetchOrdersApi, fetchOrderById, updateOrder as updateOrderApi } from '../services/orderService';
 import { getUsers as getUsersApi } from '../services/userService';
 import {
   getAllCoupons,
@@ -1657,7 +1657,46 @@ function AdminDashboard({
               <div className="admin-table__body">
                 <div className="admin-table__row">
                   <span>배송 상태</span>
-                  <span className={`admin-status ${shippingStatusClass}`}>{shippingStatusLabel}</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={shipping.status || ''}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        setSelectedSalesOrder((prev) => ({
+                          ...prev,
+                          shipping: {
+                            ...prev.shipping,
+                            status: newStatus,
+                          },
+                        }));
+                      }}
+                      onBlur={async () => {
+                        try {
+                          await updateOrderApi(selectedSalesOrder._id, {
+                            shipping: {
+                              ...selectedSalesOrder.shipping,
+                              status: selectedSalesOrder.shipping?.status || '',
+                            },
+                          });
+                          await loadSalesOrders(salesPage);
+                          const updatedOrder = await fetchOrderById(selectedSalesOrderId);
+                          setSelectedSalesOrder(updatedOrder);
+                        } catch (error) {
+                          console.error('배송 상태 업데이트 실패:', error);
+                          alert('배송 상태를 업데이트하지 못했습니다.');
+                        }
+                      }}
+                      placeholder="배송 상태 입력"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '0.9rem',
+                        minWidth: '120px',
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="admin-table__row">
                   <span>받는 사람</span>
@@ -1695,8 +1734,47 @@ function AdminDashboard({
                   </span>
                 </div>
                 <div className="admin-table__row">
-                  <span>배송 방법</span>
-                  <span>{shipping.carrier || '-'}</span>
+                  <span>택배사</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={shipping.carrier || ''}
+                      onChange={(e) => {
+                        const newCarrier = e.target.value;
+                        setSelectedSalesOrder((prev) => ({
+                          ...prev,
+                          shipping: {
+                            ...prev.shipping,
+                            carrier: newCarrier,
+                          },
+                        }));
+                      }}
+                      onBlur={async () => {
+                        try {
+                          await updateOrderApi(selectedSalesOrder._id, {
+                            shipping: {
+                              ...selectedSalesOrder.shipping,
+                              carrier: selectedSalesOrder.shipping?.carrier || '',
+                            },
+                          });
+                          await loadSalesOrders(salesPage);
+                          const updatedOrder = await fetchOrderById(selectedSalesOrderId);
+                          setSelectedSalesOrder(updatedOrder);
+                        } catch (error) {
+                          console.error('택배사 업데이트 실패:', error);
+                          alert('택배사를 업데이트하지 못했습니다.');
+                        }
+                      }}
+                      placeholder="택배사 입력 (예: CJ대한통운)"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '0.9rem',
+                        minWidth: '150px',
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="admin-table__row">
                   <span>배송비 결제</span>

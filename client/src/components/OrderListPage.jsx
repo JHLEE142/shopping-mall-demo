@@ -233,10 +233,17 @@ function OrderListPage({ user, onBack, onViewOrderDetail, onViewProduct, onExcha
                           )}
                         </div>
                         <div className="order-list-page__order-item-info">
-                          <div className="order-list-page__order-item-delivery-type">
-                            <Truck size={16} />
-                            <span>로켓 새벽</span>
-                          </div>
+                          {order.shipping?.carrier && (
+                            <div className="order-list-page__order-item-delivery-type">
+                              <Truck size={16} />
+                              <span>{order.shipping.carrier}</span>
+                            </div>
+                          )}
+                          {order.shipping?.status && (
+                            <div className="order-list-page__order-item-shipping-status">
+                              <span>{order.shipping.status}</span>
+                            </div>
+                          )}
                           <div className="order-list-page__order-item-name">
                             {item.name}
                           </div>

@@ -259,6 +259,11 @@ const orderSchema = new Schema(
         default: '',
         trim: true,
       },
+      status: {
+        type: String,
+        default: '',
+        trim: true,
+      },
       trackingNumber: {
         type: String,
         default: '',

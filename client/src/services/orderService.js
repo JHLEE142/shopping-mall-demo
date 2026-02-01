@@ -92,4 +92,27 @@ export async function fetchOrderById(orderId) {
   return data;
 }
 
+export async function updateOrder(orderId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = data?.message || '주문을 수정하지 못했습니다.';
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
+}
+
 

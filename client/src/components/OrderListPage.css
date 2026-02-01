@@ -223,7 +223,8 @@
   gap: 0.5rem;
 }
 
-.order-list-page__order-item-delivery-type {
+.order-list-page__order-item-delivery-type,
+.order-list-page__order-item-shipping-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
