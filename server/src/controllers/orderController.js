@@ -853,6 +853,12 @@ async function getOrderById(req, res, next) {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
 
+    // 관리자는 모든 주문 조회 가능
+    const isAdmin = req.user && req.user.user_type === 'admin';
+    if (isAdmin) {
+      return res.json(order);
+    }
+
     // 회원 주문인 경우
     if (order.user) {
       if (!canAccessOrder(req.user, order)) {

@@ -330,12 +330,14 @@ async function updateInquiry(req, res, next) {
       return res.status(404).json({ message: '문의를 찾을 수 없습니다.' });
     }
 
-    // 본인 문의만 수정 가능
-    if (inquiry.userId.toString() !== userId.toString()) {
+    // 관리자는 모든 문의 수정 가능, 일반 사용자는 본인 문의만 수정 가능
+    const user = await User.findById(userId);
+    const isAdmin = user && user.user_type === 'admin';
+    if (!isAdmin && inquiry.userId.toString() !== userId.toString()) {
       return res.status(403).json({ message: '본인의 문의만 수정할 수 있습니다.' });
     }
 
-    // 답변이 있으면 수정 불가
+    // 답변이 있으면 수정 불가 (관리자도 동일)
     if (inquiry.answer && inquiry.answer.content) {
       return res.status(400).json({ message: '답변이 있는 문의는 수정할 수 없습니다.' });
     }

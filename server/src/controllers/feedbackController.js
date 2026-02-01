@@ -177,8 +177,9 @@ async function deleteFeedback(req, res, next) {
       return res.status(404).json({ message: '의견을 찾을 수 없습니다.' });
     }
 
-    // 본인 의견인지 확인
-    if (feedback.user?.toString() !== userId.toString()) {
+    // 관리자는 모든 의견 삭제 가능, 일반 사용자는 본인 의견만 삭제 가능
+    const isAdmin = req.user?.user_type === 'admin';
+    if (!isAdmin && feedback.user?.toString() !== userId.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
 

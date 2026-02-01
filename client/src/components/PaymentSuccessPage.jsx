@@ -339,10 +339,42 @@ function PaymentSuccessPage({
 
   if (status === 'loading') {
     return (
-      <div className="payment-success-page">
-        <div className="payment-success-page__loading">
-          <div className="loading-spinner"></div>
-          <h2>결제 승인 중...</h2>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem',
+        backgroundColor: '#f3f4f6'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '600px',
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          padding: '3rem',
+          textAlign: 'center'
+        }}>
+          <div 
+            className="loading-spinner"
+            style={{
+              width: '50px',
+              height: '50px',
+              margin: '0 auto 1.5rem',
+              border: '4px solid #e5e7eb',
+              borderTop: '4px solid #6366f1',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}
+          ></div>
+          <h2 style={{ 
+            fontSize: '1.5rem', 
+            fontWeight: '600',
+            color: '#111827'
+          }}>
+            결제 승인 중...
+          </h2>
         </div>
       </div>
     );
@@ -350,75 +382,182 @@ function PaymentSuccessPage({
 
   if (status === 'error') {
     return (
-      <div className="payment-success-page">
-        <div className="payment-success-page__error" style={{ 
-          padding: '2rem', 
-          textAlign: 'center',
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem',
+        backgroundColor: '#f3f4f6'
+      }}>
+        <div style={{
+          width: '100%',
           maxWidth: '600px',
-          margin: '0 auto'
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          padding: '2.5rem',
+          textAlign: 'center'
         }}>
-          <div style={{ fontSize: '4rem', color: '#dc2626', marginBottom: '1rem' }}>✗</div>
-          <h2 style={{ marginBottom: '1rem', color: '#1f2937' }}>결제 처리 중 오류가 발생했습니다</h2>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            margin: '0 auto 1.5rem',
+            backgroundColor: '#fee2e2',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '3rem',
+            color: '#dc2626',
+            fontWeight: 'bold'
+          }}>
+            ✗
+          </div>
+          <h2 style={{ 
+            marginBottom: '1rem', 
+            color: '#111827',
+            fontSize: '1.75rem',
+            fontWeight: 'bold'
+          }}>
+            결제 처리 중 오류가 발생했습니다
+          </h2>
           <p style={{ 
             marginBottom: '2rem', 
             color: '#6b7280', 
             fontSize: '1rem',
             lineHeight: '1.6',
             wordBreak: 'break-word'
-          }}>{error}</p>
-          <div className="button-group" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            <button 
-              onClick={onBackToHome}
-              style={{
-                padding: '0.75rem 2rem',
-                fontSize: '1rem',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              홈으로 돌아가기
-            </button>
-          </div>
+          }}>
+            {error}
+          </p>
+          <button 
+            onClick={onBackToHome}
+            style={{
+              padding: '0.75rem 2rem',
+              fontSize: '1rem',
+              backgroundColor: '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#4f46e5'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#6366f1'}
+          >
+            홈으로 돌아가기
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="payment-success-page">
-      <div className="payment-success-page__success">
-        <div className="success-icon">✓</div>
-        <h2>결제를 완료했어요</h2>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem',
+      backgroundColor: '#f3f4f6'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '600px',
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        padding: '2.5rem',
+        textAlign: 'center'
+      }}>
+        {/* 성공 아이콘 */}
+        <div style={{
+          width: '80px',
+          height: '80px',
+          margin: '0 auto 1.5rem',
+          backgroundColor: '#10b981',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '3rem',
+          color: 'white',
+          fontWeight: 'bold'
+        }}>
+          ✓
+        </div>
+
+        <h2 style={{ 
+          fontSize: '1.75rem', 
+          fontWeight: 'bold', 
+          marginBottom: '0.5rem',
+          color: '#111827'
+        }}>
+          결제를 완료했어요
+        </h2>
+
         {order ? (
           <>
-            <p style={{ marginTop: '1rem', color: '#059669', fontWeight: 'bold' }}>
+            <p style={{ 
+              marginTop: '0.5rem', 
+              marginBottom: '2rem',
+              color: '#10b981', 
+              fontWeight: '600',
+              fontSize: '1rem'
+            }}>
               주문이 성공적으로 생성되었습니다!
             </p>
             
-            {/* 주문 기본 정보 */}
-            <div className="payment-info" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
-              <div className="info-row">
-                <span className="info-label">주문번호</span>
-                <span className="info-value">{order.orderNumber || order._id}</span>
+            {/* 주문 정보 카드 */}
+            <div style={{
+              backgroundColor: '#f9fafb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '1.5rem',
+              textAlign: 'left'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '0.75rem',
+                paddingBottom: '0.75rem',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>주문번호</span>
+                <span style={{ fontWeight: '600', color: '#111827' }}>{order.orderNumber || order._id}</span>
               </div>
-              <div className="info-row">
-                <span className="info-label">결제 금액</span>
-                <span className="info-value">
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '0.75rem',
+                paddingBottom: '0.75rem',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>결제 금액</span>
+                <span style={{ fontWeight: 'bold', color: '#10b981', fontSize: '1.1rem' }}>
                   {paymentData?.amount ? paymentData.amount.toLocaleString() : 
                    order.summary?.grandTotal ? order.summary.grandTotal.toLocaleString() : 
                    '0'}원
                 </span>
               </div>
-              <div className="info-row">
-                <span className="info-label">결제 방법</span>
-                <span className="info-value">{order.payment?.method === 'online' ? '온라인 결제' : order.payment?.method || '알 수 없음'}</span>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '0.75rem',
+                paddingBottom: '0.75rem',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>결제 방법</span>
+                <span style={{ fontWeight: '500' }}>{order.payment?.method === 'online' ? '온라인 결제' : order.payment?.method || '알 수 없음'}</span>
               </div>
-              <div className="info-row">
-                <span className="info-label">주문 상태</span>
-                <span className="info-value">
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>주문 상태</span>
+                <span style={{ 
+                  fontWeight: '500',
+                  color: order.status === 'paid' ? '#10b981' : '#6b7280'
+                }}>
                   {order.status === 'paid' ? '결제 완료' : 
                    order.status === 'pending' ? '결제 대기' : 
                    order.status || '알 수 없음'}
@@ -426,159 +565,248 @@ function PaymentSuccessPage({
               </div>
             </div>
 
-            {/* 주문 상품 목록 */}
+            {/* 주문 상품 (간단히) */}
             {order.items && order.items.length > 0 && (
-              <div className="order-items" style={{ 
-                marginTop: '2rem', 
-                padding: '1.5rem', 
-                backgroundColor: '#f9fafb', 
-                borderRadius: '8px',
-                marginBottom: '2rem'
+              <div style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                textAlign: 'left'
               }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>주문 상품</h3>
-                {order.items.map((item, index) => (
+                <h3 style={{ 
+                  fontSize: '1rem', 
+                  fontWeight: '600', 
+                  marginBottom: '1rem',
+                  color: '#111827'
+                }}>
+                  주문 상품
+                </h3>
+                {order.items.slice(0, 2).map((item, index) => (
                   <div key={index} style={{ 
                     display: 'flex', 
                     gap: '1rem', 
-                    padding: '1rem', 
-                    backgroundColor: 'white', 
-                    borderRadius: '6px',
-                    marginBottom: '0.5rem'
+                    marginBottom: index < order.items.length - 1 ? '1rem' : '0',
+                    paddingBottom: index < order.items.length - 1 ? '1rem' : '0',
+                    borderBottom: index < order.items.length - 1 ? '1px solid #e5e7eb' : 'none'
                   }}>
                     {item.thumbnail && (
                       <img 
                         src={item.thumbnail} 
                         alt={item.name} 
-                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                        style={{ 
+                          width: '60px', 
+                          height: '60px', 
+                          objectFit: 'cover', 
+                          borderRadius: '8px',
+                          flexShrink: 0
+                        }}
                       />
                     )}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{item.name}</div>
-                      {item.sku && (
-                        <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                          상품코드: {item.sku}
-                        </div>
-                      )}
-                      <div style={{ fontSize: '0.9rem', color: '#374151' }}>
-                        수량: {item.quantity}개 × {item.unitPrice?.toLocaleString() || 0}원
-                        {item.lineDiscount > 0 && (
-                          <span style={{ color: '#dc2626', marginLeft: '0.5rem' }}>
-                            (할인: -{item.lineDiscount.toLocaleString()}원)
-                          </span>
-                        )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ 
+                        fontWeight: '500', 
+                        marginBottom: '0.25rem',
+                        fontSize: '0.9rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {item.name}
                       </div>
-                      <div style={{ marginTop: '0.5rem', fontWeight: 'bold', color: '#059669' }}>
-                        {item.lineTotal?.toLocaleString() || 0}원
+                      <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                        {item.quantity}개 × {item.unitPrice?.toLocaleString() || 0}원
                       </div>
                     </div>
                   </div>
                 ))}
+                {order.items.length > 2 && (
+                  <div style={{ 
+                    marginTop: '0.75rem', 
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid #e5e7eb',
+                    fontSize: '0.85rem',
+                    color: '#6b7280',
+                    textAlign: 'center'
+                  }}>
+                    외 {order.items.length - 2}개 상품
+                  </div>
+                )}
               </div>
             )}
 
-            {/* 주문 요약 */}
+            {/* 주문 요약 (간단히) */}
             {order.summary && (
-              <div className="order-summary" style={{ 
-                marginTop: '1rem', 
-                padding: '1.5rem', 
-                backgroundColor: '#f9fafb', 
-                borderRadius: '8px',
-                marginBottom: '2rem'
+              <div style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                textAlign: 'left'
               }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>주문 요약</h3>
-                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>상품 금액</span>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  <span style={{ color: '#6b7280' }}>상품 금액</span>
                   <span>{order.summary.subtotal?.toLocaleString() || 0}원</span>
                 </div>
                 {order.summary.discountTotal > 0 && (
-                  <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#dc2626' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    marginBottom: '0.5rem',
+                    fontSize: '0.9rem',
+                    color: '#dc2626'
+                  }}>
                     <span>할인 금액</span>
                     <span>-{order.summary.discountTotal.toLocaleString()}원</span>
                   </div>
                 )}
-                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>배송비</span>
-                  <span>{order.summary.shippingFee?.toLocaleString() || 0}원</span>
-                </div>
-                <div className="summary-row" style={{ 
+                <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
-                  marginTop: '1rem', 
-                  paddingTop: '1rem', 
-                  borderTop: '2px solid #e5e7eb',
+                  marginBottom: '0.75rem',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid #e5e7eb',
+                  fontSize: '0.9rem'
+                }}>
+                  <span style={{ color: '#6b7280' }}>배송비</span>
+                  <span>{order.summary.shippingFee?.toLocaleString() || 0}원</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
                   fontSize: '1.1rem',
                   fontWeight: 'bold'
                 }}>
                   <span>총 결제 금액</span>
-                  <span style={{ color: '#059669' }}>{order.summary.grandTotal?.toLocaleString() || 0}원</span>
+                  <span style={{ color: '#10b981' }}>
+                    {order.summary.grandTotal?.toLocaleString() || 0}원
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* 배송 정보 */}
+            {/* 배송 정보 (간단히) */}
             {order.shipping && order.shipping.address && (
-              <div className="shipping-info" style={{ 
-                marginTop: '1rem', 
-                padding: '1.5rem', 
-                backgroundColor: '#f9fafb', 
-                borderRadius: '8px',
-                marginBottom: '2rem'
-              }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>배송 정보</h3>
-                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>수령인:</span>
-                  <span>{order.shipping.address.name}</span>
-                </div>
-                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>연락처:</span>
-                  <span>{order.shipping.address.phone}</span>
-                </div>
-                <div className="info-row" style={{ marginBottom: '0.5rem' }}>
-                  <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>주소:</span>
-                  <span>
-                    [{order.shipping.address.postalCode}] {order.shipping.address.address1}
-                    {order.shipping.address.address2 && ` ${order.shipping.address.address2}`}
-                  </span>
-                </div>
-                {order.shipping.request && (
-                  <div className="info-row" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
-                    <span style={{ fontWeight: 'bold', marginRight: '0.5rem' }}>배송 요청사항:</span>
-                    <span>{order.shipping.request}</span>
+              <div style={{
+              backgroundColor: '#f9fafb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '2rem',
+              textAlign: 'left'
+            }}>
+                <h3 style={{ 
+                  fontSize: '1rem', 
+                  fontWeight: '600', 
+                  marginBottom: '1rem',
+                  color: '#111827'
+                }}>
+                  배송 정보
+                </h3>
+                <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <strong>수령인:</strong> {order.shipping.address.name}
                   </div>
-                )}
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <strong>연락처:</strong> {order.shipping.address.phone}
+                  </div>
+                  <div>
+                    <strong>주소:</strong> [{order.shipping.address.postalCode}] {order.shipping.address.address1}
+                    {order.shipping.address.address2 && ` ${order.shipping.address.address2}`}
+                  </div>
+                </div>
               </div>
             )}
           </>
         ) : (
           paymentData && (
-            <div className="payment-info" style={{ marginTop: '1.5rem' }}>
-              <div className="info-row">
-                <span className="info-label">결제 금액</span>
-                <span className="info-value">{paymentData.amount.toLocaleString()}원</span>
+            <div style={{
+              backgroundColor: '#f9fafb',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '2rem',
+              textAlign: 'left'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '0.75rem'
+              }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>결제 금액</span>
+                <span style={{ fontWeight: '600' }}>{paymentData.amount.toLocaleString()}원</span>
               </div>
-              <div className="info-row">
-                <span className="info-label">주문번호</span>
-                <span className="info-value">{paymentData.orderId}</span>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: '0.75rem'
+              }}>
+                <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>주문번호</span>
+                <span style={{ fontWeight: '600' }}>{paymentData.orderId}</span>
               </div>
-              {paymentData.paymentKey && (
-                <div className="info-row">
-                  <span className="info-label">결제키</span>
-                  <span className="info-value" style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{paymentData.paymentKey}</span>
-                </div>
-              )}
-              <p style={{ marginTop: '1rem', color: '#dc2626', fontSize: '0.9rem' }}>
+              <p style={{ 
+                marginTop: '1rem', 
+                color: '#dc2626', 
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                padding: '0.75rem',
+                backgroundColor: '#fee2e2',
+                borderRadius: '8px'
+              }}>
                 ⚠️ 주문 정보를 찾을 수 없습니다. 고객센터로 문의해주세요.
               </p>
             </div>
           )
         )}
-        <div className="button-group" style={{ marginTop: '2rem' }}>
+
+        {/* 버튼 */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          justifyContent: 'center',
+          marginTop: '2rem'
+        }}>
           {order && (
-            <button className="btn-primary" onClick={() => onViewOrder(order)}>
+            <button 
+              onClick={() => onViewOrder(order)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#6366f1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.95rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#4f46e5'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#6366f1'}
+            >
               주문 상세보기
             </button>
           )}
-          <button onClick={onBackToHome}>홈으로 돌아가기</button>
+          <button 
+            onClick={onBackToHome}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+          >
+            홈으로 돌아가기
+          </button>
         </div>
       </div>
     </div>

@@ -257,8 +257,9 @@ async function deleteInquiry(req, res, next) {
       return res.status(404).json({ message: '문의를 찾을 수 없습니다.' });
     }
 
-    // 본인 문의인지 확인
-    if (inquiry.user?.toString() !== userId.toString()) {
+    // 관리자는 모든 문의 삭제 가능, 일반 사용자는 본인 문의만 삭제 가능
+    const isAdmin = req.user?.user_type === 'admin';
+    if (!isAdmin && inquiry.user?.toString() !== userId.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
 

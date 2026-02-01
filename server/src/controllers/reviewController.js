@@ -152,7 +152,9 @@ async function updateReview(req, res, next) {
       return res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' });
     }
 
-    if (review.userId.toString() !== userId.toString()) {
+    // 관리자는 모든 리뷰 수정 가능, 일반 사용자는 본인 리뷰만 수정 가능
+    const isAdmin = req.user?.user_type === 'admin';
+    if (!isAdmin && review.userId.toString() !== userId.toString()) {
       return res.status(403).json({ message: '본인의 리뷰만 수정할 수 있습니다.' });
     }
 
@@ -203,7 +205,9 @@ async function deleteReview(req, res, next) {
       return res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' });
     }
 
-    if (review.userId.toString() !== userId.toString()) {
+    // 관리자는 모든 리뷰 삭제 가능, 일반 사용자는 본인 리뷰만 삭제 가능
+    const isAdmin = req.user?.user_type === 'admin';
+    if (!isAdmin && review.userId.toString() !== userId.toString()) {
       return res.status(403).json({ message: '본인의 리뷰만 삭제할 수 있습니다.' });
     }
 

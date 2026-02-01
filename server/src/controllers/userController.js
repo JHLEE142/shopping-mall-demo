@@ -133,10 +133,19 @@ async function getUsers(req, res, next) {
 
 async function getUserById(req, res, next) {
   try {
+    const userId = req.user?._id || req.user?.id;
+    const isAdmin = req.user?.user_type === 'admin';
+    
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    
+    // 관리자는 모든 사용자 조회 가능, 일반 사용자는 본인만 조회 가능
+    if (!isAdmin && user._id.toString() !== userId?.toString()) {
+      return res.status(403).json({ message: '권한이 없습니다.' });
+    }
+    
     res.json(sanitizeUser(user));
   } catch (error) {
     next(error);
@@ -145,6 +154,14 @@ async function getUserById(req, res, next) {
 
 async function updateUser(req, res, next) {
   try {
+    const userId = req.user?._id || req.user?.id;
+    const isAdmin = req.user?.user_type === 'admin';
+    
+    // 관리자는 모든 사용자 수정 가능, 일반 사용자는 본인만 수정 가능
+    if (!isAdmin && req.params.id !== userId?.toString()) {
+      return res.status(403).json({ message: '권한이 없습니다.' });
+    }
+    
     const updatePayload = { ...req.body };
 
     if (Object.prototype.hasOwnProperty.call(updatePayload, 'password')) {
