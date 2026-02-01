@@ -1,0 +1,240 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2024-01-18",
+  "categories": [
+    {
+      "category": "상품 검색",
+      "keywords": ["검색", "찾아", "찾아줘", "찾아봐", "찾기", "어디", "있어", "있나", "보여줘", "보여", "알려줘", "알려", "추천", "추천해줘", "search", "find", "show", "recommend"],
+      "questions": [
+        {
+          "question": "프라이팬 찾아줘",
+          "variations": ["프라이팬 검색", "프라이팬 있어?", "프라이팬 보여줘", "프라이팬 추천해줘", "프라이팬 찾아봐"],
+          "answer": "프라이팬을 검색해드리겠습니다.",
+          "action": "search",
+          "params": {"query": "프라이팬"}
+        },
+        {
+          "question": "냄비 찾아줘",
+          "variations": ["냄비 검색", "냄비 있어?", "냄비 보여줘", "냄비 추천해줘"],
+          "answer": "냄비를 검색해드리겠습니다.",
+          "action": "search",
+          "params": {"query": "냄비"}
+        },
+        {
+          "question": "주방용품 추천해줘",
+          "variations": ["주방용품 추천", "주방용품 보여줘", "주방용품 찾아줘"],
+          "answer": "주방용품을 추천해드리겠습니다.",
+          "action": "search",
+          "params": {"query": "주방용품"}
+        },
+        {
+          "question": "20만원 이하 상품 추천해줘",
+          "variations": ["저렴한 상품", "가성비 좋은 상품", "20만원 이하", "저가 상품"],
+          "answer": "20만원 이하 상품을 검색해드리겠습니다.",
+          "action": "search",
+          "params": {"query": "", "maxPrice": 200000}
+        }
+      ]
+    },
+    {
+      "category": "장바구니",
+      "keywords": ["장바구니", "담아", "담아줘", "담기", "추가", "추가해줘", "cart", "add", "장바구니에"],
+      "questions": [
+        {
+          "question": "이거 장바구니에 담아줘",
+          "variations": ["장바구니 담기", "담아줘", "추가해줘", "장바구니에 추가"],
+          "answer": "장바구니에 추가해드리겠습니다.",
+          "action": "addToCart",
+          "params": {}
+        },
+        {
+          "question": "프라이팬 장바구니에 담아줘",
+          "variations": ["프라이팬 담아줘", "프라이팬 추가", "프라이팬 장바구니"],
+          "answer": "프라이팬을 장바구니에 추가해드리겠습니다.",
+          "action": "addToCart",
+          "params": {"productName": "프라이팬"}
+        }
+      ]
+    },
+    {
+      "category": "주문 조회",
+      "keywords": ["주문", "주문조회", "주문내역", "주문확인", "배송", "배송조회", "배송추적", "order", "delivery", "tracking"],
+      "questions": [
+        {
+          "question": "주문 내역 보여줘",
+          "variations": ["주문 조회", "주문 확인", "내 주문", "주문 내역"],
+          "answer": "주문 내역을 조회해드리겠습니다.",
+          "action": "viewOrders",
+          "params": {}
+        },
+        {
+          "question": "배송 조회",
+          "variations": ["배송 추적", "배송 확인", "배송 상태", "언제 도착"],
+          "answer": "배송 정보를 조회해드리겠습니다.",
+          "action": "trackDelivery",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "주문 취소/환불",
+      "keywords": ["취소", "주문취소", "환불", "반품", "교환", "cancel", "refund", "return"],
+      "questions": [
+        {
+          "question": "주문 취소하고 싶어",
+          "variations": ["주문 취소", "취소해줘", "주문 취소 가능해?"],
+          "answer": "주문 취소를 도와드리겠습니다. 주문번호를 알려주시거나 취소하실 주문을 선택해주세요.",
+          "action": "cancelOrder",
+          "params": {}
+        },
+        {
+          "question": "환불 받고 싶어",
+          "variations": ["환불", "환불해줘", "환불 신청", "환불 가능해?"],
+          "answer": "환불 신청을 도와드리겠습니다. 환불 사유를 알려주세요.",
+          "action": "requestRefund",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "리뷰",
+      "keywords": ["리뷰", "후기", "평가", "작성", "리뷰작성", "review", "rating"],
+      "questions": [
+        {
+          "question": "리뷰 작성하고 싶어",
+          "variations": ["리뷰 쓰기", "후기 작성", "평가하기"],
+          "answer": "리뷰 작성을 도와드리겠습니다. 어떤 상품에 대한 리뷰를 작성하시겠어요?",
+          "action": "writeReview",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "적립금/포인트",
+      "keywords": ["적립금", "포인트", "마일리지", "적립", "보유", "잔액", "points", "rewards"],
+      "questions": [
+        {
+          "question": "적립금 얼마 있어?",
+          "variations": ["포인트 조회", "적립금 확인", "보유 포인트", "잔액 확인"],
+          "answer": "적립금을 조회해드리겠습니다.",
+          "action": "checkRewards",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "배송 정책",
+      "keywords": ["배송비", "무료배송", "배송기간", "배송일", "언제 도착", "shipping", "delivery"],
+      "questions": [
+        {
+          "question": "배송비 얼마야?",
+          "variations": ["배송비", "배송비 얼마", "배송비 얼마나", "배송비 확인"],
+          "answer": "20,000원 이상 구매 시 무료배송이며, 미만 시 배송비 3,000원이 부과됩니다.",
+          "action": "answer",
+          "params": {}
+        },
+        {
+          "question": "무료배송 기준이 뭐야?",
+          "variations": ["무료배송", "무료배송 기준", "무료배송 조건"],
+          "answer": "20,000원 이상 구매 시 무료배송입니다.",
+          "action": "answer",
+          "params": {}
+        },
+        {
+          "question": "배송은 며칠 걸려?",
+          "variations": ["배송기간", "배송일", "언제 도착", "배송 소요시간"],
+          "answer": "배송은 보통 3-5일 정도 소요됩니다. 상품별로 배송 예상일이 다를 수 있습니다.",
+          "action": "answer",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "반품/교환 정책",
+      "keywords": ["반품", "교환", "반품정책", "교환정책", "반품가능", "교환가능", "return", "exchange"],
+      "questions": [
+        {
+          "question": "반품 가능해?",
+          "variations": ["반품", "반품 가능", "반품 신청", "반품 정책"],
+          "answer": "네, 반품이 가능합니다. 단순 변심의 경우 배송비는 고객 부담이며, 상품 수령 후 30일 이내에 신청하실 수 있습니다.",
+          "action": "answer",
+          "params": {}
+        },
+        {
+          "question": "교환 가능해?",
+          "variations": ["교환", "교환 가능", "교환 신청", "교환 정책"],
+          "answer": "교환은 재구매 후 환불 방식으로 처리됩니다. 교환을 원하시는 상품을 알려주시면 도와드리겠습니다.",
+          "action": "answer",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "쿠폰/할인",
+      "keywords": ["쿠폰", "할인", "할인쿠폰", "프로모션", "이벤트", "coupon", "discount", "promotion"],
+      "questions": [
+        {
+          "question": "쿠폰 있어?",
+          "variations": ["할인쿠폰", "쿠폰 확인", "보유 쿠폰", "사용 가능한 쿠폰"],
+          "answer": "보유하신 쿠폰을 조회해드리겠습니다.",
+          "action": "checkCoupons",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "로그인/회원가입",
+      "keywords": ["로그인", "회원가입", "가입", "로그", "login", "signup", "register"],
+      "questions": [
+        {
+          "question": "로그인하고 싶어",
+          "variations": ["로그인", "로그인해줘", "로그인 페이지", "로그인 하기"],
+          "answer": "로그인 페이지로 이동해드리겠습니다.",
+          "action": "navigate",
+          "params": {"page": "login"}
+        },
+        {
+          "question": "회원가입하고 싶어",
+          "variations": ["회원가입", "가입", "회원가입 페이지", "가입하기"],
+          "answer": "회원가입 페이지로 이동해드리겠습니다.",
+          "action": "navigate",
+          "params": {"page": "signup"}
+        }
+      ]
+    },
+    {
+      "category": "상품 정보",
+      "keywords": ["가격", "재고", "옵션", "색상", "사이즈", "상세정보", "price", "stock", "option", "detail"],
+      "questions": [
+        {
+          "question": "이 상품 가격이 얼마야?",
+          "variations": ["가격", "얼마야", "가격 확인"],
+          "answer": "상품 가격을 확인해드리겠습니다. 어떤 상품인가요?",
+          "action": "getProductInfo",
+          "params": {}
+        },
+        {
+          "question": "재고 있어?",
+          "variations": ["재고", "재고 확인", "재고 있나", "구매 가능"],
+          "answer": "재고를 확인해드리겠습니다. 어떤 상품인가요?",
+          "action": "checkStock",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "category": "일반 문의",
+      "keywords": ["문의", "질문", "도움", "help", "question", "inquiry"],
+      "questions": [
+        {
+          "question": "도움이 필요해",
+          "variations": ["도움", "도와줘", "질문", "문의"],
+          "answer": "무엇을 도와드릴까요? 상품 검색, 주문 조회, 배송 추적 등 무엇이든 물어보세요.",
+          "action": "answer",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}
+

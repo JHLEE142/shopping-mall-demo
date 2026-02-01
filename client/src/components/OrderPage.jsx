@@ -5,7 +5,7 @@ import { getUserCoupons } from '../services/couponService';
 import TossPaymentWidget from './TossPaymentWidget';
 
 const PAYMENT_METHODS = [
-  { value: 'online', label: 'Online Payment', description: '신용/체크카드, 간편결제' },
+  { value: 'online', label: '온라인 결제', description: '신용/체크카드, 간편결제' },
 ];
 
 function formatCurrency(value, currency = 'KRW') {
@@ -569,21 +569,21 @@ function OrderPage({
         )}
         <dl className="order-summary__totals">
           <div>
-            <dt>Subtotal</dt>
+            <dt>상품 금액</dt>
             <dd>{formatCurrency(subtotal, currencyCode)}</dd>
           </div>
           {couponDiscount > 0 && (
             <div>
-              <dt>Coupon Discount</dt>
+              <dt>쿠폰 할인</dt>
               <dd style={{ color: '#6366f1' }}>-{formatCurrency(couponDiscount, currencyCode)}</dd>
             </div>
           )}
           <div>
-            <dt>Shipping</dt>
+            <dt>배송비</dt>
             <dd>{shippingFee === 0 ? '무료' : formatCurrency(shippingFee, currencyCode)}</dd>
           </div>
           <div className="order-summary__grand">
-            <dt>Total</dt>
+            <dt>총 결제 금액</dt>
             <dd>{formatCurrency(total, currencyCode)}</dd>
           </div>
         </dl>
@@ -652,7 +652,7 @@ function OrderPage({
             <strong>#{orderResult.orderNumber}</strong> 입니다.
           </p>
           <div className="order-result__summary-card">
-            <h2>Order Summary</h2>
+            <h2>주문 요약</h2>
             <ul className="order-result__items">
               {orderResult.items?.map((item) => (
                 <li key={item.product?.toString() || item.name}>
@@ -662,7 +662,7 @@ function OrderPage({
               ))}
             </ul>
             <div className="order-result__total">
-              <span>Total</span>
+              <span>총 결제 금액</span>
               <strong>{formatCurrency(orderResult.summary?.grandTotal, successCurrency)}</strong>
             </div>
           </div>
@@ -672,7 +672,7 @@ function OrderPage({
               onClick={() => onOrderPlaced(orderResult)}
               className="order-result__primary"
             >
-              Back to Home
+              홈으로 돌아가기
             </button>
           </div>
         </div>
@@ -740,23 +740,23 @@ function OrderPage({
       {status === 'success' && (
         <div className="order-page__layout">
           <section className="order-form">
-            <h2>Delivery Information</h2>
+            <h2>배송 정보</h2>
             <div className="order-form__grid">
               <label>
-                Name
+                이름
                 <input type="text" value={formData.name} onChange={handleInputChange('name')} placeholder="받는 분 이름" />
               </label>
               <label>
-                Mobile Number
+                전화번호
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={handleInputChange('phone')}
-                  placeholder="+82 10-1234-5678"
+                  placeholder="- 없이 적어주세요"
                 />
               </label>
               <label>
-                Email
+                이메일
                 <input
                   type="email"
                   value={formData.email}
@@ -765,7 +765,7 @@ function OrderPage({
                 />
               </label>
               <label>
-                City
+                도시
                 <input
                   type="text"
                   value={formData.city}
@@ -774,7 +774,7 @@ function OrderPage({
                 />
               </label>
               <label>
-                State
+                시/도
                 <input
                   type="text"
                   value={formData.state}
@@ -840,7 +840,7 @@ function OrderPage({
               <div className="order-form__options-row">
                 <div className="order-form__option-card">
                   <div className="order-form__option-header">
-                    <h3>Schedule Delivery</h3>
+                    <h3>배송 일정</h3>
                     <button
                       type="button"
                       className={`order-form__toggle ${formData.scheduleEnabled ? 'is-active' : ''}`}
@@ -865,7 +865,7 @@ function OrderPage({
                     </p>
                   )}
                   <label className="order-form__notes">
-                    Note
+                    메모
                     <input
                       type="text"
                       value={formData.notes}
@@ -876,7 +876,7 @@ function OrderPage({
                 </div>
                 <div className="order-form__option-card">
                   <div className="order-form__option-header order-form__option-header--simple">
-                    <h3>Payment Method</h3>
+                    <h3>결제 방법</h3>
                   </div>
                   <div className="order-form__payments order-form__payments--stack">
                     {PAYMENT_METHODS.map((method) => (
@@ -906,7 +906,7 @@ function OrderPage({
           </section>
 
           <aside className="order-summary">
-            <h2>Order Summary</h2>
+            <h2>주문 요약</h2>
             {renderOrderSummary()}
           </aside>
         </div>

@@ -242,7 +242,7 @@ function CartPage({
           <button type="button" className="cart-page__back" onClick={() => window.history.back()}>
             ← 계속 쇼핑하기
           </button>
-          <h1>Shopping Bag ({cart?.items?.length ?? 0})</h1>
+          <h1>장바구니 ({cart?.items?.length ?? 0})</h1>
         </div>
       </header>
 
@@ -306,7 +306,7 @@ function CartPage({
                               {isProductDeleted ? '삭제된 상품' : item.product.name}
                             </h2>
                             {!isProductDeleted && (
-                              <span className="cart-item-card__sku">SKU: {item.product.sku || 'N/A'}</span>
+                              <span className="cart-item-card__sku">상품코드: {item.product.sku || '없음'}</span>
                             )}
                             {isProductDeleted && (
                               <span className="cart-item-card__sku" style={{ color: '#dc3545' }}>
@@ -413,14 +413,14 @@ function CartPage({
 
             <aside className="cart-summary">
               <div className="cart-summary__card">
-                <h3>Order Summary</h3>
+                <h3>주문 요약</h3>
                 <dl>
                   <div>
-                    <dt>Subtotal ({cart.items.length} items)</dt>
+                    <dt>상품 금액 ({cart.items.length}개)</dt>
                     <dd>{formatCurrency(subtotal, currencyCode)}</dd>
                   </div>
                   <div>
-                    <dt>Shipping</dt>
+                    <dt>배송비</dt>
                     <dd>{shippingFee === 0 ? '무료' : formatCurrency(shippingFee, currencyCode)}</dd>
                   </div>
                   <div>
@@ -429,24 +429,24 @@ function CartPage({
                   </div>
                 </dl>
                 <div className="cart-summary__total">
-                  <span>Total</span>
+                  <span>총 결제 금액</span>
                   <strong>{formatCurrency(total, currencyCode)}</strong>
                 </div>
                 <button type="button" className="cart-summary__checkout" onClick={onProceedToCheckout}>
-                  PROCEED TO CHECKOUT
+                  주문하기
                 </button>
                 <button type="button" className="cart-summary__continue" onClick={() => window.history.back()}>
-                  CONTINUE SHOPPING
+                  쇼핑 계속하기
                 </button>
                 <div className="cart-summary__secure">
-                  <span>We accept:</span>
+                  <span>결제 수단:</span>
                   <div className="cart-summary__payments">
                     <span>VISA</span>
                     <span>MC</span>
                     <span>AMEX</span>
                     <span>PAYPAL</span>
                   </div>
-                  <p>✔ Secure checkout with SSL encryption</p>
+                  <p>✔ SSL 암호화로 안전한 결제</p>
                 </div>
               </div>
             </aside>

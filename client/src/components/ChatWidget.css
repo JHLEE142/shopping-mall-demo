@@ -107,6 +107,13 @@
   color: white;
 }
 
+.chat-widget__beta-notice {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 .chat-widget__status {
   font-size: 0.75rem;
   color: #9ca3af;

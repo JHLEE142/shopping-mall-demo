@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageCircle, X, Send, Minimize2, Maximize2, ShoppingCart, ChevronLeft, ChevronRight, Cat } from 'lucide-react';
 import { sendChatMessage } from '../services/chatService';
 import { addItemToCart } from '../services/cartService';
+import { fetchProducts } from '../services/productService';
 import './ChatWidget.css';
 
 function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, currentView = 'home', onViewProduct = null, onAddToCart = null }) {
@@ -19,7 +20,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
     if (isLoggedIn) {
       return {
         id: 1,
-        text: `안녕하세요! AI 쇼핑 비서입니다. 어떤 상품을 찾고 계신가요?`,
+        text: `안녕하세요! 네코(AI 쇼핑 비서)입니다. 어떤 상품을 찾고 계신가요?`,
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -27,7 +28,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
       // 로그인 전 메인페이지: 로그인 유도 메시지
       return {
         id: 1,
-        text: `채팅 기능은 로그인 후 이용 가능합니다.\n\n로그인하시면 AI 쇼핑 비서를 통해 상품 추천, 검색, 주문 도움 등을 받으실 수 있습니다.\n\n지금 로그인하시겠어요?`,
+        text: `채팅 기능은 로그인 후 이용 가능합니다.\n\n로그인하시면 네코(AI 쇼핑 비서)를 통해 상품 추천, 검색, 주문 도움 등을 받으실 수 있습니다.\n\n지금 로그인하시겠어요?`,
         sender: 'bot',
         timestamp: new Date(),
         action: 'login_prompt',
@@ -213,24 +214,46 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
       }
       
       const response = await sendChatMessage([...messages, userMessage], isLoggedIn, currentView, null, pageToUse, 40);
-      const botResponse = typeof response === 'string' ? response : response.message || response.response || '';
+      let botResponse = typeof response === 'string' ? response : response.message || response.response || '';
       const productCards = response.productCards || null;
       const pagination = response.pagination || null;
+      
+      // 액션 처리 (로컬 모델에서 반환된 action 파라미터 확인)
+      if (response.action === 'navigate') {
+        if (response.params && response.params.page === 'login' && onMoveToLogin) {
+          onMoveToLogin();
+          setIsOpen(false);
+          return;
+        } else if (response.params && response.params.page === 'signup' && onMoveToSignUp) {
+          onMoveToSignUp();
+          setIsOpen(false);
+          return;
+        }
+      }
+      
+      // 장바구니 추가 액션 처리
+      if (response.action === 'addToCart' && response.params?.productName && isLoggedIn) {
+        try {
+          const searchResult = await fetchProducts(1, 1, null, response.params.productName);
+          if (searchResult.items && searchResult.items.length > 0) {
+            const product = searchResult.items[0];
+            await addItemToCart(product._id || product.id, 1);
+            botResponse += `\n✅ ${product.name}을(를) 장바구니에 추가했습니다!`;
+            if (onAddToCart) {
+              onAddToCart();
+            }
+          } else {
+            botResponse += `\n❌ "${response.params.productName}" 상품을 찾을 수 없습니다.`;
+          }
+        } catch (error) {
+          console.error('장바구니 추가 실패:', error);
+          botResponse += `\n❌ 장바구니 추가 중 오류가 발생했습니다.`;
+        }
+      }
       
       setMessages((prev) => {
         // 검색 중 메시지 제거 (검색 결과가 도착했으므로)
         const filteredPrev = prev.filter(msg => !msg.isSearching);
-        
-        // 액션 처리 (서버에서 반환된 action 파라미터 확인)
-        if (response.action === 'navigate') {
-          if (response.actionParams && response.actionParams.page === 'login' && onMoveToLogin) {
-            onMoveToLogin();
-            setIsOpen(false);
-          } else if (response.actionParams && response.actionParams.page === 'signup' && onMoveToSignUp) {
-            onMoveToSignUp();
-            setIsOpen(false);
-          }
-        }
         
         const botMessage = {
           id: filteredPrev.length + 1,
@@ -463,7 +486,7 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
       <button
         className={`chat-widget__button ${isOpen ? 'is-open' : ''}`}
         onClick={handleToggle}
-        aria-label={isLoggedIn ? "AI 쇼핑 비서 열기" : "로그인/회원가입 도우미 열기"}
+        aria-label={isLoggedIn ? "네코(AI 쇼핑 비서) 열기" : "로그인/회원가입 도우미 열기"}
       >
         <MessageCircle size={24} />
         {!isOpen && <span className="chat-widget__button-badge">1</span>}
@@ -474,9 +497,17 @@ function ChatWidget({ user = null, onMoveToLogin = null, onMoveToSignUp = null, 
         <div className={`chat-widget__container ${isMinimized ? 'is-minimized' : ''}`}>
           <div className="chat-widget__header">
             <div className="chat-widget__header-info">
-              <h3 className="chat-widget__title">
-                {isLoggedIn ? 'AI 쇼핑 비서' : '로그인/회원가입 도우미'}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Cat size={20} />
+                  <h3 className="chat-widget__title">
+                    {isLoggedIn ? '네코(AI 쇼핑 비서)' : '로그인/회원가입 도우미'}
+                  </h3>
+                </div>
+                {isLoggedIn && (
+                  <span className="chat-widget__beta-notice">테스트 중이라 정확하게 작동하지 않을 수 있습니다</span>
+                )}
+              </div>
               <span className="chat-widget__status">대기 중</span>
             </div>
             <div className="chat-widget__header-actions">
