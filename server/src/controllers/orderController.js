@@ -816,10 +816,40 @@ async function listOrders(req, res, next) {
       filter.user = req.user._id;
     }
 
-    const [items, totalItems] = await Promise.all([
+    const [orders, totalItems] = await Promise.all([
       Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('user', 'name email user_type'),
       Order.countDocuments(filter),
     ]);
+
+    // items의 product populate
+    const items = await Promise.all(
+      orders.map(async (order) => {
+        const orderObj = order.toObject ? order.toObject() : order;
+        if (orderObj.items && orderObj.items.length > 0) {
+          const productIds = orderObj.items.map(item => item.product).filter(Boolean);
+          if (productIds.length > 0) {
+            const Product = require('../models/product');
+            const products = await Product.find({ _id: { $in: productIds } })
+              .select('name image images')
+              .lean();
+            const productMap = new Map(products.map(p => [p._id.toString(), p]));
+            
+            orderObj.items = orderObj.items.map(item => {
+              const product = productMap.get(item.product?.toString());
+              return {
+                ...item,
+                product: product ? {
+                  _id: product._id,
+                  name: product.name,
+                  image: product.images?.[0] || product.image,
+                } : null,
+              };
+            });
+          }
+        }
+        return orderObj;
+      })
+    );
 
     const totalPages = Math.max(Math.ceil(totalItems / limit), 1);
 

@@ -115,4 +115,25 @@ export async function updateOrder(orderId, payload) {
   return data;
 }
 
+export async function deleteOrder(orderId) {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+    method: 'DELETE',
+    headers: {
+      ...buildAuthHeaders(),
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = data?.message || '주문을 삭제하지 못했습니다.';
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
+}
+
 

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserPlus, Star, Repeat, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, UserPlus, Star, Repeat, TrendingUp, TrendingDown, Search } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { getUsers as getUsersApi } from '../../../services/userService';
+import { fetchOrders as fetchOrdersApi } from '../../../services/orderService';
+import { getStatisticsData as getStatisticsDataApi } from '../../../services/statisticsService';
 import './CustomersPage.css';
 
 const COLORS = ['#111827', '#374151', '#6b7280', '#9ca3af'];
@@ -14,6 +16,14 @@ function CustomersPage() {
     repeatCustomers: 67,
   });
   const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState([]);
+  const [growthTrendData, setGrowthTrendData] = useState([]);
+  const [purchaseFrequencyData, setPurchaseFrequencyData] = useState([]);
+  const [ageDistributionData, setAgeDistributionData] = useState([]);
+  const [categoryPreferencesData, setCategoryPreferencesData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
 
   useEffect(() => {
     loadData();
@@ -22,20 +32,113 @@ function CustomersPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const usersData = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
-      // API 응답 형식: { page, limit, totalItems, totalPages, items }
+      
+      // 고객 목록 로드
+      const usersData = await getUsersApi({ page, limit: 20, user_type: 'customer' });
       const users = usersData.items || (Array.isArray(usersData) ? usersData : []);
       const customerUsers = users.filter(u => u.user_type === 'customer') || [];
+      
+      // 검색 필터 적용
+      let filteredCustomers = customerUsers;
+      if (searchQuery) {
+        filteredCustomers = customerUsers.filter(u => 
+          u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      
+      setCustomers(filteredCustomers);
+      setPagination({
+        totalPages: usersData.totalPages || 1,
+        totalItems: usersData.totalItems || filteredCustomers.length,
+      });
+
+      // 전체 고객 수 계산
+      const allUsersData = await getUsersApi({ page: 1, limit: 1000, user_type: 'customer' });
+      const allUsers = allUsersData.items || [];
+      const allCustomerUsers = allUsers.filter(u => u.user_type === 'customer') || [];
+      
+      // 신규 고객 수 계산
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      const newCustomers = allCustomerUsers.filter(u => {
+        const created = new Date(u.createdAt);
+        return created >= monthAgo;
+      }).length;
+
+      // 주문 데이터로 재방문 고객 계산
+      const ordersData = await fetchOrdersApi({ limit: 1000 });
+      const allOrders = ordersData.items || [];
+      const customerOrderMap = new Map();
+      allOrders.forEach(order => {
+        if (order.user && order.user._id) {
+          const userId = order.user._id.toString();
+          customerOrderMap.set(userId, (customerOrderMap.get(userId) || 0) + 1);
+        }
+      });
+      const repeatCustomerCount = Array.from(customerOrderMap.values()).filter(count => count > 1).length;
+      const repeatCustomerPercent = allCustomerUsers.length > 0 
+        ? Math.round((repeatCustomerCount / allCustomerUsers.length) * 100) 
+        : 0;
+
+      // 통계 데이터 로드
+      const statsData = await getStatisticsDataApi();
+      
+      // 고객 성장 추이 데이터
+      if (statsData && statsData.monthlyStats) {
+        const trendData = statsData.monthlyStats.map(stat => ({
+          month: stat.month,
+          value: stat.customers || 0,
+        }));
+        setGrowthTrendData(trendData);
+      }
+
+      // 주문 빈도 데이터 계산
+      const frequencyMap = new Map();
+      allOrders.forEach(order => {
+        if (order.user && order.user._id) {
+          const userId = order.user._id.toString();
+          const count = customerOrderMap.get(userId) || 0;
+          if (count === 1) frequencyMap.set('Once', (frequencyMap.get('Once') || 0) + 1);
+          else if (count <= 3) frequencyMap.set('2-3 times', (frequencyMap.get('2-3 times') || 0) + 1);
+          else if (count <= 5) frequencyMap.set('4-5 times', (frequencyMap.get('4-5 times') || 0) + 1);
+          else frequencyMap.set('6+ times', (frequencyMap.get('6+ times') || 0) + 1);
+        }
+      });
+      setPurchaseFrequencyData([
+        { frequency: 'Once', value: frequencyMap.get('Once') || 0 },
+        { frequency: '2-3 times', value: frequencyMap.get('2-3 times') || 0 },
+        { frequency: '4-5 times', value: frequencyMap.get('4-5 times') || 0 },
+        { frequency: '6+ times', value: frequencyMap.get('6+ times') || 0 },
+      ]);
+
+      // 나이 분포 (실제 데이터가 없으므로 기본값 유지)
+      setAgeDistributionData([
+        { name: '18-25', value: Math.floor(allCustomerUsers.length * 0.3) },
+        { name: '26-35', value: Math.floor(allCustomerUsers.length * 0.4) },
+        { name: '36-45', value: Math.floor(allCustomerUsers.length * 0.2) },
+        { name: '46+', value: Math.floor(allCustomerUsers.length * 0.1) },
+      ]);
+
+      // 카테고리 선호도 (주문 데이터 기반)
+      const categoryMap = new Map();
+      allOrders.forEach(order => {
+        order.items?.forEach(item => {
+          const category = item.product?.category || item.category || '기타';
+          categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+        });
+      });
+      const topCategories = Array.from(categoryMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([category, value]) => ({ category, value }));
+      setCategoryPreferencesData(topCategories);
+
       setStats({
-        totalCustomer: customerUsers.length,
-        newCustomer: customerUsers.filter(u => {
-          const created = new Date(u.createdAt);
-          const monthAgo = new Date();
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          return created >= monthAgo;
-        }).length,
-        avgRating: 4.7,
-        repeatCustomers: 67,
+        totalCustomer: allCustomerUsers.length,
+        newCustomer: newCustomers,
+        avgRating: 4.7, // 리뷰 데이터가 있으면 실제 값 사용
+        repeatCustomers: repeatCustomerPercent,
       });
     } catch (error) {
       console.error('고객 데이터 로드 실패:', error);
@@ -44,36 +147,18 @@ function CustomersPage() {
     }
   };
 
-  // Mock data for charts
-  const growthTrendData = [
-    { month: 'JAN', value: 2000 },
-    { month: 'FEB', value: 3000 },
-    { month: 'MAR', value: 4000 },
-    { month: 'APR', value: 5000 },
-    { month: 'MAY', value: 6000 },
-    { month: 'JUN', value: 7000 },
-    { month: 'JUL', value: 8000 },
-  ];
+  useEffect(() => {
+    loadData();
+  }, [page, searchQuery]);
 
-  const purchaseFrequencyData = [
-    { frequency: 'Daily', value: 900 },
-    { frequency: 'Weekly', value: 2700 },
-    { frequency: 'Bi-weekly', value: 1800 },
-    { frequency: 'Monthly', value: 900 },
-  ];
-
-  const ageDistributionData = [
-    { name: '18-25', value: 2134 },
-    { name: '26-35', value: 2856 },
-    { name: '36-45', value: 1247 },
-    { name: '46+', value: 1456 },
-  ];
-
-  const categoryPreferencesData = [
-    { category: 'Fruits & Vegetables', value: 32 },
-    { category: 'Dairy Products', value: 24 },
-    { category: 'Meat & Seafood', value: 18 },
-  ];
+  const formatDate = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   if (loading) {
     return <div className="admin-page-loading">Loading...</div>;
@@ -178,6 +263,103 @@ function CustomersPage() {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* Customer List */}
+      <div className="admin-card">
+        <div className="admin-card__header">
+          <h3>Customer List</h3>
+          <div className="admin-card__header-actions">
+            <div className="admin-search-bar">
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="admin-page-loading">Loading...</div>
+        ) : customers.length === 0 ? (
+          <div className="admin-empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
+            <Users size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <p>고객이 없습니다.</p>
+          </div>
+        ) : (
+          <>
+            <div className="admin-table admin-table--customers">
+              <div className="admin-table__header">
+                <span>Name</span>
+                <span>Email</span>
+                <span>User Type</span>
+                <span>Joined Date</span>
+                <span>Status</span>
+              </div>
+              <div className="admin-table__body">
+                {customers.map((customer) => (
+                  <div key={customer._id} className="admin-table__row">
+                    <div className="admin-table__cell-customer">
+                      <div className="admin-table__customer-avatar">
+                        {customer.name?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div className="admin-table__customer-name">{customer.name || 'Unknown'}</div>
+                    </div>
+                    <div>{customer.email || '-'}</div>
+                    <div>
+                      <span className="admin-badge admin-badge--default">
+                        {customer.user_type || 'customer'}
+                      </span>
+                    </div>
+                    <div>{formatDate(customer.createdAt)}</div>
+                    <div>
+                      <span className="admin-badge admin-badge--success">Active</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {pagination.totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  ← Previous
+                </button>
+                <div className="admin-pagination__pages">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        className={`admin-pagination__page ${page === pageNum ? 'is-active' : ''}`}
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="admin-pagination__button"
+                  onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page >= pagination.totalPages}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

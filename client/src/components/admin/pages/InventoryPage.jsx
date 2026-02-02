@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Package, AlertTriangle, XCircle, Grid, Search, Filter, Download, MoreVertical } from 'lucide-react';
-import { fetchProducts } from '../../../services/productService';
+import { Package, AlertTriangle, XCircle, Grid, Search, Filter, Download, MoreVertical, Edit, Trash2, X } from 'lucide-react';
+import { fetchProducts, updateProduct, deleteProduct } from '../../../services/productService';
 import './InventoryPage.css';
 
 function InventoryPage() {
@@ -14,6 +14,8 @@ function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All Products');
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     loadProducts();
@@ -88,6 +90,46 @@ function InventoryPage() {
     if (stock === 0) return { label: 'Out of Stock', class: 'error', progress: 0 };
     if (stock <= minStock) return { label: 'Low Stock', class: 'warning', progress: (stock / minStock) * 100 };
     return { label: 'In Stock', class: 'success', progress: Math.min(100, (stock / (minStock * 2)) * 100) };
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct({ ...product });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProduct) return;
+    try {
+      await updateProduct(editingProduct._id, {
+        name: editingProduct.name,
+        price: editingProduct.price,
+        inventory: {
+          stock: editingProduct.inventory?.stock || 0,
+          reorderPoint: editingProduct.inventory?.reorderPoint || 0,
+          supplier: editingProduct.inventory?.supplier || '',
+        },
+      });
+      setEditingProduct(null);
+      loadProducts();
+    } catch (error) {
+      console.error('상품 수정 실패:', error);
+      alert('상품 수정에 실패했습니다: ' + error.message);
+    }
+  };
+
+  const handleDelete = (product) => {
+    setDeleteConfirm(product);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteProduct(deleteConfirm._id);
+      setDeleteConfirm(null);
+      loadProducts();
+    } catch (error) {
+      console.error('상품 삭제 실패:', error);
+      alert('상품 삭제에 실패했습니다: ' + error.message);
+    }
   };
 
   return (
@@ -192,9 +234,22 @@ function InventoryPage() {
                         {stockStatus.label}
                       </span>
                     </div>
-                    <div>
-                      <button type="button" className="admin-button admin-button--icon">
-                        <MoreVertical size={18} />
+                    <div className="admin-table__cell-actions">
+                      <button 
+                        type="button" 
+                        className="admin-button admin-button--icon admin-button--edit"
+                        onClick={() => handleEdit(product)}
+                        title="Edit"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        type="button" 
+                        className="admin-button admin-button--icon admin-button--delete"
+                        onClick={() => handleDelete(product)}
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -204,6 +259,145 @@ function InventoryPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingProduct && (
+        <div className="admin-modal-overlay" onClick={() => setEditingProduct(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Edit Product</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setEditingProduct(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <div className="admin-form-group">
+                <label>Product Name</label>
+                <input 
+                  type="text" 
+                  value={editingProduct.name || ''} 
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>Price</label>
+                <input 
+                  type="number" 
+                  value={editingProduct.price || 0} 
+                  onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>Stock</label>
+                <input 
+                  type="number" 
+                  value={editingProduct.inventory?.stock || 0} 
+                  onChange={(e) => setEditingProduct({ 
+                    ...editingProduct, 
+                    inventory: { 
+                      ...editingProduct.inventory, 
+                      stock: Number(e.target.value) 
+                    } 
+                  })}
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>Reorder Point</label>
+                <input 
+                  type="number" 
+                  value={editingProduct.inventory?.reorderPoint || 0} 
+                  onChange={(e) => setEditingProduct({ 
+                    ...editingProduct, 
+                    inventory: { 
+                      ...editingProduct.inventory, 
+                      reorderPoint: Number(e.target.value) 
+                    } 
+                  })}
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>Supplier</label>
+                <input 
+                  type="text" 
+                  value={editingProduct.inventory?.supplier || ''} 
+                  onChange={(e) => setEditingProduct({ 
+                    ...editingProduct, 
+                    inventory: { 
+                      ...editingProduct.inventory, 
+                      supplier: e.target.value 
+                    } 
+                  })}
+                  className="admin-input"
+                />
+              </div>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setEditingProduct(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--primary"
+                onClick={handleSaveEdit}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="admin-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Delete Product</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p>Are you sure you want to delete "{deleteConfirm.name}"?</p>
+              <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

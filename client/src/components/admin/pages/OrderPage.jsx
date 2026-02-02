@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, Clock, CheckCircle, XCircle, Plus, Search, Filter, MoreVertical } from 'lucide-react';
-import { fetchOrders as fetchOrdersApi, updateOrder as updateOrderApi } from '../../../services/orderService';
+import { ShoppingCart, Clock, CheckCircle, XCircle, Plus, Search, Filter, MoreVertical, Edit, Trash2, X } from 'lucide-react';
+import { fetchOrders as fetchOrdersApi, updateOrder as updateOrderApi, deleteOrder as deleteOrderApi } from '../../../services/orderService';
 import './OrderPage.css';
 
 const ORDER_STATUSES = ['All Order', 'Pending', 'Processing', 'Out for Delivery', 'Delivered'];
@@ -18,6 +18,8 @@ function OrderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     loadOrders();
@@ -96,6 +98,41 @@ function OrderPage() {
   const getCustomerSegment = (user) => {
     // 간단한 로직: 주문 수에 따라 분류
     return 'New Customer'; // 실제로는 주문 이력 기반으로 계산
+  };
+
+  const handleEdit = (order) => {
+    setEditingOrder(order);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingOrder) return;
+    try {
+      await updateOrderApi(editingOrder._id, {
+        status: editingOrder.status,
+        notes: editingOrder.notes,
+      });
+      setEditingOrder(null);
+      loadOrders();
+    } catch (error) {
+      console.error('주문 수정 실패:', error);
+      alert('주문 수정에 실패했습니다: ' + error.message);
+    }
+  };
+
+  const handleDelete = (order) => {
+    setDeleteConfirm(order);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteOrderApi(deleteConfirm._id);
+      setDeleteConfirm(null);
+      loadOrders();
+    } catch (error) {
+      console.error('주문 삭제 실패:', error);
+      alert('주문 삭제에 실패했습니다: ' + error.message);
+    }
   };
 
   return (
@@ -198,15 +235,15 @@ function OrderPage() {
                   <div key={order._id} className="admin-table__row">
                     <div className="admin-table__cell-product">
                       <div className="admin-table__product-image">
-                        {order.items?.[0]?.product?.image ? (
-                          <img src={order.items[0].product.image} alt={order.items[0].product.name} />
+                        {order.items?.[0]?.product?.image || order.items?.[0]?.thumbnail ? (
+                          <img src={order.items[0].product?.image || order.items[0].thumbnail} alt={order.items[0].product?.name || order.items[0].name} />
                         ) : (
                           <div className="admin-table__product-placeholder">📦</div>
                         )}
                       </div>
                       <div>
                         <div className="admin-table__product-name">
-                          {order.items?.[0]?.product?.name || 'N/A'}
+                          {order.items?.[0]?.product?.name || order.items?.[0]?.name || 'N/A'}
                         </div>
                         <div className="admin-table__product-meta">
                           Items {order.items?.length || 0}
@@ -237,9 +274,22 @@ function OrderPage() {
                         {order.status || 'Pending'}
                       </span>
                     </div>
-                    <div>
-                      <button type="button" className="admin-button admin-button--icon">
-                        <MoreVertical size={18} />
+                    <div className="admin-table__cell-actions">
+                      <button 
+                        type="button" 
+                        className="admin-button admin-button--icon admin-button--edit"
+                        onClick={() => handleEdit(order)}
+                        title="Edit"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        type="button" 
+                        className="admin-button admin-button--icon admin-button--delete"
+                        onClick={() => handleDelete(order)}
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -285,6 +335,114 @@ function OrderPage() {
           </>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingOrder && (
+        <div className="admin-modal-overlay" onClick={() => setEditingOrder(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Edit Order</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setEditingOrder(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <div className="admin-form-group">
+                <label>Order Number</label>
+                <input 
+                  type="text" 
+                  value={editingOrder.orderNumber || ''} 
+                  disabled 
+                  className="admin-input"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label>Status</label>
+                <select 
+                  value={editingOrder.status || 'pending'} 
+                  onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value })}
+                  className="admin-input"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="fulfilled">Fulfilled</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
+              <div className="admin-form-group">
+                <label>Notes</label>
+                <textarea 
+                  value={editingOrder.notes || ''} 
+                  onChange={(e) => setEditingOrder({ ...editingOrder, notes: e.target.value })}
+                  className="admin-input"
+                  rows={4}
+                />
+              </div>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setEditingOrder(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--primary"
+                onClick={handleSaveEdit}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="admin-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Delete Order</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p>Are you sure you want to delete order #{deleteConfirm.orderNumber || deleteConfirm._id?.slice(-8)}?</p>
+              <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
