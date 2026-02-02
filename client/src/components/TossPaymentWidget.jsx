@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk';
 
-const TOSS_CLIENT_KEY = process.env.VITE_TOSS_CLIENT_KEY || 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm';
+const TOSS_CLIENT_KEY = process.env.VITE_TOSS_CLIENT_KEY;
+
+if (!TOSS_CLIENT_KEY) {
+  console.error('VITE_TOSS_CLIENT_KEY 환경변수가 설정되지 않았습니다. 토스페이먼츠 결제를 사용할 수 없습니다.');
+}
 
 function TossPaymentWidget({
   amount,
@@ -35,6 +39,18 @@ function TossPaymentWidget({
 
     async function initTossPayments() {
       try {
+        // 환경변수 확인
+        if (!TOSS_CLIENT_KEY) {
+          const errorMsg = '토스페이먼츠 클라이언트 키가 설정되지 않았습니다. VITE_TOSS_CLIENT_KEY 환경변수를 확인해주세요.';
+          console.error(errorMsg);
+          if (isMounted) {
+            setIsReady(false);
+            isInitializedRef.current = true;
+            onPaymentError?.(new Error(errorMsg));
+          }
+          return;
+        }
+
         // DOM 요소가 준비될 때까지 대기
         const checkDOMReady = () => {
           const paymentMethodEl = document.getElementById('payment-method');
