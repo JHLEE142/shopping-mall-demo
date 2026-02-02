@@ -181,18 +181,68 @@ function TossPaymentWidget({
       // 위젯이 결제 수단 선택 상태를 완전히 인식할 수 있도록 약간의 지연
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // 결제 수단이 선택되었을 때만 requestPayment 호출
-      // 토스페이먼츠가 paymentKey와 orderId를 자동으로 추가하므로 successUrl에는 view만 포함
-      // amount는 sessionStorage에 저장하여 PaymentSuccessPage에서 사용
-      await widgets.requestPayment({
-        orderId,
-        orderName,
-        successUrl: `${window.location.origin}?view=payment-success`,
-        failUrl: `${window.location.origin}?view=payment-fail`,
-        customerEmail: customerEmail || 'customer@example.com',
-        customerName: customerName || '고객',
-        customerMobilePhone: customerPhone || '01012345678',
-      });
+      // 브라우저 뒤로가기 이벤트 처리 (결제 팝업이 열려있는 동안)
+      let popstateHandler = null;
+      let isPaymentPopupOpen = true;
+      let paymentStatePushed = false;
+
+      // popstate 이벤트 리스너 추가 (팝업이 열려있는 동안 브라우저 뒤로가기 감지)
+      popstateHandler = (event) => {
+        if (isPaymentPopupOpen && paymentStatePushed) {
+          // 팝업이 열려있는 동안 뒤로가기를 감지하면 결제 취소 처리
+          isPaymentPopupOpen = false;
+          paymentStatePushed = false;
+          setIsLoading(false);
+          
+          // history를 다시 앞으로 이동 (뒤로가기 취소)
+          window.history.pushState({ paymentPopup: true }, '', window.location.href);
+          
+          const cancelError = new Error('결제가 취소되었습니다.');
+          onPaymentError?.(cancelError);
+          
+          // 이벤트 리스너 제거
+          window.removeEventListener('popstate', popstateHandler);
+        }
+      };
+
+      // history에 항목 추가하여 popstate 이벤트가 발생하도록 함
+      window.history.pushState({ paymentPopup: true }, '', window.location.href);
+      paymentStatePushed = true;
+      window.addEventListener('popstate', popstateHandler);
+
+      try {
+        // 결제 수단이 선택되었을 때만 requestPayment 호출
+        // 토스페이먼츠가 paymentKey와 orderId를 자동으로 추가하므로 successUrl에는 view만 포함
+        // amount는 sessionStorage에 저장하여 PaymentSuccessPage에서 사용
+        await widgets.requestPayment({
+          orderId,
+          orderName,
+          successUrl: `${window.location.origin}?view=payment-success`,
+          failUrl: `${window.location.origin}?view=payment-fail`,
+          customerEmail: customerEmail || 'customer@example.com',
+          customerName: customerName || '고객',
+          customerMobilePhone: customerPhone || '01012345678',
+        });
+        
+        // 결제 성공 시 팝업이 닫힘
+        isPaymentPopupOpen = false;
+        paymentStatePushed = false;
+        window.removeEventListener('popstate', popstateHandler);
+        // history에서 추가한 항목 제거
+        if (window.history.state?.paymentPopup) {
+          window.history.back();
+        }
+      } catch (paymentError) {
+        // 결제 실패/취소 시 팝업이 닫힘
+        isPaymentPopupOpen = false;
+        paymentStatePushed = false;
+        window.removeEventListener('popstate', popstateHandler);
+        // history에서 추가한 항목 제거
+        if (window.history.state?.paymentPopup) {
+          window.history.back();
+        }
+        throw paymentError;
+      }
     } catch (error) {
       console.error('●▶결제 요청 실패 :', error);
       setIsLoading(false);
@@ -207,6 +257,14 @@ function TossPaymentWidget({
           errorMessage.includes('payment method') ||
           errorMessage.includes('선택되지 않았어요')) {
         errorMessage = '결제 수단을 선택해주세요. 위젯에서 결제 수단을 먼저 선택한 후 결제하기 버튼을 클릭해주세요.';
+      }
+      
+      // 취소 관련 에러 메시지 처리
+      if (errorMessage.includes('취소') || 
+          errorMessage.includes('cancel') ||
+          errorMessage.includes('사용자가 결제를 취소') ||
+          errorMessage.includes('USER_CANCEL')) {
+        errorMessage = '결제가 취소되었습니다.';
       }
       
       // 에러 객체가 아닌 경우 Error 객체로 변환
