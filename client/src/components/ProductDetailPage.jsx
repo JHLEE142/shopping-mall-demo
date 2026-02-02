@@ -285,7 +285,6 @@ function ProductDetailPage({
   const [reviewSearchTerm, setReviewSearchTerm] = useState('');
   const [reviewSort, setReviewSort] = useState('평점');
   const [reviewGender, setReviewGender] = useState('성별');
-  const [newsletterEmail, setNewsletterEmail] = useState('');
   
   // 상품 문의 관련 상태
   const [inquiries, setInquiries] = useState([]);
@@ -2044,32 +2043,6 @@ function ProductDetailPage({
                 <p>추천 상품이 없습니다.</p>
               </div>
             )}
-          </section>
-
-          <section className="product-newsletter">
-            <div className="product-newsletter__content">
-          <h2>코로라 뉴스레터 구독 신청</h2>
-          <p>코로라 신제품, 스웻라이프 컨텐츠 및 이벤트 소식을 제일 먼저 받아보세요. 구독은 언제든지 취소할 수 있어요.</p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!newsletterEmail.trim()) {
-                    alert('이메일을 입력해주세요.');
-                    return;
-                  }
-                  alert('뉴스레터 구독이 접수되었습니다.');
-                  setNewsletterEmail('');
-                }}
-              >
-                <input
-                  type="email"
-                  placeholder="이메일 주소를 입력하세요"
-                  value={newsletterEmail}
-                  onChange={(e) => setNewsletterEmail(e.target.value)}
-                />
-                <button type="submit">구독 신청하기</button>
-              </form>
-          </div>
           </section>
         </>
       )}
