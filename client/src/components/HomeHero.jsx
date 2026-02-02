@@ -217,14 +217,16 @@ function HomeHero({
     }
   }, [initialPage, currentPage]);
 
-  // 카테고리 목록 로드
+  // 카테고리 목록 로드 (등록된 상품의 카테고리만 표시)
   useEffect(() => {
     async function loadCategories() {
       try {
         setCategoriesLoading(true);
         const data = await fetchCategories({ includeProductCount: true });
-        // console.log('카테고리 로드 성공:', data?.length || 0, '개');
-        setCategories(data || []);
+        // 상품이 있는 카테고리만 필터링
+        const categoriesWithProducts = (data || []).filter(cat => (cat.productCount || 0) > 0);
+        // console.log('카테고리 로드 성공:', categoriesWithProducts?.length || 0, '개');
+        setCategories(categoriesWithProducts || []);
       } catch (error) {
         console.error('카테고리 로드 실패:', error.message);
         // 에러가 발생해도 빈 배열로 설정하여 UI가 깨지지 않도록 함

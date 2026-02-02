@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LogOut, UserRound, ChevronDown, Bell, Heart, Settings } from 'lucide-react';
 import SessionTimer from './SessionTimer';
-import { fetchCategoryHierarchy } from '../services/categoryService';
+import { fetchCategories } from '../services/categoryService';
 import { getUnreviewedProducts } from '../services/reviewService';
 import LogoImage from '../assets/고귀몰_로고_홈버튼_수정.png';
 
@@ -40,16 +40,17 @@ function MainNavbar({
   const notificationRef = useRef(null);
   const isAdmin = user?.user_type === 'admin';
 
-  // 카테고리 목록 로드 (대분류만 표시)
+  // 카테고리 목록 로드 (등록된 상품의 카테고리만 표시)
   useEffect(() => {
     async function loadCategories() {
       try {
         setCategoriesLoading(true);
-        const hierarchy = await fetchCategoryHierarchy(false);
-        // 계층 구조에서 대분류(level 1)만 추출
-        const mainCategories = hierarchy.filter(cat => cat.level === 1);
-        // console.log('대분류 카테고리 로드 성공:', mainCategories?.length || 0, '개');
-        setCategories(mainCategories || []);
+        // 등록된 상품의 카테고리만 조회 (상품 데이터 기반)
+        const categories = await fetchCategories({ includeProductCount: true });
+        // 상품이 있는 카테고리만 필터링
+        const categoriesWithProducts = categories.filter(cat => (cat.productCount || 0) > 0);
+        // console.log('카테고리 로드 성공:', categoriesWithProducts?.length || 0, '개');
+        setCategories(categoriesWithProducts || []);
       } catch (error) {
         console.error('카테고리 로드 실패:', error.message);
         // 에러가 발생해도 빈 배열로 설정하여 UI가 깨지지 않도록 함

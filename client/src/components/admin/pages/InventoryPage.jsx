@@ -17,6 +17,9 @@ function InventoryPage({ onAddProduct }) {
   const [searchInput, setSearchInput] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -129,10 +132,81 @@ function InventoryPage({ onAddProduct }) {
     try {
       await deleteProduct(deleteConfirm._id);
       setDeleteConfirm(null);
+      setSelectedProducts(new Set());
       loadProducts();
     } catch (error) {
       console.error('상품 삭제 실패:', error);
       alert('상품 삭제에 실패했습니다: ' + error.message);
+    }
+  };
+
+  const handleSelectProduct = (productId) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedProducts.size === products.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(products.map(p => p._id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.size === 0) return;
+    
+    try {
+      const deletePromises = Array.from(selectedProducts).map(productId => 
+        deleteProduct(productId).catch(err => {
+          console.error(`상품 ${productId} 삭제 실패:`, err);
+          return null;
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      setSelectedProducts(new Set());
+      setBulkDeleteConfirm(false);
+      loadProducts();
+    } catch (error) {
+      console.error('다수 상품 삭제 실패:', error);
+      alert('일부 상품 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      // 모든 상품 ID 가져오기
+      const allProducts = await fetchProducts(1, 10000);
+      const allProductIds = (allProducts.items || allProducts.products || []).map(p => p._id);
+      
+      if (allProductIds.length === 0) {
+        alert('삭제할 상품이 없습니다.');
+        setDeleteAllConfirm(false);
+        return;
+      }
+
+      // 모든 상품 삭제
+      const deletePromises = allProductIds.map(productId => 
+        deleteProduct(productId).catch(err => {
+          console.error(`상품 ${productId} 삭제 실패:`, err);
+          return null;
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      setSelectedProducts(new Set());
+      setDeleteAllConfirm(false);
+      loadProducts();
+      alert('모든 상품이 삭제되었습니다.');
+    } catch (error) {
+      console.error('전체 상품 삭제 실패:', error);
+      alert('전체 상품 삭제에 실패했습니다: ' + error.message);
     }
   };
 
@@ -178,6 +252,26 @@ function InventoryPage({ onAddProduct }) {
             <button type="button" className="admin-button admin-button--icon">
               <MoreVertical size={18} />
             </button>
+            {selectedProducts.size > 0 && (
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={() => setBulkDeleteConfirm(true)}
+                style={{ marginRight: '0.5rem' }}
+              >
+                <Trash2 size={18} />
+                선택 삭제 ({selectedProducts.size})
+              </button>
+            )}
+            <button 
+              type="button" 
+              className="admin-button admin-button--danger"
+              onClick={() => setDeleteAllConfirm(true)}
+              style={{ marginRight: '0.5rem' }}
+            >
+              <Trash2 size={18} />
+              모두 삭제
+            </button>
             {onAddProduct && (
               <button 
                 type="button" 
@@ -206,6 +300,14 @@ function InventoryPage({ onAddProduct }) {
         ) : (
           <div className="admin-table admin-table--inventory">
             <div className="admin-table__header">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={selectedProducts.size === products.length && products.length > 0}
+                  onChange={handleSelectAll}
+                  className="admin-checkbox"
+                />
+              </span>
               <span>Product Name</span>
               <span>Category</span>
               <span>Stock Level</span>
@@ -219,6 +321,14 @@ function InventoryPage({ onAddProduct }) {
                 const stockStatus = getStockStatus(product);
                 return (
                   <div key={product._id} className="admin-table__row">
+                    <div>
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product._id)}
+                        onChange={() => handleSelectProduct(product._id)}
+                        className="admin-checkbox"
+                      />
+                    </div>
                     <div className="admin-table__cell-product">
                       <div className="admin-table__product-image">
                         {product.image ? (
@@ -408,6 +518,89 @@ function InventoryPage({ onAddProduct }) {
                 onClick={confirmDelete}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="admin-modal-overlay" onClick={() => setBulkDeleteConfirm(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Delete Multiple Products</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setBulkDeleteConfirm(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p>Are you sure you want to delete {selectedProducts.size} selected product(s)?</p>
+              <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setBulkDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={handleBulkDelete}
+              >
+                Delete {selectedProducts.size} Product(s)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {deleteAllConfirm && (
+        <div className="admin-modal-overlay" onClick={() => setDeleteAllConfirm(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Delete All Products</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setDeleteAllConfirm(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p style={{ color: '#dc3545', fontWeight: 'bold', marginBottom: '1rem' }}>
+                ⚠️ 경고: 모든 상품을 삭제하시겠습니까?
+              </p>
+              <p>이 작업은 되돌릴 수 없습니다. 모든 상품 데이터가 영구적으로 삭제됩니다.</p>
+              <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                현재 등록된 모든 상품이 삭제됩니다.
+              </p>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setDeleteAllConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={handleDeleteAll}
+              >
+                Delete All Products
               </button>
             </div>
           </div>
