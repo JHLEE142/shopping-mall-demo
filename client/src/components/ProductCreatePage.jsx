@@ -343,7 +343,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
   const uploadToCloudinary = async (file, onProgress) => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      throw new Error('Cloudinary 설정이 없습니다. 환경 변수를 확인해주세요.');
+      const missingVars = [];
+      if (!CLOUD_NAME) missingVars.push('VITE_CLOUDINARY_CLOUD_NAME');
+      if (!UPLOAD_PRESET) missingVars.push('VITE_CLOUDINARY_UPLOAD_PRESET');
+      throw new Error(`Cloudinary 설정이 없습니다. 다음 환경 변수를 확인해주세요: ${missingVars.join(', ')}`);
+    }
+
+    // 환경 변수 값 확인 (디버깅용)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Cloudinary 설정 확인:', {
+        cloudName: CLOUD_NAME ? `${CLOUD_NAME.substring(0, 4)}...` : '없음',
+        uploadPreset: UPLOAD_PRESET ? `${UPLOAD_PRESET.substring(0, 4)}...` : '없음',
+      });
     }
 
     const formData = new FormData();
@@ -362,15 +373,48 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response.secure_url);
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.secure_url);
+          } catch (parseError) {
+            console.error('Cloudinary 응답 파싱 오류:', parseError);
+            reject(new Error('서버 응답을 처리할 수 없습니다.'));
+          }
         } else {
-          reject(new Error('이미지 업로드에 실패했습니다.'));
+          // Cloudinary 오류 응답 파싱
+          let errorMessage = '이미지 업로드에 실패했습니다.';
+          try {
+            const errorResponse = JSON.parse(xhr.responseText);
+            if (errorResponse.error) {
+              errorMessage = errorResponse.error.message || errorResponse.error;
+            } else if (xhr.status === 401) {
+              errorMessage = '인증 실패: Cloudinary 업로드 프리셋을 확인해주세요. (Unsigned 프리셋이어야 합니다)';
+            } else if (xhr.status === 400) {
+              errorMessage = '잘못된 요청: 파일 형식이나 크기를 확인해주세요.';
+            } else if (xhr.status === 404) {
+              errorMessage = 'Cloudinary 클라우드 이름을 확인해주세요.';
+            }
+          } catch (parseError) {
+            // JSON 파싱 실패 시 상태 코드 기반 메시지
+            if (xhr.status === 401) {
+              errorMessage = '인증 실패: Cloudinary 업로드 프리셋을 확인해주세요. (Unsigned 프리셋이어야 합니다)';
+            } else if (xhr.status === 400) {
+              errorMessage = '잘못된 요청입니다.';
+            } else if (xhr.status === 404) {
+              errorMessage = 'Cloudinary 클라우드 이름을 확인해주세요.';
+            }
+          }
+          console.error('Cloudinary 업로드 실패:', {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            response: xhr.responseText,
+          });
+          reject(new Error(errorMessage));
         }
       });
 
       xhr.addEventListener('error', () => {
-        reject(new Error('네트워크 오류가 발생했습니다.'));
+        reject(new Error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.'));
       });
 
       xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
@@ -499,7 +543,10 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
   const uploadDescriptionImageToCloudinary = async (file) => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      throw new Error('Cloudinary 설정이 없습니다. 환경 변수를 확인해주세요.');
+      const missingVars = [];
+      if (!CLOUD_NAME) missingVars.push('VITE_CLOUDINARY_CLOUD_NAME');
+      if (!UPLOAD_PRESET) missingVars.push('VITE_CLOUDINARY_UPLOAD_PRESET');
+      throw new Error(`Cloudinary 설정이 없습니다. 다음 환경 변수를 확인해주세요: ${missingVars.join(', ')}`);
     }
 
     const formData = new FormData();
@@ -518,15 +565,48 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
 
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response.secure_url);
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.secure_url);
+          } catch (parseError) {
+            console.error('Cloudinary 응답 파싱 오류:', parseError);
+            reject(new Error('서버 응답을 처리할 수 없습니다.'));
+          }
         } else {
-          reject(new Error('이미지 업로드에 실패했습니다.'));
+          // Cloudinary 오류 응답 파싱
+          let errorMessage = '이미지 업로드에 실패했습니다.';
+          try {
+            const errorResponse = JSON.parse(xhr.responseText);
+            if (errorResponse.error) {
+              errorMessage = errorResponse.error.message || errorResponse.error;
+            } else if (xhr.status === 401) {
+              errorMessage = '인증 실패: Cloudinary 업로드 프리셋을 확인해주세요. (Unsigned 프리셋이어야 합니다)';
+            } else if (xhr.status === 400) {
+              errorMessage = '잘못된 요청: 파일 형식이나 크기를 확인해주세요.';
+            } else if (xhr.status === 404) {
+              errorMessage = 'Cloudinary 클라우드 이름을 확인해주세요.';
+            }
+          } catch (parseError) {
+            // JSON 파싱 실패 시 상태 코드 기반 메시지
+            if (xhr.status === 401) {
+              errorMessage = '인증 실패: Cloudinary 업로드 프리셋을 확인해주세요. (Unsigned 프리셋이어야 합니다)';
+            } else if (xhr.status === 400) {
+              errorMessage = '잘못된 요청입니다.';
+            } else if (xhr.status === 404) {
+              errorMessage = 'Cloudinary 클라우드 이름을 확인해주세요.';
+            }
+          }
+          console.error('Cloudinary 업로드 실패:', {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            response: xhr.responseText,
+          });
+          reject(new Error(errorMessage));
         }
       });
 
       xhr.addEventListener('error', () => {
-        reject(new Error('네트워크 오류가 발생했습니다.'));
+        reject(new Error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.'));
       });
 
       xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);

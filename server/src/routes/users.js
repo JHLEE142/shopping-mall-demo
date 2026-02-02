@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const dotenv = require('dotenv');
+const authenticate = require('../middleware/authMiddleware');
 const {
   createUser,
   getUsers,
@@ -20,11 +21,11 @@ router.post('/google-login', googleLogin);
 
 router.get('/', getUsers);
 
-router.get('/:id', getUserById);
+router.get('/:id', authenticate, getUserById);
 
-router.put('/:id', updateUser);
+router.put('/:id', authenticate, updateUser);
 
-router.delete('/:id', deleteUser);
+router.delete('/:id', authenticate, deleteUser);
 
 module.exports = router;
 

@@ -133,8 +133,13 @@ async function getUsers(req, res, next) {
 
 async function getUserById(req, res, next) {
   try {
-    const userId = req.user?._id || req.user?.id;
-    const isAdmin = req.user?.user_type === 'admin';
+    // 인증 미들웨어를 통해 req.user가 설정되어 있어야 함
+    if (!req.user) {
+      return res.status(401).json({ message: '인증이 필요합니다.' });
+    }
+    
+    const userId = req.user._id || req.user.id;
+    const isAdmin = req.user.user_type === 'admin';
     
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -142,7 +147,7 @@ async function getUserById(req, res, next) {
     }
     
     // 관리자는 모든 사용자 조회 가능, 일반 사용자는 본인만 조회 가능
-    if (!isAdmin && user._id.toString() !== userId?.toString()) {
+    if (!isAdmin && user._id.toString() !== userId.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
