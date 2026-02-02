@@ -113,7 +113,7 @@
 
 .admin-table--orders .admin-table__header {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr 1.5fr 1fr 80px;
+  grid-template-columns: 40px 2fr 1.5fr 1fr 1.5fr 1fr 80px;
   padding: 1rem;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
@@ -124,7 +124,7 @@
 
 .admin-table--orders .admin-table__row {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr 1.5fr 1fr 80px;
+  grid-template-columns: 40px 2fr 1.5fr 1fr 1.5fr 1fr 80px;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
   align-items: center;
@@ -366,7 +366,7 @@
 @media (max-width: 1024px) {
   .admin-table--orders .admin-table__header,
   .admin-table--orders .admin-table__row {
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: 40px 2fr 1fr 1fr 1fr;
   }
 
   .admin-table__cell-product,
@@ -501,5 +501,37 @@
 
 .admin-button--delete:hover {
   background: #fee2e2;
+}
+
+.admin-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #111827;
+}
+
+.admin-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.admin-select:focus {
+  outline: none;
+  border-color: #111827;
+}
+
+.admin-button--danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.admin-button--danger:hover {
+  background: #b91c1c;
 }
 

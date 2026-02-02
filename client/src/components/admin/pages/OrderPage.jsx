@@ -4,6 +4,7 @@ import { fetchOrders as fetchOrdersApi, updateOrder as updateOrderApi, deleteOrd
 import './OrderPage.css';
 
 const ORDER_STATUSES = ['All Order', 'Pending', 'Processing', 'Out for Delivery', 'Delivered'];
+const PAGE_SIZES = [10, 30, 50, 100];
 
 function OrderPage() {
   const [orders, setOrders] = useState([]);
@@ -17,18 +18,32 @@ function OrderPage() {
   const [statusFilter, setStatusFilter] = useState('All Order');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
   const [editingOrder, setEditingOrder] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedOrders, setSelectedOrders] = useState(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
     loadOrders();
-  }, [page, statusFilter, searchQuery]);
+  }, [page, statusFilter, searchQuery, pageSize]);
+
+  // 검색어 debounce 처리
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setPage(1); // 검색 시 첫 페이지로 리셋
+    }, 500); // 500ms 후 검색 실행
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const params = { page, limit: 10 };
+      const params = { page, limit: pageSize };
       if (statusFilter !== 'All Order') {
         params.status = statusFilter.toLowerCase();
       }
@@ -128,10 +143,50 @@ function OrderPage() {
     try {
       await deleteOrderApi(deleteConfirm._id);
       setDeleteConfirm(null);
+      setSelectedOrders(new Set());
       loadOrders();
     } catch (error) {
       console.error('주문 삭제 실패:', error);
       alert('주문 삭제에 실패했습니다: ' + error.message);
+    }
+  };
+
+  const handleSelectOrder = (orderId) => {
+    const newSelected = new Set(selectedOrders);
+    if (newSelected.has(orderId)) {
+      newSelected.delete(orderId);
+    } else {
+      newSelected.add(orderId);
+    }
+    setSelectedOrders(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedOrders.size === orders.length) {
+      setSelectedOrders(new Set());
+    } else {
+      setSelectedOrders(new Set(orders.map(o => o._id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedOrders.size === 0) return;
+    
+    try {
+      const deletePromises = Array.from(selectedOrders).map(orderId => 
+        deleteOrderApi(orderId).catch(err => {
+          console.error(`주문 ${orderId} 삭제 실패:`, err);
+          return null;
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      setSelectedOrders(new Set());
+      setBulkDeleteConfirm(false);
+      loadOrders();
+    } catch (error) {
+      console.error('다수 주문 삭제 실패:', error);
+      alert('일부 주문 삭제에 실패했습니다.');
     }
   };
 
@@ -195,10 +250,32 @@ function OrderPage() {
               <input
                 type="text"
                 placeholder="Search orders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
+            <select 
+              className="admin-select"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZES.map(size => (
+                <option key={size} value={size}>{size} per page</option>
+              ))}
+            </select>
+            {selectedOrders.size > 0 && (
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={() => setBulkDeleteConfirm(true)}
+              >
+                <Trash2 size={18} />
+                Delete Selected ({selectedOrders.size})
+              </button>
+            )}
             <button type="button" className="admin-button admin-button--icon">
               <Filter size={18} />
             </button>
@@ -223,6 +300,14 @@ function OrderPage() {
           <>
             <div className="admin-table admin-table--orders">
               <div className="admin-table__header">
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={selectedOrders.size === orders.length && orders.length > 0}
+                    onChange={handleSelectAll}
+                    className="admin-checkbox"
+                  />
+                </span>
                 <span>Product Name</span>
                 <span>Customer Name</span>
                 <span>Order Id</span>
@@ -233,6 +318,14 @@ function OrderPage() {
               <div className="admin-table__body">
                 {orders.map((order) => (
                   <div key={order._id} className="admin-table__row">
+                    <div>
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.has(order._id)}
+                        onChange={() => handleSelectOrder(order._id)}
+                        className="admin-checkbox"
+                      />
+                    </div>
                     <div className="admin-table__cell-product">
                       <div className="admin-table__product-image">
                         {order.items?.[0]?.product?.image || order.items?.[0]?.thumbnail ? (
@@ -438,6 +531,46 @@ function OrderPage() {
                 onClick={confirmDelete}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteConfirm && (
+        <div className="admin-modal-overlay" onClick={() => setBulkDeleteConfirm(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal__header">
+              <h3>Delete Multiple Orders</h3>
+              <button 
+                type="button" 
+                className="admin-button admin-button--icon"
+                onClick={() => setBulkDeleteConfirm(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p>Are you sure you want to delete {selectedOrders.size} selected order(s)?</p>
+              <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="admin-modal__footer">
+              <button 
+                type="button" 
+                className="admin-button"
+                onClick={() => setBulkDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="admin-button admin-button--danger"
+                onClick={handleBulkDelete}
+              >
+                Delete {selectedOrders.size} Order(s)
               </button>
             </div>
           </div>

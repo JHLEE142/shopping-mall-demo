@@ -206,16 +206,26 @@ function normalizeString(value = '') {
 }
 
 async function generateUniqueOrderNumber() {
+  // 간단한 형식: YYYYMMDD + 4자리 랜덤 숫자
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
   let uniqueNumber = '';
   let exists = true;
+  let attempts = 0;
+  const maxAttempts = 10;
 
-  while (exists) {
-    const randomPart = Math.floor(100000 + Math.random() * 900000);
-    uniqueNumber = `${datePart}-${randomPart}`;
+  while (exists && attempts < maxAttempts) {
+    const randomPart = Math.floor(1000 + Math.random() * 9000); // 4자리 랜덤 숫자
+    uniqueNumber = `${datePart}${randomPart}`;
     // eslint-disable-next-line no-await-in-loop
     exists = await Order.exists({ orderNumber: uniqueNumber });
+    attempts++;
+  }
+
+  // 최대 시도 횟수 초과 시 타임스탬프 추가
+  if (exists) {
+    const timestamp = Date.now().toString().slice(-6);
+    uniqueNumber = `${datePart}${timestamp}`;
   }
 
   return uniqueNumber;
@@ -797,7 +807,7 @@ async function createOrder(req, res, next) {
 
 async function listOrders(req, res, next) {
   try {
-    const { status, userId } = req.query;
+    const { status, userId, search } = req.query;
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
     const skip = (page - 1) * limit;
@@ -816,10 +826,65 @@ async function listOrders(req, res, next) {
       filter.user = req.user._id;
     }
 
-    const [orders, totalItems] = await Promise.all([
-      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('user', 'name email user_type'),
-      Order.countDocuments(filter),
-    ]);
+    // 검색 기능: 주문번호, 고객 이름, 이메일, 상품 이름으로 검색
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchConditions = [
+        { orderNumber: searchRegex },
+      ];
+
+      // 사용자 정보로 검색하기 위해 populate 후 필터링하거나, 별도 쿼리 필요
+      // 여기서는 간단하게 orderNumber로만 검색하고, 나중에 클라이언트에서 필터링
+      filter.$or = searchConditions;
+    }
+
+    let orders;
+    let totalItems;
+
+    // 검색이 있는 경우 더 복잡한 쿼리 필요
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      
+      // 주문번호로 검색
+      const orderNumberFilter = { ...filter, orderNumber: searchRegex };
+      
+      // 사용자 이름/이메일로 검색하기 위해 먼저 사용자 찾기
+      const User = require('../models/user');
+      const matchingUsers = await User.find({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+        ],
+      }).select('_id').lean();
+      const userIds = matchingUsers.map(u => u._id);
+      
+      // 상품 이름으로 검색하기 위해 먼저 상품 찾기
+      const Product = require('../models/product');
+      const matchingProducts = await Product.find({
+        name: searchRegex,
+      }).select('_id').lean();
+      const productIds = matchingProducts.map(p => p._id);
+      
+      // 종합 검색 조건
+      const searchFilter = {
+        ...filter,
+        $or: [
+          { orderNumber: searchRegex },
+          ...(userIds.length > 0 ? [{ user: { $in: userIds } }] : []),
+          ...(productIds.length > 0 ? [{ 'items.product': { $in: productIds } }] : []),
+        ],
+      };
+      
+      [orders, totalItems] = await Promise.all([
+        Order.find(searchFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('user', 'name email user_type'),
+        Order.countDocuments(searchFilter),
+      ]);
+    } else {
+      [orders, totalItems] = await Promise.all([
+        Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate('user', 'name email user_type'),
+        Order.countDocuments(filter),
+      ]);
+    }
 
     // items의 product populate
     const items = await Promise.all(
@@ -1108,6 +1173,44 @@ async function updateOrder(req, res, next) {
   }
 }
 
+// 실제 주문 삭제 (관리자 전용)
+async function deleteOrder(req, res, next) {
+  try {
+    const isAdmin = req.user && req.user.user_type === 'admin';
+    if (!isAdmin) {
+      return res.status(403).json({ message: '주문을 삭제할 권한이 없습니다. 관리자만 가능합니다.' });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
+    }
+
+    // 주문 삭제 전 재고 복구
+    for (const item of order.items) {
+      if (item.product) {
+        const product = await Product.findById(item.product);
+        if (product && product.inventory) {
+          await Product.findByIdAndUpdate(
+            item.product,
+            {
+              $inc: { 'inventory.reserved': -item.quantity },
+              'inventory.updatedAt': new Date(),
+            }
+          );
+        }
+      }
+    }
+
+    await Order.findByIdAndDelete(req.params.id);
+
+    return res.json({ message: '주문이 삭제되었습니다.', orderId: req.params.id });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function cancelOrder(req, res, next) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -1120,7 +1223,9 @@ async function cancelOrder(req, res, next) {
       return res.status(404).json({ message: '주문을 찾을 수 없습니다.' });
     }
 
-    if (!canAccessOrder(req.user, order)) {
+    // 관리자는 모든 주문 취소 가능
+    const isAdmin = req.user && req.user.user_type === 'admin';
+    if (!isAdmin && !canAccessOrder(req.user, order)) {
       await session.abortTransaction();
       return res.status(403).json({ message: '이 주문을 취소할 권한이 없습니다.' });
     }
@@ -1304,6 +1409,7 @@ module.exports = {
   getOrderById,
   updateOrder,
   cancelOrder,
+  deleteOrder,
   lookupGuestOrder,
   cancelPortOnePayment, // 환불 처리를 위해 export
 };

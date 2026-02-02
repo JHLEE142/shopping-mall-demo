@@ -14,6 +14,7 @@ function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All Products');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -21,10 +22,20 @@ function InventoryPage() {
     loadProducts();
   }, [statusFilter, searchQuery]);
 
+  // 검색어 debounce 처리
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 500); // 500ms 후 검색 실행
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await fetchProducts(1, 100);
+      // 검색어를 백엔드 API에 전달
+      const data = await fetchProducts(1, 100, null, searchQuery || null);
       // API 응답 형식: { page, limit, totalItems, totalPages, items }
       let filtered = data.items || data.products || [];
 
@@ -37,13 +48,6 @@ function InventoryPage() {
           if (statusFilter === 'Out Of Stock') return stock === 0;
           return true;
         });
-      }
-
-      if (searchQuery) {
-        filtered = filtered.filter(p =>
-          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.category?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
       }
 
       setProducts(filtered);
@@ -164,8 +168,8 @@ function InventoryPage() {
               <input
                 type="text"
                 placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
             <button type="button" className="admin-button admin-button--icon">
