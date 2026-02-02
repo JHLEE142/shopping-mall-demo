@@ -13,8 +13,47 @@ function InquiriesPage() {
   const [answering, setAnswering] = useState(false);
 
   useEffect(() => {
+    // URL 파라미터에서 inquiryId와 inquiryType 확인
+    const params = new URLSearchParams(window.location.search);
+    const inquiryId = params.get('inquiryId');
+    const urlInquiryType = params.get('inquiryType');
+    
+    if (urlInquiryType) {
+      // inquiryType이 URL에 있으면 설정
+      if (urlInquiryType === 'product' || urlInquiryType === 'one-on-one') {
+        setInquiryType(urlInquiryType);
+      }
+    }
+    
+    // inquiryType 설정 후 문의 목록 로드
+    loadInquiries();
+  }, []);
+
+  useEffect(() => {
+    // inquiryType이 변경되면 문의 목록 다시 로드
     loadInquiries();
   }, [inquiryType]);
+
+  // 문의 목록이 로드된 후 URL 파라미터의 inquiryId로 문의 열기
+  useEffect(() => {
+    if (inquiries.length === 0) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const inquiryId = params.get('inquiryId');
+    
+    if (inquiryId) {
+      // 해당 문의 찾기
+      const inquiry = inquiries.find(i => i._id === inquiryId);
+      if (inquiry) {
+        setSelectedInquiry(inquiry);
+        // URL에서 inquiryId 제거 (한 번만 열기)
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('inquiryId');
+        newUrl.searchParams.delete('inquiryType');
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [inquiries]);
 
   const loadInquiries = async () => {
     try {
@@ -160,7 +199,16 @@ function InquiriesPage() {
                     {inquiryType === 'one-on-one' ? (
                       <>
                         <span>{inquiry.type || '일반'}</span>
-                        <span className="admin-table__inquiry-preview">
+                        <span 
+                          className="admin-table__inquiry-preview"
+                          style={{ 
+                            cursor: 'pointer', 
+                            color: '#6366f1',
+                            textDecoration: 'underline',
+                          }}
+                          onClick={() => setSelectedInquiry(inquiry)}
+                          title="클릭하여 상세보기"
+                        >
                           {inquiry.title || (inquiry.content ? (inquiry.content.length > 50 ? inquiry.content.substring(0, 50) + '...' : inquiry.content) : '-')}
                         </span>
                       </>
@@ -172,7 +220,16 @@ function InquiriesPage() {
                           )}
                           <span>{inquiry.productId?.name || inquiry.product?.name || '-'}</span>
                         </div>
-                        <span className="admin-table__inquiry-preview">
+                        <span 
+                          className="admin-table__inquiry-preview"
+                          style={{ 
+                            cursor: 'pointer', 
+                            color: '#6366f1',
+                            textDecoration: 'underline',
+                          }}
+                          onClick={() => setSelectedInquiry(inquiry)}
+                          title="클릭하여 상세보기"
+                        >
                           {inquiry.question ? (inquiry.question.length > 100 ? inquiry.question.substring(0, 100) + '...' : inquiry.question) : '-'}
                         </span>
                       </>

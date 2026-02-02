@@ -15,6 +15,7 @@ function AdminDashboard({
   user,
   onNavigateToStore,
   onLogout,
+  onAddProduct,
   initialNav = 'Dashboard',
   isLoggingOut = false,
 }) {
@@ -36,7 +37,7 @@ function AdminDashboard({
       case 'Order':
         return <OrderPage />;
       case 'Inventory':
-        return <InventoryPage />;
+        return <InventoryPage onAddProduct={onAddProduct} />;
       case 'Customers':
         return <CustomersPage />;
       case 'Report & Analytics':

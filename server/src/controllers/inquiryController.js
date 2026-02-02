@@ -1,6 +1,7 @@
 const Inquiry = require('../models/inquiry');
 const Order = require('../models/order');
 const Product = require('../models/product');
+const User = require('../models/user');
 
 /**
  * 1:1 문의 목록 조회 (사용자용)
@@ -185,7 +186,13 @@ async function createInquiry(req, res, next) {
     const populated = await Inquiry.findById(inquiry._id)
       .populate('order', 'orderNumber')
       .populate('product', 'name image')
+      .populate('user', 'name email')
       .lean();
+
+    // Slack 알림 전송 (비동기로 처리, 에러가 발생해도 문의 생성은 성공)
+    sendSlackInquiryNotification(populated).catch((error) => {
+      console.error('Slack 문의 알림 전송 실패:', error);
+    });
 
     res.status(201).json(populated);
   } catch (error) {
@@ -314,6 +321,75 @@ async function answerInquiry(req, res, next) {
     res.json(populated);
   } catch (error) {
     next(error);
+  }
+}
+
+/**
+ * Slack 문의 알림 전송 (1:1 문의)
+ */
+async function sendSlackInquiryNotification(inquiry) {
+  try {
+    // Slack Webhook URL (환경변수에서만 가져오기)
+    const SLACK_WEBHOOK_ADMIN = process.env.SLACK_WEBHOOK_ADMIN;
+    
+    // 환경변수가 없으면 알림 전송 건너뛰기
+    if (!SLACK_WEBHOOK_ADMIN) {
+      console.log('Slack Webhook URL이 설정되지 않아 문의 알림을 전송하지 않습니다.');
+      return;
+    }
+
+    // 사용자 정보
+    const userName = inquiry.user?.name || 'Unknown';
+    const userEmail = inquiry.user?.email || 'N/A';
+    
+    // 문의 정보
+    const inquiryId = inquiry._id?.toString() || 'N/A';
+    const inquiryType = inquiry.type || '일반';
+    const inquiryTitle = inquiry.title || '제목 없음';
+    const inquiryContent = inquiry.content || '';
+    const contentPreview = inquiryContent.length > 200 
+      ? inquiryContent.substring(0, 200) + '...' 
+      : inquiryContent;
+    const isSecret = inquiry.isSecret ? '🔒 비밀글' : '';
+    
+    // 관련 정보
+    const orderNumber = inquiry.order?.orderNumber || null;
+    const productName = inquiry.product?.name || null;
+    
+    // 관리자 페이지 링크
+    const adminUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin?nav=Inquiries&inquiryId=${inquiryId}`;
+    
+    // 메시지 구성
+    let message = `📩 *새로운 1:1 문의가 등록되었습니다!*\n\n`;
+    message += `*문의 ID:* ${inquiryId}\n`;
+    message += `*유형:* ${inquiryType} ${isSecret}\n`;
+    message += `*제목:* ${inquiryTitle}\n\n`;
+    message += `*고객 정보:*\n`;
+    message += `• 이름: ${userName}\n`;
+    message += `• 이메일: ${userEmail}\n\n`;
+    
+    if (orderNumber) {
+      message += `*관련 주문:* #${orderNumber}\n`;
+    }
+    if (productName) {
+      message += `*관련 상품:* ${productName}\n`;
+    }
+    
+    message += `\n*문의 내용:*\n${contentPreview}\n\n`;
+    message += `*등록 시간:* ${new Date(inquiry.createdAt || Date.now()).toLocaleString('ko-KR')}\n\n`;
+    message += `<${adminUrl}|관리자 페이지에서 확인하기>`;
+
+    // Slack 메시지 전송 (#admin 채널)
+    await fetch(SLACK_WEBHOOK_ADMIN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: message,
+      }),
+    });
+  } catch (error) {
+    // Slack 알림 실패는 로그만 남기고 문의 생성에는 영향 없음
+    console.error('Slack 문의 알림 전송 중 오류:', error.message);
   }
 }
 

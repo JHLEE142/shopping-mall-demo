@@ -9,6 +9,7 @@ import {
   Settings,
   HelpCircle,
   LogOut,
+  Home,
 } from 'lucide-react';
 import './AdminSidebar.css';
 
@@ -100,6 +101,16 @@ function AdminSidebar({ activeNav, onNavChange, user, onLogout, onNavigateToStor
             </div>
           </div>
         )}
+        <button
+          type="button"
+          className="admin-sidebar__nav-item"
+          onClick={onNavigateToStore}
+          style={{ width: '100%', marginBottom: '0.5rem' }}
+        >
+          <div className="admin-sidebar__nav-bullet" />
+          <Home className="admin-icon" size={20} />
+          <span>메인페이지로 가기</span>
+        </button>
         <button
           type="button"
           className="admin-sidebar__logout"

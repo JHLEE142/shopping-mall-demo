@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Package, AlertTriangle, XCircle, Grid, Search, Filter, Download, MoreVertical, Edit, Trash2, X } from 'lucide-react';
+import { Package, AlertTriangle, XCircle, Grid, Search, Filter, Download, MoreVertical, Edit, Trash2, X, Plus } from 'lucide-react';
 import { fetchProducts, updateProduct, deleteProduct } from '../../../services/productService';
 import './InventoryPage.css';
 
-function InventoryPage() {
+function InventoryPage({ onAddProduct }) {
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -178,6 +178,17 @@ function InventoryPage() {
             <button type="button" className="admin-button admin-button--icon">
               <MoreVertical size={18} />
             </button>
+            {onAddProduct && (
+              <button 
+                type="button" 
+                className="admin-button admin-button--primary"
+                onClick={onAddProduct}
+                style={{ marginRight: '0.5rem' }}
+              >
+                <Plus size={18} />
+                상품 등록
+              </button>
+            )}
             <button type="button" className="admin-button admin-button--primary">
               <Download size={18} />
               Export
