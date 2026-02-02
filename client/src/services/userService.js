@@ -74,3 +74,26 @@ export async function getUsers({ page = 1, limit = 10, user_type } = {}) {
   return response.json();
 }
 
+export async function getUserById(userId) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = data?.message || '사용자 정보를 불러오지 못했습니다.';
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+function buildAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+

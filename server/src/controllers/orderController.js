@@ -206,28 +206,53 @@ function normalizeString(value = '') {
 }
 
 async function generateUniqueOrderNumber() {
-  // 간단한 형식: YYYYMMDD + 4자리 랜덤 숫자
+  // 형식: #YYYYMMDD-00001 (날짜-연번)
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-
-  let uniqueNumber = '';
-  let exists = true;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (exists && attempts < maxAttempts) {
-    const randomPart = Math.floor(1000 + Math.random() * 9000); // 4자리 랜덤 숫자
-    uniqueNumber = `${datePart}${randomPart}`;
-    // eslint-disable-next-line no-await-in-loop
-    exists = await Order.exists({ orderNumber: uniqueNumber });
-    attempts++;
+  
+  // 해당 날짜의 주문 수를 조회하여 연번 계산
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  
+  // 해당 날짜의 주문 수 조회 (orderNumber가 #날짜-연번 형식인 것만)
+  const todayOrders = await Order.find({
+    orderNumber: { $regex: `^#${datePart}-` },
+    createdAt: {
+      $gte: todayStart,
+      $lte: todayEnd,
+    },
+  }).sort({ createdAt: -1 }).limit(1);
+  
+  // 연번 계산 (가장 큰 연번 + 1)
+  let sequenceNumber = 1;
+  if (todayOrders.length > 0) {
+    const lastOrderNumber = todayOrders[0].orderNumber;
+    const match = lastOrderNumber.match(/^#\d{8}-(\d{5})$/);
+    if (match) {
+      sequenceNumber = parseInt(match[1], 10) + 1;
+    } else {
+      // 기존 형식이 아닌 경우, 해당 날짜의 주문 수로 계산
+      const count = await Order.countDocuments({
+        orderNumber: { $regex: `^#${datePart}-` },
+      });
+      sequenceNumber = count + 1;
+    }
   }
-
-  // 최대 시도 횟수 초과 시 타임스탬프 추가
+  
+  // 5자리 연번으로 포맷팅
+  const sequencePart = sequenceNumber.toString().padStart(5, '0');
+  const uniqueNumber = `#${datePart}-${sequencePart}`;
+  
+  // 중복 확인 (혹시 모를 경우를 대비)
+  const exists = await Order.exists({ orderNumber: uniqueNumber });
   if (exists) {
-    const timestamp = Date.now().toString().slice(-6);
-    uniqueNumber = `${datePart}${timestamp}`;
+    // 중복이 발생하면 연번을 증가시켜 재시도
+    sequenceNumber++;
+    const sequencePartRetry = sequenceNumber.toString().padStart(5, '0');
+    return `#${datePart}-${sequencePartRetry}`;
   }
-
+  
   return uniqueNumber;
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserPlus, Star, Repeat, TrendingUp, TrendingDown, Search } from 'lucide-react';
+import { Users, UserPlus, Star, Repeat, TrendingUp, TrendingDown, Search, X } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { getUsers as getUsersApi } from '../../../services/userService';
+import { getUsers as getUsersApi, getUserById } from '../../../services/userService';
 import { fetchOrders as fetchOrdersApi } from '../../../services/orderService';
 import { getStatisticsData as getStatisticsDataApi } from '../../../services/statisticsService';
 import './CustomersPage.css';
@@ -24,6 +24,9 @@ function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerDetails, setCustomerDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,6 +161,25 @@ function CustomersPage() {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const handleCustomerClick = async (customerId) => {
+    try {
+      setLoadingDetails(true);
+      const data = await getUserById(customerId);
+      setCustomerDetails(data.user || data);
+      setSelectedCustomer(customerId);
+    } catch (error) {
+      console.error('고객 정보 로드 실패:', error);
+      alert('고객 정보를 불러오는데 실패했습니다: ' + error.message);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const closeCustomerDetails = () => {
+    setSelectedCustomer(null);
+    setCustomerDetails(null);
   };
 
   if (loading) {
@@ -295,8 +317,8 @@ function CustomersPage() {
               <div className="admin-table__header">
                 <span>Name</span>
                 <span>Email</span>
-                <span>User Type</span>
-                <span>Joined Date</span>
+                <span style={{ minWidth: '120px' }}>User Type</span>
+                <span style={{ minWidth: '150px' }}>Joined Date</span>
                 <span>Status</span>
               </div>
               <div className="admin-table__body">
@@ -306,15 +328,32 @@ function CustomersPage() {
                       <div className="admin-table__customer-avatar">
                         {customer.name?.[0]?.toUpperCase() || 'U'}
                       </div>
-                      <div className="admin-table__customer-name">{customer.name || 'Unknown'}</div>
+                      <button
+                        type="button"
+                        onClick={() => handleCustomerClick(customer._id)}
+                        className="admin-table__customer-name"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          textAlign: 'left',
+                          color: '#111827',
+                          textDecoration: 'underline',
+                          fontSize: 'inherit',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {customer.name || 'Unknown'}
+                      </button>
                     </div>
                     <div>{customer.email || '-'}</div>
-                    <div>
+                    <div style={{ minWidth: '120px' }}>
                       <span className="admin-badge admin-badge--default">
                         {customer.user_type || 'customer'}
                       </span>
                     </div>
-                    <div>{formatDate(customer.createdAt)}</div>
+                    <div style={{ minWidth: '150px' }}>{formatDate(customer.createdAt)}</div>
                     <div>
                       <span className="admin-badge admin-badge--success">Active</span>
                     </div>
@@ -361,6 +400,85 @@ function CustomersPage() {
           </>
         )}
       </div>
+
+      {/* Customer Details Modal */}
+      {selectedCustomer && (
+        <div className="admin-modal-overlay" onClick={closeCustomerDetails}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
+            <div className="admin-modal__header">
+              <h3>Customer Details</h3>
+              <button
+                type="button"
+                className="admin-button admin-button--icon"
+                onClick={closeCustomerDetails}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              {loadingDetails ? (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>
+              ) : customerDetails ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>Name</label>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>{customerDetails.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>Email</label>
+                    <div>{customerDetails.email || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>User Type</label>
+                    <div>
+                      <span className="admin-badge admin-badge--default">
+                        {customerDetails.user_type || 'customer'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>Joined Date</label>
+                    <div>{formatDate(customerDetails.createdAt)}</div>
+                  </div>
+                  {customerDetails.phone && (
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>Phone</label>
+                      <div>{customerDetails.phone}</div>
+                    </div>
+                  )}
+                  {customerDetails.address && (
+                    <div>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>Address</label>
+                      <div>
+                        {customerDetails.address.postalCode && <span>{customerDetails.address.postalCode} </span>}
+                        {customerDetails.address.address1}
+                        {customerDetails.address.address2 && ` ${customerDetails.address.address2}`}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#6b7280' }}>User ID</label>
+                    <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#6b7280' }}>{customerDetails._id}</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
+                  고객 정보를 불러올 수 없습니다.
+                </div>
+              )}
+            </div>
+            <div className="admin-modal__footer">
+              <button
+                type="button"
+                className="admin-button admin-button--primary"
+                onClick={closeCustomerDetails}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

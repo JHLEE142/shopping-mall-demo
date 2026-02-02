@@ -146,7 +146,7 @@ async function getUserById(req, res, next) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
-    res.json(sanitizeUser(user));
+    res.json({ user: sanitizeUser(user) });
   } catch (error) {
     next(error);
   }

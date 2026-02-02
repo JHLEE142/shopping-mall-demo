@@ -353,7 +353,9 @@ function OrderPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="admin-table__order-id">#{order.orderNumber || order._id?.slice(-8)}</div>
+                      <div className="admin-table__order-id">
+                        {order.orderNumber ? (order.orderNumber.startsWith('#') ? order.orderNumber : `#${order.orderNumber}`) : `#${order._id?.slice(-8)}`}
+                      </div>
                       <div className="admin-table__order-date">{formatDate(order.createdAt)}</div>
                     </div>
                     <div>
@@ -512,7 +514,7 @@ function OrderPage() {
               </button>
             </div>
             <div className="admin-modal__body">
-              <p>Are you sure you want to delete order #{deleteConfirm.orderNumber || deleteConfirm._id?.slice(-8)}?</p>
+              <p>Are you sure you want to delete order {deleteConfirm.orderNumber ? (deleteConfirm.orderNumber.startsWith('#') ? deleteConfirm.orderNumber : `#${deleteConfirm.orderNumber}`) : `#${deleteConfirm._id?.slice(-8)}`}?</p>
               <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                 This action cannot be undone.
               </p>
