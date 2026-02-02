@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk';
 
-const TOSS_CLIENT_KEY = process.env.VITE_TOSS_CLIENT_KEY;
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY;
 
 if (!TOSS_CLIENT_KEY) {
   console.error('VITE_TOSS_CLIENT_KEY 환경변수가 설정되지 않았습니다. 토스페이먼츠 결제를 사용할 수 없습니다.');
@@ -41,7 +41,7 @@ function TossPaymentWidget({
       try {
         // 환경변수 확인
         if (!TOSS_CLIENT_KEY) {
-          const errorMsg = '토스페이먼츠 클라이언트 키가 설정되지 않았습니다. VITE_TOSS_CLIENT_KEY 환경변수를 확인해주세요.';
+          const errorMsg = '관리자에게 문의해주세요.';
           console.error(errorMsg);
           if (isMounted) {
             setIsReady(false);
