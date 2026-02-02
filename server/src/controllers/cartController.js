@@ -76,14 +76,29 @@ async function getActiveCart(userId) {
 exports.getCart = async (req, res) => {
   try {
     let cart;
+    let originalItems = null; // populate 전 원본 아이템 저장
     
     if (req.user) {
-      // 회원 장바구니
-      cart = await getActiveCart(req.user._id);
+      // 회원 장바구니: populate 전 원본 데이터 저장
+      cart = await Cart.findOne({ user: req.user._id, status: 'active' });
+      if (cart) {
+        originalItems = cart.items.map(item => ({
+          productId: item.product.toString(), // 원본 productId 저장
+        }));
+        cart = await cart.populate({
+          path: 'items.product',
+          select: 'name price image sku',
+          // 삭제된 상품도 null로 유지 (제거하지 않음)
+          match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
+        });
+      }
     } else {
       // 비회원 장바구니
       cart = await getOrCreateCart(req);
       if (cart) {
+        originalItems = cart.items.map(item => ({
+          productId: item.product.toString(), // 원본 productId 저장
+        }));
         cart = await cart.populate({
           path: 'items.product',
           select: 'name price image sku',
@@ -97,7 +112,18 @@ exports.getCart = async (req, res) => {
       return res.status(200).json({ cart: null, message: '장바구니가 비어 있습니다.' });
     }
 
-    return res.json({ cart });
+    // 각 아이템에 원본 productId 추가 (populate 실패 시에도 삭제 가능하도록)
+    const cartObj = cart.toObject ? cart.toObject() : cart;
+    if (cartObj.items && originalItems) {
+      cartObj.items = cartObj.items.map((item, index) => {
+        return {
+          ...item,
+          productId: originalItems[index]?.productId || item.product?._id || item.product, // 원본 productId를 별도 필드로 추가
+        };
+      });
+    }
+
+    return res.json({ cart: cartObj });
   } catch (error) {
     return res.status(500).json({ message: '장바구니를 불러오지 못했습니다.', error: error.message });
   }
@@ -195,6 +221,11 @@ exports.addCartItem = async (req, res) => {
 
     await cart.save();
 
+    // populate 전 원본 아이템 저장
+    const originalItems = cart.items.map(item => ({
+      productId: item.product.toString(),
+    }));
+
     const populatedCart = await cart.populate({
       path: 'items.product',
       select: 'name price image sku',
@@ -202,7 +233,16 @@ exports.addCartItem = async (req, res) => {
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });
 
-    return res.status(201).json({ cart: populatedCart });
+    // 원본 productId 추가
+    const cartObj = populatedCart.toObject ? populatedCart.toObject() : populatedCart;
+    if (cartObj.items && originalItems) {
+      cartObj.items = cartObj.items.map((item, index) => ({
+        ...item,
+        productId: originalItems[index]?.productId || item.product?._id || item.product,
+      }));
+    }
+
+    return res.status(201).json({ cart: cartObj });
   } catch (error) {
     return res.status(500).json({ message: '장바구니에 상품을 추가하지 못했습니다.', error: error.message });
   }
@@ -247,6 +287,11 @@ exports.updateCartItem = async (req, res) => {
 
     await cart.save();
 
+    // populate 전 원본 아이템 저장
+    const originalItems = cart.items.map(item => ({
+      productId: item.product.toString(),
+    }));
+
     const populatedCart = await cart.populate({
       path: 'items.product',
       select: 'name price image sku',
@@ -254,7 +299,16 @@ exports.updateCartItem = async (req, res) => {
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });
 
-    return res.json({ cart: populatedCart });
+    // 원본 productId 추가
+    const cartObj = populatedCart.toObject ? populatedCart.toObject() : populatedCart;
+    if (cartObj.items && originalItems) {
+      cartObj.items = cartObj.items.map((item, index) => ({
+        ...item,
+        productId: originalItems[index]?.productId || item.product?._id || item.product,
+      }));
+    }
+
+    return res.json({ cart: cartObj });
   } catch (error) {
     return res.status(500).json({ message: '장바구니 상품을 수정하지 못했습니다.', error: error.message });
   }
@@ -288,6 +342,11 @@ exports.removeCartItem = async (req, res) => {
 
     await cart.save();
 
+    // populate 전 원본 아이템 저장
+    const originalItems = cart.items.map(item => ({
+      productId: item.product.toString(),
+    }));
+
     const populatedCart = await cart.populate({
       path: 'items.product',
       select: 'name price image sku',
@@ -295,7 +354,16 @@ exports.removeCartItem = async (req, res) => {
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });
 
-    return res.json({ cart: populatedCart });
+    // 원본 productId 추가
+    const cartObj = populatedCart.toObject ? populatedCart.toObject() : populatedCart;
+    if (cartObj.items && originalItems) {
+      cartObj.items = cartObj.items.map((item, index) => ({
+        ...item,
+        productId: originalItems[index]?.productId || item.product?._id || item.product,
+      }));
+    }
+
+    return res.json({ cart: cartObj });
   } catch (error) {
     return res.status(500).json({ message: '장바구니 상품을 삭제하지 못했습니다.', error: error.message });
   }

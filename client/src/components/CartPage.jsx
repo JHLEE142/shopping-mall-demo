@@ -268,10 +268,15 @@ function CartPage({
             <section className="cart-page__items">
               <ul className="cart-item-list">
                 {cart.items.map((item, index) => {
-                  const productId = item.product?._id || item.product || `deleted-${index}`;
-                  const isProductDeleted = !item.product || item.product === null;
-                  const isUpdating = updatingItemId === productId;
-                  const isRemoving = removingItemId === productId;
+                  // productId 추출: 서버에서 제공한 productId 우선 사용, 없으면 기존 방식 사용
+                  const productId = item.productId || 
+                                   (item.product?._id) || 
+                                   (item.product?.toString ? item.product.toString() : item.product) ||
+                                   `item-${index}`;
+                  
+                  const isProductDeleted = !item.product || (item.product === null) || (typeof item.product === 'object' && !item.product._id && !item.product.name);
+                  const isUpdating = updatingItemId === productId || (updatingItemId && updatingItemId.toString() === productId?.toString());
+                  const isRemoving = removingItemId === productId || (removingItemId && removingItemId.toString() === productId?.toString());
                   const productPrice = item.priceSnapshot;
                   const hasDiscount =
                     item.product?.price && item.product.price > productPrice ? item.product.price : null;
