@@ -25,7 +25,7 @@ async function confirmPayment(req, res, next) {
 
     const secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY;
     if (!secretKey) {
-      throw createHttpError(500, '토스페이먼츠 Secret Key가 설정되지 않았습니다.');
+      throw createHttpError(500, '관리자에게 문의해주세요.');
     }
 
     // Secret Key를 Base64로 인코딩 (Basic Auth)
