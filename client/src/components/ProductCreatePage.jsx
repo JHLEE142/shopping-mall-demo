@@ -674,32 +674,15 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
     setError('');
     setSuccess(false);
 
-    // 카테고리 정보 가져오기
-    const selectedMain = categoryHierarchy.find(m => {
-      const mainId = m._id?.toString() || m._id;
-      return mainId === (selectedMainCategory?.toString() || selectedMainCategory);
-    });
-
-    if (!selectedMain) {
-      setError('대분류를 선택해주세요.');
-      return;
-    }
-
-    // children 구조 사용
-    const selectedMid = selectedMidCategory ? selectedMain?.children?.find(m => {
-      const midId = m._id?.toString() || m._id;
-      return midId === (selectedMidCategory?.toString() || selectedMidCategory);
-    }) : null;
-
-    const selectedSub = selectedSubCategory && selectedMid ? selectedMid?.children?.find(s => {
-      const subId = s._id?.toString() || s._id;
-      return subId === (selectedSubCategory?.toString() || selectedSubCategory);
-    }) : null;
-
     // 직접 입력 모드와 드롭다운 선택 모드 분기 처리
     let finalCategory, categoryMain, categoryMid, categorySub, finalCategoryId, categoryPathIds, categoryPathText;
     
     if (categoryInputMode === 'input') {
+      // 직접 입력 모드: 대분류 입력 확인
+      if (!customCategoryMain || !customCategoryMain.trim()) {
+        setError('대분류를 입력해주세요.');
+        return;
+      }
       // 직접 입력 모드
       categoryMain = customCategoryMain.trim();
       categoryMid = customCategoryMid.trim() || null;
@@ -713,12 +696,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       if (categorySub) pathParts.push(categorySub);
       categoryPathText = pathParts.join(' > ');
     } else {
-      // 드롭다운 선택 모드
-      const selectedMain = selectedMainCategory ? categoryHierarchy.find(m => {
+      // 드롭다운 선택 모드: 카테고리 정보 가져오기
+      const selectedMain = categoryHierarchy.find(m => {
         const mainId = m._id?.toString() || m._id;
         return mainId === (selectedMainCategory?.toString() || selectedMainCategory);
-      }) : null;
+      });
 
+      if (!selectedMain) {
+        setError('대분류를 선택해주세요.');
+        return;
+      }
+
+      // children 구조 사용
       const selectedMid = selectedMidCategory && selectedMain ? selectedMain?.children?.find(m => {
         const midId = m._id?.toString() || m._id;
         return midId === (selectedMidCategory?.toString() || selectedMidCategory);
