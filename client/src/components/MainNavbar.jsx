@@ -109,6 +109,10 @@ function MainNavbar({
   const handleNavigateHome = () => {
     closeMenu();
     closeUserMenu();
+    closeCategories();
+    // 페이지 맨 위로 스크롤
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // 홈으로 이동
     onNavigateHome();
   };
 
