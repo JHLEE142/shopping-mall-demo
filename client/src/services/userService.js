@@ -92,6 +92,25 @@ export async function getUserById(userId) {
   return response.json();
 }
 
+export async function updateUserSettings(userId, settings) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildAuthHeaders(),
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const message = data?.message || '설정 업데이트에 실패했습니다.';
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
 function buildAuthHeaders() {
   const token = localStorage.getItem('token');
   return token ? { Authorization: `Bearer ${token}` } : {};

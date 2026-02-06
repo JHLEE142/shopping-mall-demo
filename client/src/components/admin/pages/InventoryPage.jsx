@@ -3,7 +3,7 @@ import { Package, AlertTriangle, XCircle, Grid, Search, Filter, Download, MoreVe
 import { fetchProducts, updateProduct, deleteProduct } from '../../../services/productService';
 import './InventoryPage.css';
 
-function InventoryPage({ onAddProduct }) {
+function InventoryPage({ onAddProduct, onEditProduct }) {
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -337,7 +337,25 @@ function InventoryPage({ onAddProduct }) {
                           <div className="admin-table__product-placeholder">📦</div>
                         )}
                       </div>
-                      <div className="admin-table__product-name">{product.name}</div>
+                      <div 
+                        className="admin-table__product-name"
+                        style={{ 
+                          cursor: 'pointer', 
+                          color: '#6366f1',
+                          textDecoration: 'underline',
+                        }}
+                        onClick={() => {
+                          if (onEditProduct) {
+                            onEditProduct(product);
+                          } else if (onAddProduct) {
+                            // fallback: 상품 데이터를 전달하여 수정 모드로 진입
+                            onAddProduct(product);
+                          }
+                        }}
+                        title="상품 수정하기"
+                      >
+                        {product.name}
+                      </div>
                     </div>
                     <div>{product.category || '-'}</div>
                     <div>
@@ -363,7 +381,13 @@ function InventoryPage({ onAddProduct }) {
                       <button 
                         type="button" 
                         className="admin-button admin-button--icon admin-button--edit"
-                        onClick={() => handleEdit(product)}
+                        onClick={() => {
+                          if (onEditProduct) {
+                            onEditProduct(product);
+                          } else {
+                            handleEdit(product);
+                          }
+                        }}
                         title="Edit"
                       >
                         <Edit size={16} />

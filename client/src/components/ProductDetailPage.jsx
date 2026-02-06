@@ -317,6 +317,10 @@ function ProductDetailPage({
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const detailTabsRef = useRef(null);
+  
+  // 판매자 정보 관련 상태
+  const [sellerInfo, setSellerInfo] = useState(null);
+  const [userSettings, setUserSettings] = useState(null);
 
   useEffect(() => {
     const normalized = buildProductData(initialProduct);
@@ -324,6 +328,18 @@ function ProductDetailPage({
     setSelectedColor(normalized.colors && normalized.colors.length > 0 ? normalized.colors[0] : null);
     setSelectedSize(null);
     setActiveImage(normalized.gallery.length > 0 ? 0 : 0);
+    
+    // initialProduct에서 판매자 정보 저장
+    if (initialProduct?.sellerId) {
+      const seller = initialProduct.sellerId;
+      setSellerInfo({
+        id: seller._id || seller,
+        businessName: seller.businessName || (typeof seller === 'string' ? null : seller),
+        name: seller.name || null,
+      });
+    } else {
+      setSellerInfo(null);
+    }
     
     const targetId = initialProduct?._id || productId;
     if (targetId) {
@@ -593,6 +609,17 @@ function ProductDetailPage({
         
         // 추천 상품 로드
         loadRecommendedProducts(data._id || targetProductId);
+        
+        // 판매자 정보 저장 (관리자 권한 체크는 렌더링 시)
+        if (data.sellerId) {
+          setSellerInfo({
+            id: data.sellerId._id || data.sellerId,
+            businessName: data.sellerId.businessName || data.sellerId,
+            name: data.sellerId.name || null,
+          });
+        } else {
+          setSellerInfo(null);
+        }
       } catch (err) {
         if (!isMounted) return;
         setStatus('error');
@@ -606,6 +633,29 @@ function ProductDetailPage({
       isMounted = false;
     };
   }, [productId, initialProduct]);
+
+  // 사용자 설정 로드 (관리자 권한이 있는 경우)
+  useEffect(() => {
+    const session = loadSession();
+    const isAdmin = session?.user?.user_type === 'admin';
+    
+    if (isAdmin && session?.user?._id) {
+      // 관리자 권한이 있는 경우 사용자 설정 로드
+      import('../services/userService').then(({ getUserById }) => {
+        getUserById(session.user._id)
+          .then((data) => {
+            setUserSettings(data.user);
+          })
+          .catch((err) => {
+            console.error('Failed to load user settings:', err);
+            // 기본값 사용
+            setUserSettings({ sellerNameDisplayFormat: 'businessName' });
+          });
+      });
+    } else {
+      setUserSettings(null);
+    }
+  }, []);
 
   useEffect(() => {
     const session = loadSession();
@@ -932,7 +982,7 @@ function ProductDetailPage({
                   onClick={handleToggleWishlist}
                   disabled={wishlistUpdating}
                 >
-                  <Heart size={18} fill={isWishlisted ? '#111' : 'none'} />
+                  <Heart size={24} fill={isWishlisted ? '#111' : 'none'} />
                 </button>
               </div>
               {product.gallery.length > 1 && (
@@ -1099,7 +1149,7 @@ function ProductDetailPage({
               {product.sizes && product.sizes.length > 0 && (
                 <div className="product-info__sizes">
                   <div className="product-info__sizes-header">
-                    <p>US (KR) 사이즈를 선택하세요</p>
+                    <p>옵션을 선택하세요</p>
                   </div>
                   <div className="product-info__size-grid">
                     {product.sizes.map((size) => (
@@ -1140,12 +1190,31 @@ function ProductDetailPage({
                 )}
               </div>
 
-              {/* 판매자 정보 */}
-              <div style={{ marginTop: '1rem', padding: '1rem', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
-                  판매자: <span style={{ color: '#111', fontWeight: 600 }}>LMN</span>
-                </p>
-              </div>
+              {/* 판매자 정보 (관리자 권한이 있는 경우에만 표시) */}
+              {(() => {
+                const session = loadSession();
+                const isAdmin = session?.user?.user_type === 'admin';
+                const displayFormat = userSettings?.sellerNameDisplayFormat || 'businessName';
+                
+                if (!isAdmin || !sellerInfo || displayFormat === 'hide') {
+                  return null;
+                }
+                
+                let sellerDisplayName = '';
+                if (displayFormat === 'businessName') {
+                  sellerDisplayName = sellerInfo.businessName || '판매자 정보 없음';
+                } else if (displayFormat === 'sellerName') {
+                  sellerDisplayName = sellerInfo.name || sellerInfo.businessName || '판매자 정보 없음';
+                }
+                
+                return (
+                  <div style={{ marginTop: '1rem', padding: '1rem', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
+                      판매자: <span style={{ color: '#111', fontWeight: 600 }}>{sellerDisplayName}</span>
+                    </p>
+                  </div>
+                );
+              })()}
 
 
               

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getTrustedDevices, revokeDevice, revokeAllDevices } from '../services/trustedDeviceService';
 import { clearSession, clearTrustedDevice } from '../utils/sessionStorage';
 import { getDeviceInfo, generateDeviceName } from '../utils/deviceInfo';
+import { getUserById, updateUserSettings } from '../services/userService';
 import './SettingsPage.css';
 
 function SettingsPage({ user, onBack, onLogout }) {
@@ -9,6 +10,8 @@ function SettingsPage({ user, onBack, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revokingDeviceId, setRevokingDeviceId] = useState(null);
+  const [sellerNameDisplayFormat, setSellerNameDisplayFormat] = useState('businessName');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     // 현재 기기 정보 콘솔 출력 (항상 실행)
@@ -36,7 +39,34 @@ function SettingsPage({ user, onBack, onLogout }) {
     console.log('========================\n');
     
     loadDevices();
+    
+    // 관리자 권한이 있는 경우 사용자 설정 로드
+    if (user?.user_type === 'admin' && user?._id) {
+      getUserById(user._id)
+        .then((data) => {
+          if (data.user?.sellerNameDisplayFormat) {
+            setSellerNameDisplayFormat(data.user.sellerNameDisplayFormat);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load user settings:', err);
+        });
+    }
   }, [user]);
+  
+  const handleSaveSellerNameDisplayFormat = async () => {
+    if (!user?._id || user?.user_type !== 'admin') return;
+    
+    try {
+      setSavingSettings(true);
+      await updateUserSettings(user._id, { sellerNameDisplayFormat });
+      alert('설정이 저장되었습니다.');
+    } catch (err) {
+      alert(err.message || '설정 저장에 실패했습니다.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const loadDevices = async () => {
     try {
@@ -243,6 +273,56 @@ function SettingsPage({ user, onBack, onLogout }) {
               </div>
             )}
           </section>
+          
+          {/* 관리자 전용: 판매자 이름 표시 설정 */}
+          {user?.user_type === 'admin' && (
+            <section className="settings-section">
+              <h2 className="settings-section-title">판매자 이름 표시 설정</h2>
+              <p className="settings-section-description">
+                상품 상세페이지에서 판매자 이름을 어떻게 표시할지 선택하세요.
+              </p>
+              
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  표시 형식
+                </label>
+                <select
+                  value={sellerNameDisplayFormat}
+                  onChange={(e) => setSellerNameDisplayFormat(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <option value="businessName">사업자명 표시</option>
+                  <option value="sellerName">판매자명 표시</option>
+                  <option value="hide">숨김</option>
+                </select>
+                
+                <button
+                  type="button"
+                  onClick={handleSaveSellerNameDisplayFormat}
+                  disabled={savingSettings}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: savingSettings ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {savingSettings ? '저장 중...' : '설정 저장'}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </section>
     </div>
