@@ -1043,6 +1043,11 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                          <span className="catalog-card__stock-badge">
+                            {product.stockRemaining}개 남음
+                          </span>
+                        )}
                         <button
                           type="button"
                           className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
@@ -1075,12 +1080,6 @@ function HomeHero({
                           </div>
                         )}
                         <h3 className="catalog-card__title">{product.name}</h3>
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
-                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
-                        )}
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
-                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
-                        )}
                         <div className="catalog-card__rating">
                           <Star size={16} fill="#111" strokeWidth={0} />
                           <span>
@@ -1126,6 +1125,11 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                          <span className="catalog-card__stock-badge">
+                            {product.stockRemaining}개 남음
+                          </span>
+                        )}
                         <button
                           type="button"
                           className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
@@ -1158,9 +1162,6 @@ function HomeHero({
                           </div>
                         )}
                         <h3 className="catalog-card__title">{product.name}</h3>
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
-                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
-                        )}
                         <div className="catalog-card__rating">
                           <Star size={16} fill="#111" strokeWidth={0} />
                           <span>
@@ -1206,6 +1207,11 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                          <span className="catalog-card__stock-badge">
+                            {product.stockRemaining}개 남음
+                          </span>
+                        )}
                         <button
                           type="button"
                           className={`catalog-card__wishlist ${wishlistedItems.has(product.id) ? 'catalog-card__wishlist--active' : ''}`}
@@ -1455,6 +1461,11 @@ function HomeHero({
               style={{ position: 'relative' }}
             >
               <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
+              {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                <span className="catalog-card__stock-badge">
+                  {product.stockRemaining}개 남음
+                </span>
+              )}
               {compareMode && (
                 <div
                   style={{
@@ -1528,9 +1539,6 @@ function HomeHero({
                 </div>
               )}
               <h3 className="catalog-card__title">{product.name}</h3>
-              {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
-                <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
-              )}
               <div className="catalog-card__rating">
                 <Star size={16} fill="#111" strokeWidth={0} />
                 <span>

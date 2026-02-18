@@ -738,6 +738,29 @@ function ProductDetailPage({
     return Math.max(stock - reserved, 0);
   }, [product.inventory?.stock, product.inventory?.reserved]);
 
+  const optionStockTotal = useMemo(() => {
+    const sizeStocks = (product.sizes || [])
+      .map((size) => (typeof size.stock === 'number' ? size.stock : null))
+      .filter((value) => value !== null);
+    if (sizeStocks.length > 0) {
+      return sizeStocks.reduce((sum, value) => sum + value, 0);
+    }
+    const colorStocks = (product.colors || [])
+      .map((color) => (typeof color.stock === 'number' ? color.stock : null))
+      .filter((value) => value !== null);
+    if (colorStocks.length > 0) {
+      return colorStocks.reduce((sum, value) => sum + value, 0);
+    }
+    return null;
+  }, [product.colors, product.sizes]);
+
+  const totalDisplayStock = useMemo(() => {
+    if (typeof optionStockTotal === 'number') {
+      return optionStockTotal;
+    }
+    return availableStock;
+  }, [availableStock, optionStockTotal]);
+
   const selectedOptionStock = useMemo(() => {
     const candidates = [];
     if (selectedSize) {
@@ -1152,9 +1175,9 @@ function ProductDetailPage({
                   (1개당 {new Intl.NumberFormat('ko-KR').format(product.priceSale || product.price)}원)
                 </span>
               </div>
-              {typeof availableStock === 'number' && availableStock <= 3 && (
+              {typeof totalDisplayStock === 'number' && totalDisplayStock <= 3 && (
                 <div style={{ marginTop: '0.5rem', color: '#dc2626', fontWeight: 600, fontSize: '0.95rem' }}>
-                  재고 {availableStock}개 남음
+                  재고 {totalDisplayStock}개 남음
                 </div>
               )}
 
