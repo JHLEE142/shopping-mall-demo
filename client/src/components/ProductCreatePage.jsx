@@ -90,12 +90,11 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
   useEffect(() => {
     if (isEditMode && product && categoryHierarchy.length > 0) {
       // 수정 모드: categoryId가 있으면 우선 사용, 없으면 기존 방식 사용
+      let foundCategory = null;
+      let foundMain = null;
+      let foundMid = null;
       if (product.categoryId) {
         // categoryId로 카테고리 찾기
-        let foundCategory = null;
-        let foundMain = null;
-        let foundMid = null;
-        
         // 전체 계층 구조를 탐색하여 categoryId와 일치하는 카테고리 찾기
         for (const mainCat of categoryHierarchy) {
           if (mainCat._id?.toString() === product.categoryId?.toString()) {
@@ -139,6 +138,15 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         // 하위 호환성: 기존 category 필드로 찾기
         findAndSetCategoryFromName(product.category);
       }
+
+      if (foundCategory) {
+        setCategoryInputMode('select');
+      } else if (product.categoryMain || product.category) {
+        setCategoryInputMode('input');
+        setCustomCategoryMain(product.categoryMain || product.category || '');
+        setCustomCategoryMid(product.categoryMid || '');
+        setCustomCategorySub(product.categorySub || '');
+      }
       const productImages = product.images && Array.isArray(product.images) && product.images.length > 0
         ? product.images
         : (product.image ? [product.image] : []);
@@ -159,7 +167,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         colors: product.colors && Array.isArray(product.colors) ? product.colors : [],
         sizes: product.sizes && Array.isArray(product.sizes) ? product.sizes : [],
         stockManagement: product.stockManagement || 'track',
-        totalStock: product.totalStock || 0,
+        totalStock: product.inventory?.stock ?? product.totalStock ?? 0,
         status: product.status || 'draft',
         shipping: {
           isFree: product.shipping?.isFree || false,
@@ -714,47 +722,64 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
       });
 
       if (!selectedMain) {
-        setError('대분류를 선택해주세요.');
-        return;
-      }
+        if (isEditMode && (formData.categoryMain || product?.categoryMain || product?.category)) {
+          categoryMain = formData.categoryMain || product?.categoryMain || product?.category || '';
+          categoryMid = formData.categoryMid || product?.categoryMid || null;
+          categorySub = formData.categorySub || product?.categorySub || null;
+          finalCategory = formData.category || categorySub || categoryMid || categoryMain;
+          finalCategoryId = product?.categoryId || null;
+          categoryPathIds = Array.isArray(product?.categoryPathIds) ? product.categoryPathIds : [];
+          if (product?.categoryPathText) {
+            categoryPathText = product.categoryPathText;
+          } else {
+            const pathParts = [categoryMain];
+            if (categoryMid) pathParts.push(categoryMid);
+            if (categorySub) pathParts.push(categorySub);
+            categoryPathText = pathParts.join(' > ');
+          }
+        } else {
+          setError('대분류를 선택해주세요.');
+          return;
+        }
+      } else {
+        // children 구조 사용
+        const selectedMid = selectedMidCategory && selectedMain ? selectedMain?.children?.find(m => {
+          const midId = m._id?.toString() || m._id;
+          return midId === (selectedMidCategory?.toString() || selectedMidCategory);
+        }) : null;
 
-      // children 구조 사용
-      const selectedMid = selectedMidCategory && selectedMain ? selectedMain?.children?.find(m => {
-        const midId = m._id?.toString() || m._id;
-        return midId === (selectedMidCategory?.toString() || selectedMidCategory);
-      }) : null;
+        const selectedSub = selectedSubCategory && selectedMid ? selectedMid?.children?.find(s => {
+          const subId = s._id?.toString() || s._id;
+          return subId === (selectedSubCategory?.toString() || selectedSubCategory);
+        }) : null;
 
-      const selectedSub = selectedSubCategory && selectedMid ? selectedMid?.children?.find(s => {
-        const subId = s._id?.toString() || s._id;
-        return subId === (selectedSubCategory?.toString() || selectedSubCategory);
-      }) : null;
-
-      // 최종 카테고리: 소분류가 있으면 소분류, 없으면 중분류, 둘 다 없으면 대분류
-      finalCategory = selectedSub?.name || selectedMid?.name || selectedMain?.name;
-      categoryMain = selectedMain?.name;
-      categoryMid = selectedMid?.name || null;
-      categorySub = selectedSub?.name || null;
-      
-      // categoryId는 최종 선택된 카테고리의 ID (우선순위: 소분류 > 중분류 > 대분류)
-      finalCategoryId = selectedSub?._id || selectedMid?._id || selectedMain?._id;
-      
-      // categoryPathIds 계산 (경로상의 모든 카테고리 ID)
-      categoryPathIds = [];
-      if (selectedMain?._id) {
-        categoryPathIds.push(selectedMain._id);
-        if (selectedMid?._id) {
-          categoryPathIds.push(selectedMid._id);
-          if (selectedSub?._id) {
-            categoryPathIds.push(selectedSub._id);
+        // 최종 카테고리: 소분류가 있으면 소분류, 없으면 중분류, 둘 다 없으면 대분류
+        finalCategory = selectedSub?.name || selectedMid?.name || selectedMain?.name;
+        categoryMain = selectedMain?.name;
+        categoryMid = selectedMid?.name || null;
+        categorySub = selectedSub?.name || null;
+        
+        // categoryId는 최종 선택된 카테고리의 ID (우선순위: 소분류 > 중분류 > 대분류)
+        finalCategoryId = selectedSub?._id || selectedMid?._id || selectedMain?._id;
+        
+        // categoryPathIds 계산 (경로상의 모든 카테고리 ID)
+        categoryPathIds = [];
+        if (selectedMain?._id) {
+          categoryPathIds.push(selectedMain._id);
+          if (selectedMid?._id) {
+            categoryPathIds.push(selectedMid._id);
+            if (selectedSub?._id) {
+              categoryPathIds.push(selectedSub._id);
+            }
           }
         }
+        
+        // categoryPathText 계산
+        const pathParts = [selectedMain?.name];
+        if (selectedMid?.name) pathParts.push(selectedMid.name);
+        if (selectedSub?.name) pathParts.push(selectedSub.name);
+        categoryPathText = pathParts.join(' > ');
       }
-      
-      // categoryPathText 계산
-      const pathParts = [selectedMain?.name];
-      if (selectedMid?.name) pathParts.push(selectedMid.name);
-      if (selectedSub?.name) pathParts.push(selectedSub.name);
-      categoryPathText = pathParts.join(' > ');
     }
 
     // 카테고리 검증: 직접 입력 모드일 때는 customCategoryMain도 확인

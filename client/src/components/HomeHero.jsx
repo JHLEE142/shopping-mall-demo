@@ -1043,7 +1043,10 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 0 && (
+                          <span className="catalog-card__soldout-badge">품절</span>
+                        )}
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
                           <span className="catalog-card__stock-badge">
                             {product.stockRemaining}개 남음
                           </span>
@@ -1101,6 +1104,7 @@ function HomeHero({
                           type="button"
                           className="catalog-card__cta"
                           onClick={() => onViewProduct(product.detail)}
+                          disabled={typeof product.stockRemaining === 'number' && product.stockRemaining <= 0}
                         >
                           <ShoppingBag size={16} />
                           바로 구매하기
@@ -1125,7 +1129,10 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 0 && (
+                          <span className="catalog-card__soldout-badge">품절</span>
+                        )}
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
                           <span className="catalog-card__stock-badge">
                             {product.stockRemaining}개 남음
                           </span>
@@ -1183,6 +1190,7 @@ function HomeHero({
                           type="button"
                           className="catalog-card__cta"
                           onClick={() => onViewProduct(product.detail)}
+                          disabled={typeof product.stockRemaining === 'number' && product.stockRemaining <= 0}
                         >
                           <ShoppingBag size={16} />
                           바로 구매하기
@@ -1207,7 +1215,10 @@ function HomeHero({
                         }
                       }}>
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
-                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining <= 0 && (
+                          <span className="catalog-card__soldout-badge">품절</span>
+                        )}
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
                           <span className="catalog-card__stock-badge">
                             {product.stockRemaining}개 남음
                           </span>
@@ -1265,6 +1276,7 @@ function HomeHero({
                           type="button"
                           className="catalog-card__cta"
                           onClick={() => onViewProduct(product.detail)}
+                          disabled={typeof product.stockRemaining === 'number' && product.stockRemaining <= 0}
                         >
                           <ShoppingBag size={16} />
                           바로 구매하기
@@ -1461,7 +1473,10 @@ function HomeHero({
               style={{ position: 'relative' }}
             >
               <img src={product.image} alt={product.name} loading="lazy" decoding="async" />
-              {typeof product.stockRemaining === 'number' && product.stockRemaining <= 3 && (
+              {typeof product.stockRemaining === 'number' && product.stockRemaining <= 0 && (
+                <span className="catalog-card__soldout-badge">품절</span>
+              )}
+              {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
                 <span className="catalog-card__stock-badge">
                   {product.stockRemaining}개 남음
                 </span>
@@ -1560,6 +1575,7 @@ function HomeHero({
                 type="button"
                 className="catalog-card__cta"
                 onClick={() => onViewProduct(product.detail)}
+                disabled={typeof product.stockRemaining === 'number' && product.stockRemaining <= 0}
               >
                 <ShoppingBag size={16} />
                 바로 구매하기

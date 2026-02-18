@@ -761,6 +761,8 @@ function ProductDetailPage({
     return availableStock;
   }, [availableStock, optionStockTotal]);
 
+  const isSoldOut = typeof totalDisplayStock === 'number' && totalDisplayStock <= 0;
+
   const selectedOptionStock = useMemo(() => {
     const candidates = [];
     if (selectedSize) {
@@ -916,6 +918,10 @@ function ProductDetailPage({
       setAddError('사이즈를 선택해주세요.');
       return;
     }
+    if (isSoldOut) {
+      setAddError('현재 품절 중입니다. 문의하기를 통해 상품 요청을 해보세요.');
+      return;
+    }
     if (typeof maxAvailable === 'number' && maxAvailable > 0 && selectedQuantity > maxAvailable) {
       setAddError(`재고가 부족합니다. 남은 수량: ${maxAvailable}개`);
       return;
@@ -958,6 +964,10 @@ function ProductDetailPage({
 
     if (product?.sizes?.length && !selectedSize) {
       alert('사이즈를 선택해주세요.');
+      return;
+    }
+    if (isSoldOut) {
+      setAddError('현재 품절 중입니다. 문의하기를 통해 상품 요청을 해보세요.');
       return;
     }
     if (typeof maxAvailable === 'number' && maxAvailable > 0 && selectedQuantity > maxAvailable) {
@@ -1450,25 +1460,47 @@ function ProductDetailPage({
                   type="button"
                   className="product-info__cta-primary"
                   onClick={handleAddToCart}
-                  disabled={addStatus === 'loading' || (typeof maxAvailable === 'number' && maxAvailable <= 0)}
+                  disabled={addStatus === 'loading' || isSoldOut}
                   style={{ flex: 1, padding: '0.75rem 1rem' }}
                 >
                   <ShoppingBag size={18} />
-                  {addStatus === 'loading' ? '담는 중...' : '장바구니 담기'}
+                  {isSoldOut ? '품절' : addStatus === 'loading' ? '담는 중...' : '장바구니 담기'}
                 </button>
                 <button
                   type="button"
                   className="product-info__cta-secondary"
                   onClick={handleDirectOrder}
-                  style={{ flex: 1, padding: '0.75rem 1rem', backgroundColor: '#6366f1', color: '#fff' }}
+                  disabled={isSoldOut}
+                  style={{ flex: 1, padding: '0.75rem 1rem', backgroundColor: '#6366f1', color: '#fff', opacity: isSoldOut ? 0.6 : 1 }}
                 >
-                  바로구매 &gt;
+                  {isSoldOut ? '품절' : '바로구매 >'}
                 </button>
               </div>
               {(addError || addMessage) && (
                 <p className={`product-info__add-status ${addError ? 'is-error' : 'is-success'}`}>
                   {addError || addMessage}
                 </p>
+              )}
+              {isSoldOut && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDetailTab('inquiry');
+                      detailTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      padding: '0.65rem 1rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    문의하기
+                  </button>
+                </div>
               )}
 
               {/* 상품 상세 요약 정보 */}
