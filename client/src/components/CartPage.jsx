@@ -15,6 +15,53 @@ function normalizeSelectedOptions(options) {
   return {};
 }
 
+function normalizeOptionValue(value) {
+  return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function resolveOptionStock(product, selectedOptions = {}) {
+  if (!product) {
+    return null;
+  }
+  const sizeValue = normalizeOptionValue(selectedOptions.size || selectedOptions.Size);
+  const colorValue = normalizeOptionValue(selectedOptions.color || selectedOptions.Color);
+
+  const sizeOption = sizeValue
+    ? (product.sizes || []).find(
+        (size) => normalizeOptionValue(size.value) === sizeValue || normalizeOptionValue(size.label) === sizeValue
+      )
+    : null;
+  const colorOption = colorValue
+    ? (product.colors || []).find(
+        (color) => normalizeOptionValue(color.name) === colorValue
+      )
+    : null;
+
+  const optionStocks = [];
+  if (sizeOption && typeof sizeOption.stock === 'number') {
+    optionStocks.push(sizeOption.stock);
+  }
+  if (colorOption && typeof colorOption.stock === 'number') {
+    optionStocks.push(colorOption.stock);
+  }
+
+  const baseStock = typeof product.inventory?.stock === 'number' ? product.inventory.stock : null;
+  const baseReserved = typeof product.inventory?.reserved === 'number' ? product.inventory.reserved : 0;
+  const baseAvailable = baseStock === null ? null : Math.max(baseStock - baseReserved, 0);
+
+  const candidates = [];
+  if (baseAvailable !== null) {
+    candidates.push(baseAvailable);
+  }
+  optionStocks.forEach((stock) => candidates.push(stock));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return Math.min(...candidates);
+}
+
 function formatCurrency(value, currency = 'KRW') {
   return new Intl.NumberFormat('ko-KR', {
     style: 'currency',
@@ -158,6 +205,11 @@ function CartPage({
       setNotice({ type: 'error', message: '수량은 최소 1개 이상이어야 합니다.' });
       return;
     }
+    const maxAvailable = resolveOptionStock(currentItem.product, normalizeSelectedOptions(currentItem.selectedOptions));
+    if (typeof maxAvailable === 'number' && nextQuantity > maxAvailable) {
+      setNotice({ type: 'error', message: `재고가 부족합니다. 남은 수량: ${maxAvailable}개` });
+      return;
+    }
 
     setUpdatingItemId(productId);
     setNotice({ type: '', message: '' });
@@ -280,6 +332,12 @@ function CartPage({
                   const productPrice = item.priceSnapshot;
                   const hasDiscount =
                     item.product?.price && item.product.price > productPrice ? item.product.price : null;
+                  const normalizedOptions = normalizeSelectedOptions(item.selectedOptions);
+                  const maxAvailable = resolveOptionStock(item.product, normalizedOptions);
+                  const stockLabel = typeof maxAvailable === 'number'
+                    ? `재고 ${maxAvailable}개`
+                    : '재고 확인 불가';
+                  const isOutOfStock = typeof maxAvailable === 'number' && maxAvailable <= 0;
 
                   return (
                     <li key={productId} className="cart-item-card">
@@ -335,7 +393,11 @@ function CartPage({
                               <span>사이즈: {renderOption(item, 'size')}</span>
                               <span>컬러: {renderOption(item, 'color')}</span>
                               <span className="cart-item-card__stock">
-                                <span className="cart-item-card__stock-indicator" /> 재고 있음
+                                <span
+                                  className="cart-item-card__stock-indicator"
+                                  style={{ backgroundColor: isOutOfStock ? '#dc2626' : '#10b981' }}
+                                />
+                                {stockLabel}
                               </span>
                             </div>
 
@@ -353,7 +415,10 @@ function CartPage({
                                 <button
                                   type="button"
                                   onClick={() => handleQuantityChange(productId, 1)}
-                                  disabled={isUpdating}
+                                  disabled={
+                                    isUpdating ||
+                                    (typeof maxAvailable === 'number' && item.quantity >= maxAvailable)
+                                  }
                                   aria-label="수량 증가"
                                 >
                                   <Plus size={16} />

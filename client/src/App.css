@@ -2583,6 +2583,13 @@ body {
   line-height: 1.4;
 }
 
+.catalog-card__stock {
+  margin-bottom: clamp(0.25rem, 0.75vw, 0.5rem);
+  font-size: clamp(0.5625rem, 1.3125vw, 0.6875rem);
+  font-weight: 600;
+  color: #dc2626;
+}
+
 .catalog-card__rating {
   display: flex;
   align-items: center;

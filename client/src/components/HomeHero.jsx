@@ -120,6 +120,10 @@ function mapProductsToCatalog(products = []) {
     const rating = product.rating !== undefined ? product.rating : 0;
     const reviewCount = product.reviewCount !== undefined ? product.reviewCount : 0;
 
+    const stock = typeof product.inventory?.stock === 'number' ? product.inventory.stock : null;
+    const reserved = typeof product.inventory?.reserved === 'number' ? product.inventory.reserved : 0;
+    const availableStock = stock === null ? null : Math.max(stock - reserved, 0);
+
     return {
       id: product._id,
       name: product.name,
@@ -132,6 +136,7 @@ function mapProductsToCatalog(products = []) {
       image:
         product.image ||
         'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=900&q=80',
+      stockRemaining: availableStock,
       detail: {
         id: product._id,
         category: product.category || '상의',
@@ -1070,6 +1075,12 @@ function HomeHero({
                           </div>
                         )}
                         <h3 className="catalog-card__title">{product.name}</h3>
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
+                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
+                        )}
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
+                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
+                        )}
                         <div className="catalog-card__rating">
                           <Star size={16} fill="#111" strokeWidth={0} />
                           <span>
@@ -1147,6 +1158,9 @@ function HomeHero({
                           </div>
                         )}
                         <h3 className="catalog-card__title">{product.name}</h3>
+                        {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
+                          <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
+                        )}
                         <div className="catalog-card__rating">
                           <Star size={16} fill="#111" strokeWidth={0} />
                           <span>
@@ -1514,6 +1528,9 @@ function HomeHero({
                 </div>
               )}
               <h3 className="catalog-card__title">{product.name}</h3>
+              {typeof product.stockRemaining === 'number' && product.stockRemaining > 0 && product.stockRemaining <= 3 && (
+                <div className="catalog-card__stock">재고 {product.stockRemaining}개 남음</div>
+              )}
               <div className="catalog-card__rating">
                 <Star size={16} fill="#111" strokeWidth={0} />
                 <span>

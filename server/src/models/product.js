@@ -118,6 +118,7 @@ const productSchema = new Schema(
         name: { type: String, required: true, trim: true },
         value: { type: String, required: true, trim: true }, // hex color code
         image: { type: String, default: '', trim: true }, // optional color-specific image
+        stock: { type: Number, default: null, min: [0, '재고 수량은 음수가 될 수 없습니다.'] },
       }],
       default: [],
     },
@@ -126,6 +127,7 @@ const productSchema = new Schema(
         label: { type: String, required: true, trim: true }, // e.g., "XS (KR 90)"
         value: { type: String, required: true, trim: true }, // e.g., "XS"
         available: { type: Boolean, default: true },
+        stock: { type: Number, default: null, min: [0, '재고 수량은 음수가 될 수 없습니다.'] },
       }],
       default: [],
     },

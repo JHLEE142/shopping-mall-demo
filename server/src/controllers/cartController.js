@@ -1,6 +1,50 @@
 const Cart = require('../models/cart');
 const Product = require('../models/product');
 
+function normalizeOptionValue(value) {
+  return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function resolveOptionStock(product, selectedOptions = {}) {
+  const sizeValue = normalizeOptionValue(selectedOptions.size || selectedOptions.Size);
+  const colorValue = normalizeOptionValue(selectedOptions.color || selectedOptions.Color);
+
+  const sizeOption = sizeValue
+    ? (product.sizes || []).find(
+        (size) => normalizeOptionValue(size.value) === sizeValue || normalizeOptionValue(size.label) === sizeValue
+      )
+    : null;
+  const colorOption = colorValue
+    ? (product.colors || []).find(
+        (color) => normalizeOptionValue(color.name) === colorValue
+      )
+    : null;
+
+  const optionStocks = [];
+  if (sizeOption && typeof sizeOption.stock === 'number') {
+    optionStocks.push(sizeOption.stock);
+  }
+  if (colorOption && typeof colorOption.stock === 'number') {
+    optionStocks.push(colorOption.stock);
+  }
+
+  const baseStock = typeof product.inventory?.stock === 'number' ? product.inventory.stock : null;
+  const baseReserved = typeof product.inventory?.reserved === 'number' ? product.inventory.reserved : 0;
+  const baseAvailable = baseStock === null ? null : Math.max(baseStock - baseReserved, 0);
+
+  const candidates = [];
+  if (baseAvailable !== null) {
+    candidates.push(baseAvailable);
+  }
+  optionStocks.forEach((stock) => candidates.push(stock));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return Math.min(...candidates);
+}
+
 // 회원/비회원 장바구니 조회 헬퍼 함수
 async function getOrCreateCart(req) {
   let cart;
@@ -67,7 +111,7 @@ async function getOrCreateCart(req) {
 async function getActiveCart(userId) {
   return Cart.findOne({ user: userId, status: 'active' }).populate({
     path: 'items.product',
-    select: 'name price image sku',
+    select: 'name price image sku inventory sizes colors',
     // 삭제된 상품도 null로 유지 (제거하지 않음)
     match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
   });
@@ -87,7 +131,7 @@ exports.getCart = async (req, res) => {
         }));
         cart = await cart.populate({
           path: 'items.product',
-          select: 'name price image sku',
+          select: 'name price image sku inventory sizes colors',
           // 삭제된 상품도 null로 유지 (제거하지 않음)
           match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
         });
@@ -101,7 +145,7 @@ exports.getCart = async (req, res) => {
         }));
         cart = await cart.populate({
           path: 'items.product',
-          select: 'name price image sku',
+          select: 'name price image sku inventory sizes colors',
           // 삭제된 상품도 null로 유지 (제거하지 않음)
           match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
         });
@@ -196,6 +240,14 @@ exports.addCartItem = async (req, res) => {
       return productMatch && optionsMatch;
     });
 
+    const maxAvailable = resolveOptionStock(product, selectedOptions);
+    const nextQuantity = (existingItem ? existingItem.quantity : 0) + quantity;
+    if (typeof maxAvailable === 'number' && nextQuantity > maxAvailable) {
+      return res.status(400).json({
+        message: `재고가 부족합니다. 남은 수량: ${maxAvailable}개`,
+      });
+    }
+
     if (existingItem) {
       existingItem.quantity += quantity;
       existingItem.priceSnapshot = product.priceSale || product.price;
@@ -228,7 +280,7 @@ exports.addCartItem = async (req, res) => {
 
     const populatedCart = await cart.populate({
       path: 'items.product',
-      select: 'name price image sku',
+      select: 'name price image sku inventory sizes colors',
       // 삭제된 상품도 null로 유지 (제거하지 않음)
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });
@@ -268,6 +320,14 @@ exports.updateCartItem = async (req, res) => {
       if (quantity < 1) {
         return res.status(400).json({ message: '수량은 1 이상이어야 합니다.' });
       }
+      const product = await Product.findById(item.product);
+      const optionSnapshot = selectedOptions !== undefined ? selectedOptions : item.selectedOptions;
+      const maxAvailable = product ? resolveOptionStock(product, optionSnapshot) : null;
+      if (typeof maxAvailable === 'number' && quantity > maxAvailable) {
+        return res.status(400).json({
+          message: `재고가 부족합니다. 남은 수량: ${maxAvailable}개`,
+        });
+      }
       item.quantity = quantity;
     }
 
@@ -294,7 +354,7 @@ exports.updateCartItem = async (req, res) => {
 
     const populatedCart = await cart.populate({
       path: 'items.product',
-      select: 'name price image sku',
+      select: 'name price image sku inventory sizes colors',
       // 삭제된 상품도 null로 유지 (제거하지 않음)
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });
@@ -349,7 +409,10 @@ exports.removeCartItem = async (req, res) => {
 
     const populatedCart = await cart.populate({
       path: 'items.product',
-      select: 'name price image sku',
+      select: 'name price image sku inventory sizes colors',
+    const populatedCart = await cart.populate({
+      path: 'items.product',
+      select: 'name price image sku inventory sizes colors',
       // 삭제된 상품도 null로 유지 (제거하지 않음)
       match: { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }
     });

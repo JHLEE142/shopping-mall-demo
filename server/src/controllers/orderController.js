@@ -240,8 +240,8 @@ async function generateUniqueOrderNumber() {
     }
   }
   
-  // 5자리 연번으로 포맷팅
-  const sequencePart = sequenceNumber.toString().padStart(5, '0');
+  // 7자리 연번으로 포맷팅
+  const sequencePart = sequenceNumber.toString().padStart(7, '0');
   const uniqueNumber = `#${datePart}-${sequencePart}`;
   
   // 중복 확인 (혹시 모를 경우를 대비)
@@ -249,7 +249,7 @@ async function generateUniqueOrderNumber() {
   if (exists) {
     // 중복이 발생하면 연번을 증가시켜 재시도
     sequenceNumber++;
-    const sequencePartRetry = sequenceNumber.toString().padStart(5, '0');
+    const sequencePartRetry = sequenceNumber.toString().padStart(7, '0');
     return `#${datePart}-${sequencePartRetry}`;
   }
   

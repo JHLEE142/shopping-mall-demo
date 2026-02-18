@@ -243,6 +243,7 @@ function buildProductData(source) {
     },
     materials: base.materials, // 기본값 유지 (데이터베이스에 없음)
     care: base.care, // 기본값 유지 (데이터베이스에 없음)
+    inventory: source.inventory || null,
   };
 }
 
@@ -277,7 +278,7 @@ function ProductDetailPage({
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState('');
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [quantityOptions] = useState([1, 2, 4, 6]); // 수량 옵션
+  const baseQuantityOptions = useRef([1, 2, 4, 6]);
   const [activeDetailTab, setActiveDetailTab] = useState('detail'); // 'detail', 'reviews', 'inquiry', 'shipping'
   const [showMoreRequiredInfo, setShowMoreRequiredInfo] = useState(false);
   const [showOptionModal, setShowOptionModal] = useState(false);
@@ -728,15 +729,90 @@ function ProductDetailPage({
     return `${formatter.format(product.price)}원`;
   }, [product.price, product.priceSale, product.originalPrice]);
 
+  const availableStock = useMemo(() => {
+    const stock = typeof product.inventory?.stock === 'number' ? product.inventory.stock : null;
+    const reserved = typeof product.inventory?.reserved === 'number' ? product.inventory.reserved : 0;
+    if (stock === null) {
+      return null;
+    }
+    return Math.max(stock - reserved, 0);
+  }, [product.inventory?.stock, product.inventory?.reserved]);
+
+  const selectedOptionStock = useMemo(() => {
+    const candidates = [];
+    if (selectedSize) {
+      const sizeOption = product.sizes?.find((size) => size.value === selectedSize || size.label === selectedSize);
+      if (sizeOption && typeof sizeOption.stock === 'number') {
+        candidates.push(sizeOption.stock);
+      }
+    }
+    if (selectedColor?.name) {
+      const colorOption = product.colors?.find((color) => color.name === selectedColor.name);
+      if (colorOption && typeof colorOption.stock === 'number') {
+        candidates.push(colorOption.stock);
+      }
+    }
+    if (candidates.length === 0) {
+      return null;
+    }
+    return Math.min(...candidates);
+  }, [product.colors, product.sizes, selectedColor?.name, selectedSize]);
+
+  const maxAvailable = useMemo(() => {
+    const candidates = [];
+    if (typeof availableStock === 'number') {
+      candidates.push(availableStock);
+    }
+    if (typeof selectedOptionStock === 'number') {
+      candidates.push(selectedOptionStock);
+    }
+    if (candidates.length === 0) {
+      return null;
+    }
+    return Math.min(...candidates);
+  }, [availableStock, selectedOptionStock]);
+
+  const selectedColorStock = useMemo(() => {
+    if (!selectedColor?.name) {
+      return null;
+    }
+    const colorOption = product.colors?.find((color) => color.name === selectedColor.name);
+    if (!colorOption || typeof colorOption.stock !== 'number') {
+      return null;
+    }
+    return colorOption.stock;
+  }, [product.colors, selectedColor?.name]);
+
+  const selectedSizeStock = useMemo(() => {
+    if (!selectedSize) {
+      return null;
+    }
+    const sizeOption = product.sizes?.find((size) => size.value === selectedSize || size.label === selectedSize);
+    if (!sizeOption || typeof sizeOption.stock !== 'number') {
+      return null;
+    }
+    return sizeOption.stock;
+  }, [product.sizes, selectedSize]);
+
+  const quantityOptions = useMemo(() => {
+    if (typeof maxAvailable !== 'number') {
+      return baseQuantityOptions.current;
+    }
+    if (maxAvailable <= 0) {
+      return [1];
+    }
+    return baseQuantityOptions.current.filter((qty) => qty <= maxAvailable);
+  }, [maxAvailable]);
+
   // 수량별 가격 계산
   const quantityPrices = useMemo(() => {
     const basePrice = product.priceSale || product.price;
     const originalPrice = product.originalPrice || null;
-    
+
     return quantityOptions.map((qty) => {
       const totalPrice = basePrice * qty;
       const originalTotalPrice = originalPrice ? originalPrice * qty : null;
-      
+
       // 절약 금액 계산: (원래 가격 - 할인된 가격) * 수량
       // originalPrice가 있으면 정확한 절약 금액 계산
       let savings = 0;
@@ -744,10 +820,10 @@ function ProductDetailPage({
         const perUnitSavings = originalPrice - basePrice;
         savings = Math.round(perUnitSavings * qty);
       }
-      
+
       const discount = originalTotalPrice ? originalTotalPrice - totalPrice : 0;
       const discountPerUnit = qty > 1 && originalTotalPrice ? Math.floor(discount / qty) : 0;
-      
+
       return {
         quantity: qty,
         price: totalPrice,
@@ -760,9 +836,28 @@ function ProductDetailPage({
     });
   }, [product.priceSale, product.price, product.originalPrice, quantityOptions]);
 
+  useEffect(() => {
+    if (typeof maxAvailable !== 'number') {
+      return;
+    }
+    if (maxAvailable <= 0) {
+      setSelectedQuantity(1);
+      return;
+    }
+    setSelectedQuantity((prev) => Math.min(Math.max(1, prev), maxAvailable));
+  }, [maxAvailable]);
+
   // 선택된 수량의 가격 정보
   const selectedQuantityPrice = useMemo(() => {
-    return quantityPrices.find(qp => qp.quantity === selectedQuantity) || quantityPrices[0];
+    return quantityPrices.find(qp => qp.quantity === selectedQuantity) || quantityPrices[0] || {
+      quantity: selectedQuantity,
+      price: 0,
+      originalPrice: null,
+      discount: 0,
+      discountPerUnit: 0,
+      savings: 0,
+      pricePerUnit: 0,
+    };
   }, [quantityPrices, selectedQuantity]);
 
   // 총 할인율 계산 (discountRate가 있으면 우선 사용, 없으면 기존 로직)
@@ -796,6 +891,14 @@ function ProductDetailPage({
 
     if (product?.sizes?.length && !selectedSize) {
       setAddError('사이즈를 선택해주세요.');
+      return;
+    }
+    if (typeof maxAvailable === 'number' && maxAvailable > 0 && selectedQuantity > maxAvailable) {
+      setAddError(`재고가 부족합니다. 남은 수량: ${maxAvailable}개`);
+      return;
+    }
+    if (typeof maxAvailable === 'number' && maxAvailable <= 0) {
+      setAddError('현재 재고가 없습니다.');
       return;
     }
 
@@ -832,6 +935,14 @@ function ProductDetailPage({
 
     if (product?.sizes?.length && !selectedSize) {
       alert('사이즈를 선택해주세요.');
+      return;
+    }
+    if (typeof maxAvailable === 'number' && maxAvailable > 0 && selectedQuantity > maxAvailable) {
+      alert(`재고가 부족합니다. 남은 수량: ${maxAvailable}개`);
+      return;
+    }
+    if (typeof maxAvailable === 'number' && maxAvailable <= 0) {
+      alert('현재 재고가 없습니다.');
       return;
     }
 
@@ -1041,6 +1152,11 @@ function ProductDetailPage({
                   (1개당 {new Intl.NumberFormat('ko-KR').format(product.priceSale || product.price)}원)
                 </span>
               </div>
+              {typeof availableStock === 'number' && availableStock <= 3 && (
+                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontWeight: 600, fontSize: '0.95rem' }}>
+                  재고 {availableStock}개 남음
+                </div>
+              )}
 
               {/* 수량 선택 옵션 */}
               <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
@@ -1122,15 +1238,27 @@ function ProductDetailPage({
                     <p>
                       컬러: <strong>{selectedColor?.name || product.colors[0]?.name}</strong>
                     </p>
+                    {typeof selectedColorStock === 'number' && (
+                      <span style={{ fontSize: '0.85rem', color: selectedColorStock <= 3 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                        재고 {selectedColorStock}개
+                      </span>
+                    )}
                   </div>
                   <div className="product-info__color-swatches">
                     {product.colors.map((color) => (
+                      (() => {
+                        const isOutOfStock = typeof color.stock === 'number' && color.stock <= 0;
+                        return (
                       <button
                         type="button"
                         key={color.name}
                         className={`product-info__color ${selectedColor?.name === color.name ? 'is-active' : ''}`}
-                        style={{ backgroundColor: color.value }}
+                        style={{ backgroundColor: color.value, opacity: isOutOfStock ? 0.4 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer' }}
+                        disabled={isOutOfStock}
                         onClick={() => {
+                          if (isOutOfStock) {
+                            return;
+                          }
                           setSelectedColor(color);
                           if (color.image) {
                             const galleryIndex = product.gallery.findIndex((image) => image === color.image);
@@ -1141,6 +1269,8 @@ function ProductDetailPage({
                         }}
                         aria-label={`${color.name} 컬러`}
                       />
+                        );
+                      })()
                     ))}
                   </div>
                 </div>
@@ -1150,18 +1280,34 @@ function ProductDetailPage({
                 <div className="product-info__sizes">
                   <div className="product-info__sizes-header">
                     <p>옵션을 선택하세요</p>
+                    {typeof selectedSizeStock === 'number' && (
+                      <span style={{ fontSize: '0.85rem', color: selectedSizeStock <= 3 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                        재고 {selectedSizeStock}개
+                      </span>
+                    )}
                   </div>
                   <div className="product-info__size-grid">
                     {product.sizes.map((size) => (
+                      (() => {
+                        const isOutOfStock = typeof size.stock === 'number' && size.stock <= 0;
+                        const isDisabled = size.available === false || isOutOfStock;
+                        return (
                       <button
                         key={size.value}
                         type="button"
                         className={`product-info__size ${selectedSize === size.value ? 'is-active' : ''}`}
-                        disabled={!size.available}
+                        disabled={isDisabled}
                         onClick={() => setSelectedSize(size.value)}
                       >
                         {size.label}
+                        {typeof size.stock === 'number' && (
+                          <span style={{ marginLeft: '0.35rem', fontSize: '0.75rem', color: size.stock <= 3 ? '#dc2626' : '#6b7280' }}>
+                            ({size.stock}개)
+                          </span>
+                        )}
                       </button>
+                        );
+                      })()
                     ))}
                   </div>
                 </div>
@@ -1238,10 +1384,14 @@ function ProductDetailPage({
                   <input
                     type="number"
                     min="1"
+                    max={typeof maxAvailable === 'number' && maxAvailable > 0 ? maxAvailable : undefined}
                     value={selectedQuantity}
                     onChange={(e) => {
                       const value = parseInt(e.target.value) || 1;
-                      setSelectedQuantity(Math.max(1, value));
+                      const capped = typeof maxAvailable === 'number' && maxAvailable > 0
+                        ? Math.min(value, maxAvailable)
+                        : value;
+                      setSelectedQuantity(Math.max(1, capped));
                     }}
                     style={{
                       width: '60px',
@@ -1253,7 +1403,15 @@ function ProductDetailPage({
                   />
                   <button
                     type="button"
-                    onClick={() => setSelectedQuantity(selectedQuantity + 1)}
+                    onClick={() => {
+                      const next = selectedQuantity + 1;
+                      if (typeof maxAvailable === 'number' && maxAvailable > 0) {
+                        setSelectedQuantity(Math.min(next, maxAvailable));
+                      } else {
+                        setSelectedQuantity(next);
+                      }
+                    }}
+                    disabled={typeof maxAvailable === 'number' && maxAvailable > 0 ? selectedQuantity >= maxAvailable : false}
                     style={{
                       padding: '0.5rem 0.75rem',
                       border: 'none',
@@ -1269,7 +1427,7 @@ function ProductDetailPage({
                   type="button"
                   className="product-info__cta-primary"
                   onClick={handleAddToCart}
-                  disabled={addStatus === 'loading'}
+                  disabled={addStatus === 'loading' || (typeof maxAvailable === 'number' && maxAvailable <= 0)}
                   style={{ flex: 1, padding: '0.75rem 1rem' }}
                 >
                   <ShoppingBag size={18} />

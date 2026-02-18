@@ -66,6 +66,17 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
   const [excelFileName, setExcelFileName] = useState(null);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [duplicateSkus, setDuplicateSkus] = useState(new Set()); // 중복된 SKU 집합
+
+  const normalizeOptionStock = (value) => {
+    if (value === '' || value === null || value === undefined) {
+      return null;
+    }
+    const parsed = Number(value);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      return null;
+    }
+    return parsed;
+  };
   
   // 배치 자동 실행 관련 상태
   const [batchProcessing, setBatchProcessing] = useState(false);
@@ -799,8 +810,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
         ...(mainImage && mainImage.trim() !== '' ? { image: mainImage.trim() } : {}),
         images: productImages,
         description: formData.description?.trim() || '',
-        colors: formData.colors.filter(c => c.name && c.value),
-        sizes: formData.sizes.filter(s => s.label && s.value),
+        colors: formData.colors
+          .filter((c) => c.name && c.value)
+          .map((c) => ({
+            ...c,
+            stock: normalizeOptionStock(c.stock),
+          })),
+        sizes: formData.sizes
+          .filter((s) => s.label && s.value)
+          .map((s) => ({
+            ...s,
+            stock: normalizeOptionStock(s.stock),
+          })),
         stockManagement: formData.stockManagement,
         totalStock: formData.stockManagement === 'track' ? Number(formData.totalStock) : undefined,
         status: formData.status,
@@ -2491,6 +2512,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                           }}
                           style={{ flex: 1, padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
                         />
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="재고 (선택)"
+                          value={color.stock ?? ''}
+                          onChange={(e) => {
+                            const newColors = [...formData.colors];
+                            newColors[index] = { ...newColors[index], stock: e.target.value };
+                            setFormData((prev) => ({ ...prev, colors: newColors }));
+                          }}
+                          style={{ width: '120px', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
                         <button
                           type="button"
                           onClick={() => {
@@ -2515,7 +2548,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       onClick={() => {
                         setFormData((prev) => ({
                           ...prev,
-                          colors: [...prev.colors, { name: '', value: '#000000', image: '' }],
+                          colors: [...prev.colors, { name: '', value: '#000000', image: '', stock: '' }],
                         }));
                       }}
                       style={{
@@ -2571,6 +2604,18 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                           />
                           <span style={{ fontSize: '0.875rem' }}>재고 있음</span>
             </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="재고 (선택)"
+                          value={size.stock ?? ''}
+                          onChange={(e) => {
+                            const newSizes = [...formData.sizes];
+                            newSizes[index] = { ...newSizes[index], stock: e.target.value };
+                            setFormData((prev) => ({ ...prev, sizes: newSizes }));
+                          }}
+                          style={{ width: '120px', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                        />
                         <button
                           type="button"
                           onClick={() => {
@@ -2595,7 +2640,7 @@ function ProductCreatePage({ onBack, product = null, onSubmitSuccess = () => {} 
                       onClick={() => {
                         setFormData((prev) => ({
                           ...prev,
-                          sizes: [...prev.sizes, { label: '', value: '', available: true }],
+                          sizes: [...prev.sizes, { label: '', value: '', available: true, stock: '' }],
                         }));
                       }}
                       style={{
