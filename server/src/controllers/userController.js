@@ -400,6 +400,14 @@ function getCurrentUser(req, res) {
   res.json({ user: sanitizeUser(req.user) });
 }
 
+function getAuthStatus(req, res) {
+  const user = req.user ? sanitizeUser(req.user) : null;
+  res.json({
+    loggedIn: Boolean(user),
+    user,
+  });
+}
+
 function logoutUser(req, res) {
   res.status(200).json({ message: '로그아웃되었습니다.' });
 }
@@ -413,6 +421,7 @@ module.exports = {
   loginUser,
   googleLogin,
   getCurrentUser,
+  getAuthStatus,
   logoutUser,
 };
 

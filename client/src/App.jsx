@@ -8,7 +8,7 @@ import MainNavbar from './components/MainNavbar';
 import SiteFooter from './components/SiteFooter';
 import ProductCreatePage from './components/ProductCreatePage';
 import { loadSession, clearSession, saveSession, updateActivityTime, getRemainingTime, getTrustedDevice, clearTrustedDevice } from './utils/sessionStorage';
-import { fetchCurrentSession, logout as requestLogout } from './services/authService';
+import { fetchCurrentSession, logout as requestLogout, warmupAuthStatus } from './services/authService';
 import { autoLogin } from './services/trustedDeviceService';
 import { fetchCart } from './services/cartService';
 import ProductDetailPage from './components/ProductDetailPage';
@@ -165,6 +165,7 @@ function App() {
   const [homeRestoreState, setHomeRestoreState] = useState(null);
   const [pendingHomeRestore, setPendingHomeRestore] = useState(false);
   const lastHomeStateRef = useRef(null);
+  const homeWarmupTriggeredRef = useRef(false);
   const isLoggedIn = Boolean(session?.user);
   const handleCartUpdate = (nextCount) => {
     setCartCount(Math.max(0, Number(nextCount) || 0));
@@ -532,6 +533,17 @@ function App() {
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
   }, [view, pendingHomeRestore, homeRestoreState]);
+
+  // 홈 접속 시 서버/DB 콜드스타트 완화용 auth/status 워밍업
+  useEffect(() => {
+    if (view !== 'home' || homeWarmupTriggeredRef.current) {
+      return;
+    }
+    homeWarmupTriggeredRef.current = true;
+    warmupAuthStatus().catch((error) => {
+      console.warn('[warmupAuthStatus] failed:', error);
+    });
+  }, [view]);
 
   useEffect(() => {
     if (view === 'home' && pendingHomeRestore) {

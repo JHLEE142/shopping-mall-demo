@@ -2,6 +2,7 @@ const { Router } = require('express');
 const userRouter = require('./users');
 const productRouter = require('./products');
 const authenticate = require('../middleware/authMiddleware');
+const { optionalAuth } = require('../middleware/authMiddleware');
 const cartRouter = require('./carts');
 const orderRouter = require('./orders');
 const categoryRouter = require('./categories');
@@ -26,7 +27,7 @@ const recentlyViewedProductRouter = require('./recentlyViewedProducts');
 const passwordResetRouter = require('./passwordResets');
 const newsletterRouter = require('./newsletters');
 const tossPaymentsRouter = require('./tossPayments');
-const { getCurrentUser, logoutUser } = require('../controllers/userController');
+const { getCurrentUser, getAuthStatus, logoutUser } = require('../controllers/userController');
 
 const router = Router();
 
@@ -82,6 +83,7 @@ router.use('/toss-payments', tossPaymentsRouter);
 const aiRouter = require('./ai');
 router.use('/ai', aiRouter);
 router.get('/auth/session', authenticate, getCurrentUser);
+router.get('/auth/status', optionalAuth, getAuthStatus);
 router.post('/auth/logout', authenticate, logoutUser);
 
 module.exports = router;

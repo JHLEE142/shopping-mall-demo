@@ -101,4 +101,17 @@ export async function logout() {
   clearSession();
 }
 
+export async function warmupAuthStatus() {
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/auth/status`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  }).catch(() => null);
+
+  if (!response || !response.ok) {
+    return null;
+  }
+
+  return response.json().catch(() => null);
+}
+
 
