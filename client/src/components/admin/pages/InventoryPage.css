@@ -25,7 +25,7 @@
 
 .admin-table--inventory .admin-table__header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr 1fr 80px;
+  grid-template-columns: 48px 3fr 1.1fr 1.3fr 1fr 1fr 1fr 120px;
   padding: 1rem;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
@@ -36,7 +36,7 @@
 
 .admin-table--inventory .admin-table__row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr 1fr 80px;
+  grid-template-columns: 48px 3fr 1.1fr 1.3fr 1fr 1fr 1fr 120px;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
   align-items: center;
@@ -185,6 +185,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .admin-button--edit {

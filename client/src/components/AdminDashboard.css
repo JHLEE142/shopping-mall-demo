@@ -2,6 +2,15 @@
   display: flex;
   min-height: 100vh;
   background: #f9fafb;
+  zoom: 0.75;
+}
+
+@supports not (zoom: 1) {
+  .admin-layout {
+    transform: scale(0.75);
+    transform-origin: top left;
+    width: calc(100% / 0.75);
+  }
 }
 
 .admin-main {
