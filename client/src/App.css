@@ -998,10 +998,38 @@ body {
     gap: 1rem;
   }
 
+  .nav-link-button,
+  .nav-link-dropdown {
+    width: 100%;
+    text-align: left;
+  }
+
+  .nav-link-button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+  }
+
+  .nav-link-button--dropdown {
+    justify-content: space-between;
+  }
+
   .nav-actions {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 1rem;
+  }
+
+  .nav-actions > * {
+    width: 100%;
+  }
+
+  .nav-cta,
+  .nav-user__button,
+  .nav-points {
+    justify-content: space-between;
   }
 
   .nav-toggle {
